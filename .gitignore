@@ -1,0 +1,82 @@
+# ============================================================
+#  ROOT .gitignore — covers both backend/ and frontend/
+# ============================================================
+
+# ── Dependencies ────────────────────────────────────────────
+node_modules/
+**/node_modules/
+
+# ── Build / dist output ─────────────────────────────────────
+build/
+dist/
+**/build/
+**/dist/
+
+# ── Environment & secrets ───────────────────────────────────
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+!frontend/.env
+backend/.env
+
+# ── Logs ────────────────────────────────────────────────────
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+logs/
+**/logs/
+
+# ── OS generated files ──────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Editor / IDE ────────────────────────────────────────────
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# ── Test / coverage ─────────────────────────────────────────
+coverage/
+**/coverage/
+.nyc_output/
+
+# ============================================================
+#  BACKEND  (Node.js / Express)
+# ============================================================
+
+# Uploaded / user-generated images stored locally
+# Local path: C:\Rohan\Skyrack Ai\User\backend\backend\public
+backend/backend/public/
+
+# Firebase service-account key (never commit credentials)
+backend/backend/keys/
+
+# Compiled / cached files
+backend/.cache/
+
+# ============================================================
+#  FRONTEND  (React + Vite)
+# ============================================================
+
+# Vite cache
+frontend/.vite/
+frontend/.cache/
+
+# TypeScript build info
+*.tsbuildinfo
+frontend/tsconfig.tsbuildinfo
+
+# Static asset dist
+frontend/dist/
+djfja
+frontend/.env

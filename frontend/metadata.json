@@ -1,0 +1,6 @@
+{
+  "name": "WorkSphere",
+  "description": "Premium enterprise workforce management platform featuring OTP logins, role-based access control, modular permission checkers, stock management, notifications, and activity tracking.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
