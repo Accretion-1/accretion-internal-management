@@ -61,7 +61,7 @@ export const Modal: React.FC<ModalProps> = ({
             className={`w-full ${maxWidthClass} bg-white rounded-2xl border border-slate-200 shadow-2xl flex flex-col overflow-hidden max-h-[90vh]`}
           >
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100">
+            <div className="flex items-center justify-between px-4 sm:px-6 py-4 sm:py-5 border-b border-slate-100">
               <h3 className="font-display text-lg font-semibold text-slate-900">
                 {title}
               </h3>
@@ -75,13 +75,13 @@ export const Modal: React.FC<ModalProps> = ({
             </div>
 
             {/* Body */}
-            <div className="px-6 py-6 overflow-y-auto flex-1 text-slate-700 text-sm leading-relaxed">
+            <div className="px-4 sm:px-6 py-4 sm:py-6 overflow-y-auto flex-1 text-slate-700 text-sm leading-relaxed">
               {children}
             </div>
 
             {/* Footer */}
             {footerButtons && footerButtons.length > 0 && (
-              <div className="flex items-center justify-end gap-3 px-6 py-4 bg-slate-50 border-t border-slate-100 shrink-0">
+              <div className="flex items-center justify-end gap-3 px-4 sm:px-6 py-4 bg-slate-50 border-t border-slate-100 shrink-0 flex-wrap">
                 {footerButtons.map((btn, idx) => (
                   <button
                     key={idx}

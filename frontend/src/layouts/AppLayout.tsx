@@ -226,7 +226,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ activeTab, setActiveTab, c
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
         
         {/* TOP SHELL HEADER: Height 72px */}
-        <header className="h-[72px] bg-white border-b border-slate-200 px-6 flex items-center justify-between shrink-0 relative z-20">
+        <header className="h-[72px] bg-white border-b border-slate-200 px-4 sm:px-6 flex items-center justify-between shrink-0 relative z-20">
           
           <div className="flex items-center gap-3">
             {/* Mobile Sidebar open trigger */}
@@ -278,7 +278,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ activeTab, setActiveTab, c
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       exit={{ opacity: 0, y: 10, scale: 0.95 }}
                       transition={{ duration: 0.15 }}
-                      className="absolute right-0 top-12 bg-white border border-slate-200 rounded-3xl shadow-2xl p-5 w-80 sm:w-96 z-40 text-left flex flex-col gap-4"
+                      className="absolute -right-2 sm:right-0 top-12 bg-white border border-slate-200 rounded-3xl shadow-2xl p-5 w-[calc(100vw-2rem)] sm:w-96 max-w-[384px] z-40 text-left flex flex-col gap-4"
                     >
                       <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                         <div className="flex items-center gap-2">
@@ -352,7 +352,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ activeTab, setActiveTab, c
         </header>
 
         {/* WORKSPACE APP MAIN CLIENT AREA */}
-        <main className="flex-1 overflow-y-auto p-6 md:p-8 relative">
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8 relative">
           
           <AnimatePresence mode="wait">
             {isTabAllowed ? (

@@ -45,12 +45,12 @@ export const DashboardPage: React.FC = () => {
             <h2 className="font-display text-2xl font-bold text-slate-900 tracking-tight">
               Welcome back, {currentUser.name}!
             </h2>
-            <p className="text-xs text-slate-500 mt-1 flex items-center gap-2">
+            <p className="text-xs text-slate-500 mt-1 flex flex-wrap items-center gap-2">
               <span className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-blue-50 text-blue-700 font-semibold rounded-lg text-[10px] border border-blue-100">
                 <Shield className="w-3 h-3" /> {currentUser.role} Account
               </span>
               <span>Department: <strong className="text-slate-700 font-medium">{currentUser.department}</strong></span>
-              <span>•</span>
+              <span className="hidden sm:inline">•</span>
               <span>Last login: <span className="font-mono text-[11px]">{currentUser.lastLogin}</span></span>
             </p>
           </div>
@@ -227,11 +227,11 @@ export const DashboardPage: React.FC = () => {
               </div>
 
               {/* X Axis Timestamps Labels */}
-              <div className="flex justify-between items-center px-4 font-mono text-[11px] text-slate-400 border-t border-slate-150 pt-3">
-                <span>Jan 2026 (1 Seat)</span>
-                <span>Mar (3 Seats)</span>
-                <span>May (5 Seats)</span>
-                <span>Jun 2026 (Live: {totalEmployees} Seats)</span>
+              <div className="flex justify-between items-center px-2 sm:px-4 font-mono text-[9px] sm:text-[11px] text-slate-400 border-t border-slate-150 pt-3">
+                <span>Jan '26</span>
+                <span className="hidden sm:block">Mar (3 Seats)</span>
+                <span className="hidden sm:block">May (5 Seats)</span>
+                <span>Jun '26 ({totalEmployees} Seats)</span>
               </div>
             </div>
 
@@ -423,12 +423,12 @@ export const DashboardPage: React.FC = () => {
               
               <div className="flex flex-col gap-4 mt-2">
                 {stocks.slice(0, 3).map((item) => (
-                  <div key={item.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-200/40 flex items-center justify-between">
+                  <div key={item.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-200/40 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4">
                     <div>
                       <p className="text-xs font-bold text-slate-800">{item.name}</p>
                       <p className="text-[10px] text-slate-400 mt-0.5">Asset Code: {item.sku} • Warehouse: {item.warehouse}</p>
                     </div>
-                    <div className="text-right">
+                    <div className="text-left sm:text-right mt-2 sm:mt-0">
                       <p className="text-xs font-semibold text-slate-800">{item.quantity} {item.unit} available</p>
                       <span className={`text-[9px] px-1.5 py-0.5 rounded font-semibold mt-1 inline-block ${
                         item.quantity <= item.minThreshold ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-600'
@@ -540,7 +540,7 @@ export const DashboardPage: React.FC = () => {
               <div className="flex flex-col gap-3 mt-2">
                 {userAssignedReminders.length > 0 ? (
                   userAssignedReminders.map((rem) => (
-                    <div key={rem.id} className="p-4 bg-slate-55 rounded-2xl border border-slate-200/40 flex items-center justify-between gap-4">
+                    <div key={rem.id} className="p-4 bg-slate-55 rounded-2xl border border-slate-200/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
                       <div>
                         <span className={`text-[9px] uppercase px-1.5 py-0.5 rounded font-black font-mono tracking-wider ${
                           rem.priority === 'Critical' || rem.priority === 'High' ? 'bg-rose-50 text-rose-600' : 'bg-slate-100 text-slate-600'
@@ -550,7 +550,7 @@ export const DashboardPage: React.FC = () => {
                         <h5 className="text-xs font-bold text-slate-800 mt-1.5">{rem.title}</h5>
                         <p className="text-[11px] text-slate-500 mt-0.5 leading-normal">{rem.description}</p>
                       </div>
-                      <span className="text-[10px] font-mono font-bold text-slate-400 shrink-0">Due: {rem.date}</span>
+                      <span className="text-[10px] font-mono font-bold text-slate-400 shrink-0 self-start sm:self-auto">Due: {rem.date}</span>
                     </div>
                   ))
                 ) : (

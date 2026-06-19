@@ -126,8 +126,8 @@ export const ReminderPage: React.FC = () => {
       </div>
 
       {/* Main tab headers rows */}
-      <div className="flex justify-between items-center border-b border-slate-200">
-        <div className="flex gap-4 p-1">
+      <div className="flex justify-between items-center border-b border-slate-200 overflow-x-auto hide-scrollbar">
+        <div className="flex gap-4 p-1 whitespace-nowrap">
           {(['Active', 'Snoozed', 'Completed', 'All'] as const).map((tab) => (
             <button
               key={tab}

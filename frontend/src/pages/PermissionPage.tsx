@@ -86,7 +86,7 @@ export const PermissionPage: React.FC = () => {
 
       {/* Role Selection Tabs */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-2">
-        <div className="flex border border-slate-200 bg-slate-50 p-1.5 rounded-2xl w-fit">
+        <div className="flex overflow-x-auto whitespace-nowrap border border-slate-200 bg-slate-50 p-1.5 rounded-2xl w-full sm:w-fit hide-scrollbar">
           {(['Admin', 'Manager', 'User'] as UserRole[]).map((role) => (
             <button
               key={role}
