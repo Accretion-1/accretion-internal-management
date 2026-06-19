@@ -10,24 +10,13 @@ export interface User {
   phone: string;
   email: string;
   role: UserRole;
-  department: string;
   status: 'Active' | 'Inactive';
   assignedModules: string[];
   createdDate: string;
   lastLogin: string;
 }
 
-export type PermissionAction = 'View' | 'Create' | 'Edit' | 'Delete' | 'Export' | 'Approve';
 
-export interface ModulePermission {
-  moduleName: string;
-  actions: Record<PermissionAction, boolean>;
-}
-
-export interface RolePermissions {
-  role: UserRole;
-  modules: ModulePermission[];
-}
 
 export interface StockItem {
   id: string;

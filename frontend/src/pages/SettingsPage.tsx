@@ -64,7 +64,7 @@ export const SettingsPage: React.FC = () => {
             </div>
 
             <div className="w-full border-t border-slate-100 pt-3 text-xs text-slate-500 flex flex-col gap-1 text-left select-none">
-              <span className="font-medium">Department: <strong className="text-slate-800">{currentUser?.department}</strong></span>
+
               <span className="font-medium">Onboarded: <strong className="text-slate-800">{currentUser?.createdDate}</strong></span>
             </div>
 

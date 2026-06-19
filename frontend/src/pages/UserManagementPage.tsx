@@ -18,7 +18,7 @@ export const UserManagementPage: React.FC = () => {
   // State Management
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('All');
-  const [deptFilter, setDeptFilter] = useState<string>('All');
+
   const [statusFilter, setStatusFilter] = useState<string>('All');
 
   // Sorting
@@ -39,15 +39,14 @@ export const UserManagementPage: React.FC = () => {
   const [formPhone, setFormPhone] = useState('');
   const [formEmail, setFormEmail] = useState('');
   const [formRole, setFormRole] = useState<UserRole>('User');
-  const [formDept, setFormDept] = useState('Operations');
+
   const [formStatus, setFormStatus] = useState<'Active' | 'Inactive'>('Active');
   const [formModules, setFormModules] = useState<string[]>(['Dashboard']);
 
   // Error States
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // Departments list preconfigured
-  const DEPARTMENTS = ['Management', 'Operations', 'Warehouse', 'Compliance', 'Logistics', 'Procurement'];
+
   const SYSTEM_MODULES = ['Dashboard', 'User Management', 'Permissions', 'Stock Management', 'Reports', 'Reminders', 'Settings'];
 
   // Sorting Logic
@@ -62,12 +61,11 @@ export const UserManagementPage: React.FC = () => {
 
   // Filter & Search Implementation
   const filteredUsers = users.filter((u) => {
-    const searchString = `${u.name} ${u.email} ${u.phone} ${u.department}`.toLowerCase();
+    const searchString = `${u.name} ${u.email} ${u.phone}`.toLowerCase();
     const matchesSearch = searchString.includes(searchQuery.toLowerCase());
     const matchesRole = roleFilter === 'All' || u.role === roleFilter;
-    const matchesDept = deptFilter === 'All' || u.department === deptFilter;
     const matchesStatus = statusFilter === 'All' || u.status === statusFilter;
-    return matchesSearch && matchesRole && matchesDept && matchesStatus;
+    return matchesSearch && matchesRole && matchesStatus;
   }).sort((a, b) => {
     let fieldA = a[sortField];
     let fieldB = b[sortField];
@@ -105,7 +103,7 @@ export const UserManagementPage: React.FC = () => {
     setFormPhone('');
     setFormEmail('');
     setFormRole('User');
-    setFormDept('Operations');
+
     setFormStatus('Active');
     setFormModules(['Dashboard']);
     setErrors({});
@@ -121,7 +119,7 @@ export const UserManagementPage: React.FC = () => {
       phone: cleanPhone,
       email: formEmail,
       role: formRole,
-      department: formDept,
+
       status: formStatus,
       assignedModules: formModules
     });
@@ -138,7 +136,7 @@ export const UserManagementPage: React.FC = () => {
     setFormPhone(user.phone);
     setFormEmail(user.email);
     setFormRole(user.role);
-    setFormDept(user.department);
+
     setFormStatus(user.status);
     setFormModules(user.assignedModules);
     setErrors({});
@@ -154,7 +152,7 @@ export const UserManagementPage: React.FC = () => {
       phone: formPhone,
       email: formEmail,
       role: formRole,
-      department: formDept,
+
       status: formStatus,
       assignedModules: formModules
     });
@@ -251,21 +249,7 @@ export const UserManagementPage: React.FC = () => {
               </select>
             </div>
 
-            {/* Filter Department dropdown */}
-            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl">
-              <span className="text-[10px] uppercase font-bold text-slate-400">Dept:</span>
-              <select
-                id="dept-filter-select"
-                value={deptFilter}
-                onChange={(e) => setDeptFilter(e.target.value)}
-                className="bg-transparent text-xs text-slate-700 font-semibold focus:outline-none cursor-pointer"
-              >
-                <option value="All">All Departments</option>
-                {DEPARTMENTS.map((dept) => (
-                  <option key={dept} value={dept}>{dept}</option>
-                ))}
-              </select>
-            </div>
+
 
             {/* Filter status dropdown */}
             <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl">
@@ -342,9 +326,7 @@ export const UserManagementPage: React.FC = () => {
                 <th className="px-6 py-4 cursor-pointer hover:text-slate-700" onClick={() => handleSort('role')}>
                   Authorization Role
                 </th>
-                <th className="px-6 py-4 cursor-pointer hover:text-slate-700" onClick={() => handleSort('department')}>
-                  Corporate Division
-                </th>
+
                 <th className="px-6 py-4 cursor-pointer hover:text-slate-700" onClick={() => handleSort('status')}>
                   Account State
                 </th>
@@ -403,10 +385,7 @@ export const UserManagementPage: React.FC = () => {
                         </span>
                       </td>
 
-                      {/* Division */}
-                      <td className="px-6 py-4">
-                        <span className="text-slate-700 font-medium">{user.department}</span>
-                      </td>
+
 
                       {/* State */}
                       <td className="px-6 py-4">
@@ -597,19 +576,7 @@ export const UserManagementPage: React.FC = () => {
               </select>
             </div>
 
-            <div className="flex flex-col gap-1.5 text-left">
-              <label className="text-xs font-semibold text-slate-750">Division / Department</label>
-              <select
-                id="create-form-dept"
-                value={formDept}
-                onChange={(e) => setFormDept(e.target.value)}
-                className="px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none cursor-pointer text-xs font-semibold text-slate-800"
-              >
-                {DEPARTMENTS.map((dept) => (
-                  <option key={dept} value={dept}>{dept}</option>
-                ))}
-              </select>
-            </div>
+
           </div>
 
           {/* Modules allocation selection */}
@@ -725,19 +692,7 @@ export const UserManagementPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex flex-col gap-1.5 text-left">
-            <label className="text-xs font-semibold text-slate-750">Division / Department</label>
-            <select
-              id="edit-form-dept"
-              value={formDept}
-              onChange={(e) => setFormDept(e.target.value)}
-              className="px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none cursor-pointer text-xs font-semibold text-slate-800"
-            >
-              {DEPARTMENTS.map((dept) => (
-                <option key={dept} value={dept}>{dept}</option>
-              ))}
-            </select>
-          </div>
+
 
           <div className="flex flex-col gap-2 text-left mt-2">
             <label className="text-xs font-semibold text-slate-750">Authorized Panels</label>
@@ -817,13 +772,7 @@ export const UserManagementPage: React.FC = () => {
                 </div>
               </div>
 
-              <div className="p-3.5 bg-slate-50 border border-slate-200/50 rounded-xl flex items-center gap-3">
-                <Briefcase className="w-4 h-4 text-slate-400 shrink-0" />
-                <div>
-                  <p className="text-[9px] uppercase font-bold text-slate-400">Department</p>
-                  <p className="text-xs font-semibold text-slate-805 mt-0.5">{activeUser.department}</p>
-                </div>
-              </div>
+
 
               <div className="p-3.5 bg-slate-50 border border-slate-200/50 rounded-xl flex items-center gap-3">
                 <Calendar className="w-4 h-4 text-slate-400 shrink-0" />

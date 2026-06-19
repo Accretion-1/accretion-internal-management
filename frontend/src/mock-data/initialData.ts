@@ -1,4 +1,4 @@
-import { User, StockItem, Reminder, Notification, ActivityLog, RolePermissions, AppSettings } from '../types';
+import { User, StockItem, Reminder, Notification, ActivityLog, AppSettings } from '../types';
 
 export const INITIAL_USERS: User[] = [
   {
@@ -7,7 +7,6 @@ export const INITIAL_USERS: User[] = [
     phone: '9999999991',
     email: 'sarah.jenkins@worksphere.co',
     role: 'Admin',
-    department: 'Management',
     status: 'Active',
     assignedModules: ['Dashboard', 'User Management', 'Permissions', 'Stock Management', 'Reports', 'Reminders', 'Settings'],
     createdDate: '2026-01-10',
@@ -19,7 +18,6 @@ export const INITIAL_USERS: User[] = [
     phone: '9999999992',
     email: 'david.chen@worksphere.co',
     role: 'Manager',
-    department: 'Operations',
     status: 'Active',
     assignedModules: ['Dashboard', 'User Management', 'Stock Management', 'Reports', 'Reminders'],
     createdDate: '2026-02-15',
@@ -31,7 +29,6 @@ export const INITIAL_USERS: User[] = [
     phone: '9999999993',
     email: 'alex.rivera@worksphere.co',
     role: 'User',
-    department: 'Warehouse',
     status: 'Active',
     assignedModules: ['Dashboard', 'Stock Management', 'Reminders'],
     createdDate: '2026-03-20',
@@ -43,7 +40,6 @@ export const INITIAL_USERS: User[] = [
     phone: '9875550121',
     email: 'marcus.brody@worksphere.co',
     role: 'User',
-    department: 'Logistics',
     status: 'Active',
     assignedModules: ['Dashboard', 'Stock Management', 'Reminders'],
     createdDate: '2026-04-01',
@@ -55,7 +51,6 @@ export const INITIAL_USERS: User[] = [
     phone: '9875550143',
     email: 'elena.rostova@worksphere.co',
     role: 'Manager',
-    department: 'Compliance',
     status: 'Active',
     assignedModules: ['Dashboard', 'User Management', 'Reports', 'Reminders'],
     createdDate: '2026-01-22',
@@ -67,7 +62,6 @@ export const INITIAL_USERS: User[] = [
     phone: '9875550186',
     email: 'tom.reynolds@worksphere.co',
     role: 'User',
-    department: 'Procurement',
     status: 'Inactive',
     assignedModules: ['Dashboard', 'Stock Management'],
     createdDate: '2026-05-12',
@@ -75,41 +69,7 @@ export const INITIAL_USERS: User[] = [
   }
 ];
 
-export const INITIAL_ROLE_PERMISSIONS: RolePermissions[] = [
-  {
-    role: 'Admin',
-    modules: [
-      { moduleName: 'User Management', actions: { View: true, Create: true, Edit: true, Delete: true, Export: true, Approve: true } },
-      { moduleName: 'Permissions', actions: { View: true, Create: true, Edit: true, Delete: true, Export: true, Approve: true } },
-      { moduleName: 'Stock Management', actions: { View: true, Create: true, Edit: true, Delete: true, Export: true, Approve: true } },
-      { moduleName: 'Reports', actions: { View: true, Create: true, Edit: true, Delete: true, Export: true, Approve: true } },
-      { moduleName: 'Reminders', actions: { View: true, Create: true, Edit: true, Delete: true, Export: true, Approve: true } },
-      { moduleName: 'Settings', actions: { View: true, Create: true, Edit: true, Delete: true, Export: true, Approve: true } }
-    ]
-  },
-  {
-    role: 'Manager',
-    modules: [
-      { moduleName: 'User Management', actions: { View: true, Create: true, Edit: true, Delete: false, Export: true, Approve: false } },
-      { moduleName: 'Permissions', actions: { View: true, Create: false, Edit: false, Delete: false, Export: false, Approve: false } },
-      { moduleName: 'Stock Management', actions: { View: true, Create: true, Edit: true, Delete: false, Export: true, Approve: true } },
-      { moduleName: 'Reports', actions: { View: true, Create: true, Edit: false, Delete: false, Export: true, Approve: false } },
-      { moduleName: 'Reminders', actions: { View: true, Create: true, Edit: true, Delete: true, Export: true, Approve: true } },
-      { moduleName: 'Settings', actions: { View: false, Create: false, Edit: false, Delete: false, Export: false, Approve: false } }
-    ]
-  },
-  {
-    role: 'User',
-    modules: [
-      { moduleName: 'User Management', actions: { View: false, Create: false, Edit: false, Delete: false, Export: false, Approve: false } },
-      { moduleName: 'Permissions', actions: { View: false, Create: false, Edit: false, Delete: false, Export: false, Approve: false } },
-      { moduleName: 'Stock Management', actions: { View: true, Create: false, Edit: true, Delete: false, Export: false, Approve: false } },
-      { moduleName: 'Reports', actions: { View: false, Create: false, Edit: false, Delete: false, Export: false, Approve: false } },
-      { moduleName: 'Reminders', actions: { View: true, Create: false, Edit: false, Delete: false, Export: false, Approve: false } },
-      { moduleName: 'Settings', actions: { View: false, Create: false, Edit: false, Delete: false, Export: false, Approve: false } }
-    ]
-  }
-];
+
 
 export const INITIAL_STOCKS: StockItem[] = [
   {
@@ -235,7 +195,7 @@ export const INITIAL_NOTIFICATIONS: Notification[] = [
   {
     id: 'ntf-2',
     title: 'New User Registered',
-    description: 'Alex Rivera (User) was registered into Warehouse department by Sarah Jenkins.',
+    description: 'Alex Rivera (User) was registered by Sarah Jenkins.',
     type: 'System',
     timestamp: '2026-06-18 11:45',
     read: false,

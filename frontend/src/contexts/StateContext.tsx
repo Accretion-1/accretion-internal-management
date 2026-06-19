@@ -1,12 +1,11 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User, UserRole, StockItem, Reminder, Notification, ActivityLog, RolePermissions, AppSettings } from '../types';
+import { User, UserRole, StockItem, Reminder, Notification, ActivityLog, AppSettings } from '../types';
 import { 
   INITIAL_USERS, 
   INITIAL_STOCKS, 
   INITIAL_REMINDERS, 
   INITIAL_NOTIFICATIONS, 
   INITIAL_ACTIVITIES, 
-  INITIAL_ROLE_PERMISSIONS, 
   DEFAULT_SETTINGS 
 } from '../mock-data/initialData';
 
@@ -39,9 +38,6 @@ interface StateContextType {
   deleteUser: (id: string) => Promise<boolean>;
   deactivateUser: (id: string) => Promise<boolean>;
 
-  // Permissions State
-  rolePermissions: RolePermissions[];
-  updateRolePermissions: (role: UserRole, moduleName: string, action: string, value: boolean) => Promise<boolean>;
 
   // Stock State
   stocks: StockItem[];
@@ -90,10 +86,6 @@ export const StateProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return saved ? JSON.parse(saved) : INITIAL_USERS;
   });
 
-  const [rolePermissions, setRolePermissions] = useState<RolePermissions[]>(() => {
-    const saved = localStorage.getItem('ws_perms');
-    return saved ? JSON.parse(saved) : INITIAL_ROLE_PERMISSIONS;
-  });
 
   const [stocks, setStocks] = useState<StockItem[]>(() => {
     const saved = localStorage.getItem('ws_stocks');
@@ -128,9 +120,6 @@ export const StateProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     localStorage.setItem('ws_users', JSON.stringify(users));
   }, [users]);
 
-  useEffect(() => {
-    localStorage.setItem('ws_perms', JSON.stringify(rolePermissions));
-  }, [rolePermissions]);
 
   useEffect(() => {
     localStorage.setItem('ws_stocks', JSON.stringify(stocks));
@@ -293,7 +282,7 @@ export const StateProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const newNotification: Notification = {
       id: generateUniqueId('ntf'),
       title: 'New Account Onboarded',
-      description: `${newUser.name} assigned to ${newUser.role} role in ${newUser.department}.`,
+      description: `${newUser.name} assigned to ${newUser.role} role.`,
       type: 'System',
       timestamp: new Date().toISOString().replace('T', ' ').substring(0, 16),
       read: false,
@@ -375,56 +364,6 @@ export const StateProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return true;
   };
 
-  // Permissions Matrix Management
-  const updateRolePermissions = async (
-    role: UserRole, 
-    moduleName: string, 
-    action: string, 
-    value: boolean
-  ): Promise<boolean> => {
-    setIsLoading(true);
-    await new Promise((r) => setTimeout(r, 500));
-
-    setRolePermissions((prev) =>
-      prev.map((rp) => {
-        if (rp.role === role) {
-          return {
-            ...rp,
-            modules: rp.modules.map((m) => {
-              if (m.moduleName === moduleName) {
-                return {
-                  ...m,
-                  actions: {
-                    ...m.actions,
-                    [action]: value
-                  }
-                };
-              }
-              return m;
-            })
-          };
-        }
-        return rp;
-      })
-    );
-
-    // Dynamic warning alert
-    const newNotification: Notification = {
-      id: generateUniqueId('ntf'),
-      title: 'Module Entitlements Altered',
-      description: `Action [${action}] is now ${value ? 'Allowed' : 'Revoked'} on ${moduleName} for ${role}.`,
-      type: 'Permission',
-      timestamp: new Date().toISOString().replace('T', ' ').substring(0, 16),
-      read: false,
-      priority: 'high'
-    };
-    setNotifications(prev => [newNotification, ...prev]);
-
-    logActivity('Permission Changes', 'Permission', `Adjusted permissions [${action}] mapping on ${moduleName} for ${role}`);
-    setIsLoading(false);
-    showToast('Permission guidelines saved into application cache.', 'success');
-    return true;
-  };
 
   // Stock operations (Stock In/Out)
   const executeStockIn = async (id: string, qty: number, comments?: string): Promise<boolean> => {
@@ -650,8 +589,6 @@ export const StateProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         updateUser,
         deleteUser,
         deactivateUser,
-        rolePermissions,
-        updateRolePermissions,
         stocks,
         executeStockIn,
         executeStockOut,

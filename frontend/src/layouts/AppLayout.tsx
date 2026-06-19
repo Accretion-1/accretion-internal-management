@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useLocation, useNavigate, Outlet } from 'react-router-dom';
 import { useAppState } from '../contexts/StateContext';
 import { 
   LayoutDashboard, Users, Shield, Package, BarChart4, Clock, 
@@ -18,7 +19,7 @@ interface SidebarNavItem {
 const SIDEBAR_ITEMS: SidebarNavItem[] = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, allowedRoles: ['Admin', 'Manager', 'User'] },
   { id: 'users', label: 'User Management', icon: Users, allowedRoles: ['Admin', 'Manager'] },
-  { id: 'permissions', label: 'Permissions Matrix', icon: Shield, allowedRoles: ['Admin'] },
+
   { id: 'stock', label: 'Stock Management', icon: Package, allowedRoles: ['Admin', 'Manager', 'User'] },
   { id: 'reports', label: 'Reports & Stats', icon: BarChart4, allowedRoles: ['Admin', 'Manager'] },
   { id: 'reminders', label: 'Schedule & To-Dos', icon: Clock, allowedRoles: ['Admin', 'Manager', 'User'] },
@@ -26,13 +27,7 @@ const SIDEBAR_ITEMS: SidebarNavItem[] = [
   { id: 'settings', label: 'Settings', icon: Settings, allowedRoles: ['Admin', 'Manager', 'User'] }
 ];
 
-interface AppLayoutProps {
-  activeTab: string;
-  setActiveTab: (tab: string) => void;
-  children: React.ReactNode;
-}
-
-export const AppLayout: React.FC<AppLayoutProps> = ({ activeTab, setActiveTab, children }) => {
+export const AppLayout: React.FC = () => {
   const { currentUser, logout, notifications, markAllNotificationsAsRead, addNotificationCount } = useAppState();
 
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -41,6 +36,10 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ activeTab, setActiveTab, c
 
   if (!currentUser) return null;
 
+  const location = useLocation();
+  const navigate = useNavigate();
+  const activeTab = location.pathname.substring(1) || 'dashboard';
+
   // Route protection evaluations
   const currentTabItem = SIDEBAR_ITEMS.find(item => item.id === activeTab);
   const isTabAllowed = currentTabItem 
@@ -48,7 +47,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ activeTab, setActiveTab, c
     : false;
 
   const handleNavClick = (tabId: string) => {
-    setActiveTab(tabId);
+    navigate(`/${tabId}`);
     setIsMobileSidebarOpen(false);
   };
 
@@ -108,7 +107,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ activeTab, setActiveTab, c
               const isActive = activeTab === item.id;
               const hasAccess = item.allowedRoles.includes(currentUser.role);
               
-              if (!hasAccess && isSidebarCollapsed) return null; // hide forbidden items in collapsed
+              if (!hasAccess) return null;
 
               return (
                 <button
@@ -188,6 +187,8 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ activeTab, setActiveTab, c
                   const Icon = item.icon;
                   const isActive = activeTab === item.id;
                   const hasAccess = item.allowedRoles.includes(currentUser.role);
+
+                  if (!hasAccess) return null;
 
                   return (
                     <button
@@ -343,7 +344,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ activeTab, setActiveTab, c
               </div>
               <div className="hidden sm:flex flex-col text-left">
                 <span className="text-xs font-bold text-slate-800">{currentUser.name}</span>
-                <span className="text-[10px] text-slate-400 font-medium font-mono">Division: {currentUser.department}</span>
+
               </div>
             </div>
 
@@ -364,7 +365,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ activeTab, setActiveTab, c
                 transition={{ duration: 0.2 }}
                 className="w-full max-w-7xl mx-auto"
               >
-                {children}
+                <Outlet />
               </motion.div>
             ) : (
               
@@ -391,12 +392,12 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ activeTab, setActiveTab, c
                   </div>
 
                   <p className="text-xs text-slate-500 leading-relaxed font-sans">
-                    WorkSphere enforces strict role authorization logic. Administrators map these criteria inside the <strong>Permissions Matrix</strong> to coordinate safe boundaries.
+                    WorkSphere enforces strict role authorization logic. Administrators map these criteria to coordinate safe boundaries.
                   </p>
 
                   <button
                     id="return-dashboard-403"
-                    onClick={() => setActiveTab('dashboard')}
+                    onClick={() => navigate('/dashboard')}
                     className="w-full bg-slate-900 hover:bg-slate-800 text-white font-semibold rounded-xl text-xs py-3 text-center cursor-pointer transition-colors"
                   >
                     Return to Safe Dashboard

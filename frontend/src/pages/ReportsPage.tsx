@@ -108,7 +108,7 @@ export const ReportsPage: React.FC = () => {
           </div>
 
           <p className="text-[11px] text-slate-450 italic border-t border-slate-100 pt-3">
-            Includes fully verified active departments.
+            Includes fully verified active operational sectors.
           </p>
         </div>
 

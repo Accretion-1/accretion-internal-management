@@ -49,7 +49,7 @@ export const DashboardPage: React.FC = () => {
               <span className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-blue-50 text-blue-700 font-semibold rounded-lg text-[10px] border border-blue-100">
                 <Shield className="w-3 h-3" /> {currentUser.role} Account
               </span>
-              <span>Department: <strong className="text-slate-700 font-medium">{currentUser.department}</strong></span>
+
               <span className="hidden sm:inline">•</span>
               <span>Last login: <span className="font-mono text-[11px]">{currentUser.lastLogin}</span></span>
             </p>
@@ -294,30 +294,7 @@ export const DashboardPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Permissions Audit Card */}
-            <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs flex flex-col gap-5 text-left">
-              <div className="flex items-center justify-between">
-                <span className="p-3 bg-violet-50 text-violet-600 rounded-2xl">
-                  <Shield className="w-6 h-6" />
-                </span>
-                <span className="text-xs font-bold px-2.5 py-0.5 bg-violet-100 text-violet-700 rounded-lg">Rule Enforcement</span>
-              </div>
-              <div>
-                <h4 className="font-display text-md font-bold text-slate-900">Granular Permission Matrix</h4>
-                <p className="text-xs text-slate-500 mt-1 leading-normal">
-                  6 major system modules and 6 operational rules enforce safe role boundaries instantly.
-                </p>
-              </div>
-              <div className="flex flex-col gap-2.5 mt-2">
-                <div className="flex justify-between items-center text-xs">
-                  <span className="font-medium text-slate-600">Role templates verified:</span>
-                  <strong className="text-violet-600">Active</strong>
-                </div>
-                <div className="w-full bg-slate-100 rounded-full h-2">
-                  <div className="bg-violet-600 h-2 rounded-full" style={{ width: '100%' }} />
-                </div>
-              </div>
-            </div>
+
 
             {/* Notification alert snapshot info */}
             <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs flex flex-col gap-5 text-left">
@@ -382,7 +359,7 @@ export const DashboardPage: React.FC = () => {
                   <UserCheck className="w-5 h-5" />
                 </div>
               </div>
-              <p className="text-xs text-slate-500 mt-4">90% of local department online</p>
+              <p className="text-xs text-slate-500 mt-4">90% of local staff online</p>
             </div>
 
             {/* Pending duties reminders count */}
