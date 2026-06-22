@@ -16,3 +16,8 @@ export const resendUserOTPController = apiHandler(async (req, res) => {
   await userService.resendUserOTPService(req.body.phone_number);
   return apiResponse(CUSTOM_SUCCESS, "OTP resent successfully", null, res);
 });
+
+export const getUserProfileController = apiHandler(async (req, res) => {
+  const user = userService.getUserProfileService(req.user);
+  return apiResponse(CUSTOM_SUCCESS, "User profile fetched successfully", user, res, "object");
+});

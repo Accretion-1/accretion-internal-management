@@ -6,6 +6,7 @@ loadEnv({ path: './.env', quiet: true });
 
 export const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const NODE_ENV = process.env.NODE_ENV;
+export const TEST_OTP = process.env.TEST_OTP;
 export const PORT = process.env.PORT;
 export const JWT_SECRET = process.env.JWT_SECRET;
 export const JWT_EXPIRY = process.env.JWT_EXPIRY;

@@ -10,6 +10,15 @@ export const getUserByPhoneNumberModel = async (phoneNumber) => {
   }
 };
 
+export const getUserByIdModel = async (userId) => {
+  try {
+    const [user] = await db.query("SELECT * FROM users WHERE user_id = ? LIMIT 1", [userId]);
+    return user;
+  } catch (error) {
+    throw new ApiError(DB_ERROR, "Checking User", error, false);
+  }
+};
+
 export const updateUserOTPModel = async (userId, otp, verificationToken) => {
   try {
     return await db.query(

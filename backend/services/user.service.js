@@ -1,5 +1,5 @@
 import jwt from "jsonwebtoken";
-import { JWT_SECRET } from "../constants.js";
+import { JWT_SECRET, NODE_ENV, TEST_OTP } from "../constants.js";
 import * as userModel from "../model/user.model.js";
 import { ApiError } from "../utils/api.util.js";
 import { CUSTOM_ERROR, INVALID, NOT_FOUND } from "../utils/message.util.js";
@@ -7,6 +7,7 @@ import { generateJWTToken, generateOTPCode, isEmpty } from "../utils/misc.util.j
 import { sendOTP } from "../utils/twillio.util.js";
 
 const OTP_EXPIRY = "5m";
+const isDevelopment = NODE_ENV === "development";
 
 const getActiveUser = async (phoneNumber) => {
   const [user] = await userModel.getUserByPhoneNumberModel(phoneNumber);
@@ -23,7 +24,12 @@ const getActiveUser = async (phoneNumber) => {
 };
 
 const issueOTP = async (user) => {
-  const otp = generateOTPCode();
+  const otp = isDevelopment ? TEST_OTP : generateOTPCode();
+
+  if (isDevelopment && !otp) {
+    throw new ApiError(CUSTOM_ERROR, "TEST_OTP is required in development mode");
+  }
+
   const verificationToken = jwt.sign(
     {
       purpose: "phone_login",
@@ -35,6 +41,8 @@ const issueOTP = async (user) => {
   );
 
   await userModel.updateUserOTPModel(user.user_id, otp, verificationToken);
+
+  if (isDevelopment) return;
 
   try {
     await sendOTP(user.phone_number, otp);
@@ -85,8 +93,9 @@ export const resendUserOTPService = async (phoneNumber) => {
 export const verifyUserOTPService = async ({ phone_number, otp }) => {
   try {
     const user = await getActiveUser(phone_number);
+    const expectedOTP = isDevelopment ? TEST_OTP : user.otp;
 
-    if (!user.otp || String(user.otp) !== String(otp)) {
+    if (!expectedOTP || String(expectedOTP) !== String(otp)) {
       throw new ApiError(INVALID, "OTP");
     }
 
@@ -121,3 +130,5 @@ export const verifyUserOTPService = async ({ phone_number, otp }) => {
     throw new ApiError(CUSTOM_ERROR, "Unable to verify OTP", error, false);
   }
 };
+
+export const getUserProfileService = (user) => sanitizeUser(user);
