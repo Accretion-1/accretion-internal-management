@@ -3,7 +3,7 @@ import { useAppState } from '../contexts/StateContext';
 import { Reminder, ReminderPriority, ReminderCategory, ReminderRecurrence } from '../types';
 import { 
   Clock, Plus, CheckSquare, Bell, Calendar, ClipboardList, 
-  UserPlus, AlertOctagon, Trash, RefreshCw, Paperclip, CheckCircle
+  UserPlus, AlertOctagon, Trash, RefreshCw, Paperclip, CheckCircle, BellRing
 } from 'lucide-react';
 import { Modal } from '../components/Modal';
 
@@ -32,13 +32,7 @@ export const ReminderPage: React.FC = () => {
 
   const [formError, setFormError] = useState('');
 
-  // Priority metadata map
-  const PRIORITY_STYLES: Record<ReminderPriority, { bg: string; text: string; border: string }> = {
-    Critical: { bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200' },
-    High: { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200' },
-    Medium: { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200' },
-    Low: { bg: 'bg-slate-100', text: 'text-slate-700', border: 'border-slate-250' }
-  };
+
 
   // Filter reminders list
   const filteredReminders = reminders.filter((r) => {
@@ -106,10 +100,10 @@ export const ReminderPage: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="font-display text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
-            <Clock className="w-6 h-6 text-blue-600" />
-            Duty Scheduler & Reminders
+            <BellRing className="w-6 h-6 text-blue-600" />
+            Reminder Schedule Management
           </h2>
-          <p className="text-xs text-slate-500 mt-1">Designate critical workflows, coordinate team objectives, and broadcast instant compliance alerts.</p>
+          <p className="text-xs text-slate-500 mt-1">Configure scheduled notifications to be dispatched to designated team members.</p>
         </div>
 
         {/* Admins & Managers can schedule reminders */}
@@ -153,7 +147,6 @@ export const ReminderPage: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {filteredReminders.length > 0 ? (
           filteredReminders.map((rem) => {
-            const style = PRIORITY_STYLES[rem.priority];
             return (
               <div 
                 key={rem.id} 
@@ -164,16 +157,13 @@ export const ReminderPage: React.FC = () => {
                 <div className="flex flex-col gap-3">
                   <div className="flex justify-between items-start gap-4">
                     <div className="flex items-center gap-2">
-                      <span className={`px-2.5 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-wider border ${style.bg} ${style.text} ${style.border}`}>
-                        {rem.priority} Priority
-                      </span>
                       <span className="text-[10px] uppercase font-bold bg-slate-100 text-slate-500 px-2 py-0.5 rounded-md">
-                        {rem.category}
+                        {rem.recurrence}
                       </span>
                     </div>
 
                     <span className="text-[10px] font-semibold text-slate-400 bg-slate-50 border border-slate-100 px-2 py-0.5 rounded-md flex items-center gap-1">
-                      <RefreshCw className="w-3 h-3" /> {rem.recurrence}
+                      <Clock className="w-3 h-3" /> {rem.time}
                     </span>
                   </div>
 
@@ -190,7 +180,7 @@ export const ReminderPage: React.FC = () => {
                   
                   {/* Grid tracking assignee profiles */}
                   <div className="flex flex-col gap-2">
-                    <span className="text-[10px] uppercase font-bold text-slate-400">Allocated Staff duty list:</span>
+                    <span className="text-[10px] uppercase font-bold text-slate-400">Notifications routing to:</span>
                     <div className="flex flex-wrap gap-1.5">
                       {rem.assignedUsers.map((userId) => {
                         const user = users.find(u => u.id === userId);
@@ -204,13 +194,7 @@ export const ReminderPage: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Attachment metadata mock */}
-                  {rem.attachments && rem.attachments.length > 0 && (
-                    <div className="flex items-center gap-1.5 text-[11px] text-slate-450 font-semibold bg-slate-50 p-2 rounded-xl w-fit border border-slate-100">
-                      <Paperclip className="w-3.5 h-3.5 text-blue-500" />
-                      <span>Attached parameters: {rem.attachments[0]}</span>
-                    </div>
-                  )}
+
 
                   {/* Operational buttons row */}
                   <div className="flex sm:items-center justify-between flex-col sm:flex-row gap-3 pt-1">
@@ -336,65 +320,19 @@ export const ReminderPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-slate-750">Risk Priority</label>
-              <select
-                id="rem-create-priority"
-                value={priority}
-                onChange={(e) => setPriority(e.target.value as ReminderPriority)}
-                className="px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none text-xs font-semibold text-slate-800 cursor-pointer"
-              >
-                <option value="Low">Low Priority</option>
-                <option value="Medium">Medium Priority</option>
-                <option value="High">High Priority</option>
-                <option value="Critical">Critical Priority</option>
-              </select>
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-slate-750">Category</label>
-              <select
-                id="rem-create-category"
-                value={category}
-                onChange={(e) => setCategory(e.target.value as ReminderCategory)}
-                className="px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none text-xs font-semibold text-slate-800 cursor-pointer"
-              >
-                <option value="Operations">Operations</option>
-                <option value="Reporting">Reporting</option>
-                <option value="Inventory">Inventory</option>
-                <option value="General">General</option>
-                <option value="Compliance">Compliance</option>
-              </select>
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-slate-755">Recurrence Routine</label>
-              <select
-                id="rem-create-recurrence"
-                value={recurrence}
-                onChange={(e) => setRecurrence(e.target.value as ReminderRecurrence)}
-                className="px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none text-xs font-semibold text-slate-800 cursor-pointer"
-              >
-                <option value="One-Time">One-Time Event</option>
-                <option value="Daily">Daily Routine</option>
-                <option value="Weekly">Weekly Routine</option>
-                <option value="Monthly">Monthly Routine</option>
-              </select>
-            </div>
-          </div>
-
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold text-slate-750">Attached Document Reference (Optional Link)</label>
-            <input
-              id="rem-create-attachment"
-              type="text"
-              placeholder="e.g. safety_guidelines_v2.pdf"
-              value={attachment}
-              onChange={(e) => setAttachment(e.target.value)}
-              className="px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none text-xs font-medium text-slate-800"
-            />
+            <label className="text-xs font-semibold text-slate-755">Recurrence Routine</label>
+            <select
+              id="rem-create-recurrence"
+              value={recurrence}
+              onChange={(e) => setRecurrence(e.target.value as ReminderRecurrence)}
+              className="px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none text-xs font-semibold text-slate-800 cursor-pointer"
+            >
+              <option value="One-Time">One-Time Event</option>
+              <option value="Daily">Daily Routine</option>
+            </select>
           </div>
+
 
           {/* User allocation selection Checklist */}
           <div className="flex flex-col gap-2.5 mt-1">

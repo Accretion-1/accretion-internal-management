@@ -22,7 +22,8 @@ const SIDEBAR_ITEMS: SidebarNavItem[] = [
 
   { id: 'stock', label: 'Stock Management', icon: Package, allowedRoles: ['Admin', 'Manager', 'User'] },
   { id: 'reports', label: 'Reports & Stats', icon: BarChart4, allowedRoles: ['Admin', 'Manager'] },
-  { id: 'reminders', label: 'Schedule & To-Dos', icon: Clock, allowedRoles: ['Admin', 'Manager', 'User'] },
+  { id: 'todos', label: 'To-Dos Management', icon: CheckSquare, allowedRoles: ['Admin', 'Manager', 'User'] },
+  { id: 'reminders', label: 'Reminder Schedule Management', icon: BellRing, allowedRoles: ['Admin', 'Manager', 'User'] },
   { id: 'activities', label: 'Workspace Audits', icon: ClipboardList, allowedRoles: ['Admin'] },
   { id: 'settings', label: 'Settings', icon: Settings, allowedRoles: ['Admin', 'Manager', 'User'] }
 ];

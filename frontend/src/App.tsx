@@ -12,6 +12,7 @@ import { UserManagementPage } from './pages/UserManagementPage';
 import { StockPage } from './pages/StockPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { ReminderPage } from './pages/ReminderPage';
+import { TodoPage } from './pages/TodoPage';
 import { ActivityLogsPage } from './pages/ActivityLogsPage';
 import { SettingsPage } from './pages/SettingsPage';
 
@@ -53,6 +54,7 @@ function AppContent() {
           <Route path="/users" element={<UserManagementPage />} />
           <Route path="/stock" element={<StockPage />} />
           <Route path="/reports" element={<ReportsPage />} />
+          <Route path="/todos" element={<TodoPage />} />
           <Route path="/reminders" element={<ReminderPage />} />
           <Route path="/activities" element={<ActivityLogsPage />} />
           <Route path="/settings" element={<SettingsPage />} />

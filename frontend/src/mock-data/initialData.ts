@@ -1,4 +1,4 @@
-import { User, StockItem, Reminder, Notification, ActivityLog, AppSettings } from '../types';
+import { User, StockItem, Reminder, Notification, ActivityLog, AppSettings, TodoItem } from '../types';
 
 export const INITIAL_USERS: User[] = [
   {
@@ -150,7 +150,7 @@ export const INITIAL_REMINDERS: Reminder[] = [
     priority: 'High',
     category: 'Inventory',
     assignedUsers: ['usr-2', 'usr-3', 'usr-4'],
-    recurrence: 'Weekly',
+    recurrence: 'Daily',
     status: 'Active',
     createdAt: '2026-06-15 08:00'
   },
@@ -163,7 +163,7 @@ export const INITIAL_REMINDERS: Reminder[] = [
     priority: 'Critical',
     category: 'Compliance',
     assignedUsers: ['usr-1', 'usr-5'],
-    recurrence: 'Monthly',
+    recurrence: 'One-Time',
     status: 'Active',
     createdAt: '2026-06-16 10:30'
   },
@@ -179,6 +179,31 @@ export const INITIAL_REMINDERS: Reminder[] = [
     recurrence: 'One-Time',
     status: 'Active',
     createdAt: '2026-06-18 11:00'
+  }
+];
+
+export const INITIAL_TODOS: TodoItem[] = [
+  {
+    id: 'tdo-1',
+    title: 'Audit Forklift Batteries',
+    description: 'Check water levels and charge capacity of all 5 forklift batteries in Sector C.',
+    date: '2026-06-20',
+    time: '09:00',
+    assignedUser: 'usr-2',
+    type: 'Daily',
+    status: 'Active',
+    createdAt: '2026-06-18 09:00'
+  },
+  {
+    id: 'tdo-2',
+    title: 'Review Overtime Requests',
+    description: 'Review and approve pending overtime hours submitted by the warehouse night crew.',
+    date: '2026-06-19',
+    time: '15:30',
+    assignedUser: 'usr-1',
+    type: 'One-Time',
+    status: 'Active',
+    createdAt: '2026-06-18 10:00'
   }
 ];
 

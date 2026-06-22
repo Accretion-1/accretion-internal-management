@@ -30,6 +30,18 @@ export interface StockItem {
   unit: string;
 }
 
+export interface TodoItem {
+  id: string;
+  title: string;
+  description: string;
+  date: string;
+  time: string;
+  assignedUser: string;
+  type: 'One-Time' | 'Daily';
+  status: 'Active' | 'Completed';
+  createdAt: string;
+}
+
 export type ReminderPriority = 'Low' | 'Medium' | 'High' | 'Critical';
 export type ReminderRecurrence = 'One-Time' | 'Daily' | 'Weekly' | 'Monthly' | 'Custom';
 export type ReminderCategory = 'Operations' | 'Reporting' | 'Inventory' | 'General' | 'Compliance';

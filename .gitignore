@@ -80,3 +80,4 @@ frontend/tsconfig.tsbuildinfo
 frontend/dist/
 djfja
 frontend/.env
+backend/public/

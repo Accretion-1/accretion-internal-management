@@ -1,12 +1,13 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User, UserRole, StockItem, Reminder, Notification, ActivityLog, AppSettings } from '../types';
+import { User, UserRole, StockItem, Reminder, Notification, ActivityLog, AppSettings, TodoItem } from '../types';
 import { 
   INITIAL_USERS, 
   INITIAL_STOCKS, 
   INITIAL_REMINDERS, 
   INITIAL_NOTIFICATIONS, 
   INITIAL_ACTIVITIES, 
-  DEFAULT_SETTINGS 
+  DEFAULT_SETTINGS,
+  INITIAL_TODOS
 } from '../mock-data/initialData';
 
 export interface ToastMessage {
@@ -51,6 +52,12 @@ interface StateContextType {
   snoozeReminder: (id: string) => Promise<boolean>;
   completeReminder: (id: string) => Promise<boolean>;
   deleteReminder: (id: string) => Promise<boolean>;
+
+  // Todos State
+  todos: TodoItem[];
+  createTodo: (todoData: Omit<TodoItem, 'id' | 'createdAt' | 'status'>) => Promise<boolean>;
+  completeTodo: (id: string) => Promise<boolean>;
+  deleteTodo: (id: string) => Promise<boolean>;
 
   // Notifications State
   notifications: Notification[];
@@ -97,6 +104,11 @@ export const StateProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return saved ? JSON.parse(saved) : INITIAL_REMINDERS;
   });
 
+  const [todos, setTodos] = useState<TodoItem[]>(() => {
+    const saved = localStorage.getItem('ws_todos');
+    return saved ? JSON.parse(saved) : INITIAL_TODOS;
+  });
+
   const [notifications, setNotifications] = useState<Notification[]>(() => {
     const saved = localStorage.getItem('ws_notifications');
     return saved ? JSON.parse(saved) : INITIAL_NOTIFICATIONS;
@@ -128,6 +140,10 @@ export const StateProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   useEffect(() => {
     localStorage.setItem('ws_reminders', JSON.stringify(reminders));
   }, [reminders]);
+
+  useEffect(() => {
+    localStorage.setItem('ws_todos', JSON.stringify(todos));
+  }, [todos]);
 
   useEffect(() => {
     localStorage.setItem('ws_notifications', JSON.stringify(notifications));
@@ -548,6 +564,69 @@ export const StateProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return true;
   };
 
+  // Todos Operations
+  const createTodo = async (todoData: Omit<TodoItem, 'id' | 'createdAt' | 'status'>): Promise<boolean> => {
+    setIsLoading(true);
+    await new Promise((r) => setTimeout(r, 600));
+
+    if (!todoData.title) {
+      showToast('To-Do Title is a required field.', 'error');
+      setIsLoading(false);
+      return false;
+    }
+
+    const newTodo: TodoItem = {
+      ...todoData,
+      id: generateUniqueId('tdo'),
+      status: 'Active',
+      createdAt: new Date().toISOString().replace('T', ' ').substring(0, 16)
+    };
+
+    setTodos((prev) => [newTodo, ...prev]);
+
+    // Send notification to the designated target
+    const user = users.find(u => u.id === todoData.assignedUser);
+    if (user) {
+      const personalNtf: Notification = {
+        id: `${generateUniqueId('ntf')}-${todoData.assignedUser}`,
+        title: 'Assigned New To-Do Task',
+        description: `You have been assigned a task: "${todoData.title}" due by ${todoData.date} ${todoData.time}.`,
+        type: 'Reminder',
+        timestamp: new Date().toISOString().replace('T', ' ').substring(0, 16),
+        read: false,
+        priority: 'medium'
+      };
+      setNotifications((prev) => [personalNtf, ...prev]);
+    }
+
+    logActivity('Todo Creation', 'Reminder', `Scheduled To-Do for: ${newTodo.title}`);
+    setIsLoading(false);
+    showToast('To-Do successfully committed.', 'success');
+    return true;
+  };
+
+  const completeTodo = async (id: string): Promise<boolean> => {
+    let title = '';
+    setTodos((prev) =>
+      prev.map((t) => {
+        if (t.id === id) {
+          title = t.title;
+          return { ...t, status: 'Completed' };
+        }
+        return t;
+      })
+    );
+    logActivity('Todo Resolved', 'Reminder', `Completed task: ${title}`);
+    showToast('To-Do marked as fully completed.', 'success');
+    return true;
+  };
+
+  const deleteTodo = async (id: string): Promise<boolean> => {
+    setTodos((prev) => prev.filter((t) => t.id !== id));
+    showToast('Deleted To-Do from pipeline.', 'info');
+    return true;
+  };
+
   // Notifications Operations
   const markNotificationAsRead = (id: string) => {
     setNotifications((prev) =>
@@ -598,6 +677,10 @@ export const StateProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         snoozeReminder,
         completeReminder,
         deleteReminder,
+        todos,
+        createTodo,
+        completeTodo,
+        deleteTodo,
         notifications,
         markNotificationAsRead,
         markAllNotificationsAsRead,
