@@ -1,44 +1,34 @@
 import React, { useState } from 'react';
 import { useAppState } from '../contexts/StateContext';
-import { 
-  FileSpreadsheet, FileText, FileDown, TrendingUp, BarChart4, 
-  PieChart, Download, Calendar, ArrowUpRight, Shield, Layers 
-} from 'lucide-react';
-
-export const ReportsPage: React.FC = () => {
-  const { users, stocks, reminders, activities, showToast } = useAppState();
-
-  const [timeframe, setTimeframe] = useState<'daily' | 'weekly' | 'monthly'>('weekly');
-  const [downloadingFormat, setDownloadingFormat] = useState<string | null>(null);
-
-  // Stats
-  const activeCount = users.filter(u => u.status === 'Active').length;
-  const stockCount = stocks.length;
-  const completedReminders = reminders.filter(r => r.status === 'Completed').length;
-  const activeReminders = reminders.filter(r => r.status === 'Active').length;
-  const completionRatio = reminders.length > 0 
-    ? Math.round((completedReminders / reminders.length) * 100) 
-    : 0;
-
-  // Export process latency simulation
-  const handleDownload = (reportName: string, format: string) => {
-    setDownloadingFormat(`${reportName}-${format}`);
-    showToast(`Compiling server assets into ${format}...`, 'info');
-    
-    setTimeout(() => {
-      setDownloadingFormat(null);
-      showToast(`WorkSphere_${reportName}_Report.${format.toLowerCase()} saved successfully.`, 'success');
-    }, 1200);
-  };
-
-  return (
-    <div className="flex flex-col gap-6 font-sans text-left pb-12">
+import { FileSpreadsheet, FileText, FileDown, BarChart4, ArrowUpRight, Shield, Layers } from 'lucide-react';
+export const ReportsPage = () => {
+    const { users, stocks, reminders, activities, showToast } = useAppState();
+    const [timeframe, setTimeframe] = useState('weekly');
+    const [downloadingFormat, setDownloadingFormat] = useState(null);
+    // Stats
+    const activeCount = users.filter(u => u.status === 'Active').length;
+    const stockCount = stocks.length;
+    const completedReminders = reminders.filter(r => r.status === 'Completed').length;
+    const activeReminders = reminders.filter(r => r.status === 'Active').length;
+    const completionRatio = reminders.length > 0
+        ? Math.round((completedReminders / reminders.length) * 100)
+        : 0;
+    // Export process latency simulation
+    const handleDownload = (reportName, format) => {
+        setDownloadingFormat(`${reportName}-${format}`);
+        showToast(`Compiling server assets into ${format}...`, 'info');
+        setTimeout(() => {
+            setDownloadingFormat(null);
+            showToast(`WorkSphere_${reportName}_Report.${format.toLowerCase()} saved successfully.`, 'success');
+        }, 1200);
+    };
+    return (<div className="flex flex-col gap-6 font-sans text-left pb-12">
       
       {/* Title block */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="font-display text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
-            <BarChart4 className="w-6 h-6 text-blue-600" />
+            <BarChart4 className="w-6 h-6 text-blue-600"/>
             Executive Reports & Analytics
           </h2>
           <p className="text-xs text-slate-500 mt-1">Cross-examine operational metrics, resource allocations, and employee metrics with high-fidelity visualization.</p>
@@ -46,20 +36,11 @@ export const ReportsPage: React.FC = () => {
 
         {/* Timeframe selector header */}
         <div className="flex bg-slate-50 border border-slate-200 p-1 rounded-xl w-fit shrink-0">
-          {(['daily', 'weekly', 'monthly'] as const).map((t) => (
-            <button
-              key={t}
-              id={`timeframe-btn-${t}`}
-              onClick={() => setTimeframe(t)}
-              className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer ${
-                timeframe === t 
-                  ? 'bg-slate-900 text-white shadow-xs' 
-                  : 'text-slate-500 hover:text-slate-900'
-              }`}
-            >
+          {['daily', 'weekly', 'monthly'].map((t) => (<button key={t} id={`timeframe-btn-${t}`} onClick={() => setTimeframe(t)} className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer ${timeframe === t
+                ? 'bg-slate-900 text-white shadow-xs'
+                : 'text-slate-500 hover:text-slate-900'}`}>
               {t} metrics
-            </button>
-          ))}
+            </button>))}
         </div>
       </div>
 
@@ -77,22 +58,8 @@ export const ReportsPage: React.FC = () => {
             {/* Custom SVG Donut Dial */}
             <div className="relative w-24 h-24 flex items-center justify-center">
               <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
-                <path
-                  className="text-slate-100"
-                  strokeWidth="3.5"
-                  stroke="currentColor"
-                  fill="none"
-                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                />
-                <path
-                  className="text-blue-600"
-                  strokeDasharray="92, 100"
-                  strokeWidth="3.5"
-                  strokeLinecap="round"
-                  stroke="currentColor"
-                  fill="none"
-                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                />
+                <path className="text-slate-100" strokeWidth="3.5" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
+                <path className="text-blue-600" strokeDasharray="92, 100" strokeWidth="3.5" strokeLinecap="round" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
               </svg>
               <div className="absolute text-center">
                 <span className="text-[17px] font-extrabold text-slate-850 font-mono">92%</span>
@@ -102,7 +69,7 @@ export const ReportsPage: React.FC = () => {
             <div className="flex-1 flex flex-col gap-0.5 text-xs text-slate-500">
               <p><strong className="text-slate-900">{activeCount} seats</strong> online this hour.</p>
               <p className="mt-1 flex items-center gap-1.5 text-emerald-600 font-bold">
-                <ArrowUpRight className="w-4.5 h-4.5" /> +4.2% Week-Over-Week
+                <ArrowUpRight className="w-4.5 h-4.5"/> +4.2% Week-Over-Week
               </p>
             </div>
           </div>
@@ -123,22 +90,8 @@ export const ReportsPage: React.FC = () => {
             {/* Custom SVG Donut Dial */}
             <div className="relative w-24 h-24 flex items-center justify-center">
               <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
-                <path
-                  className="text-slate-100"
-                  strokeWidth="3.5"
-                  stroke="currentColor"
-                  fill="none"
-                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                />
-                <path
-                  className="text-indigo-600"
-                  strokeDasharray={`${completionRatio}, 100`}
-                  strokeWidth="3.5"
-                  strokeLinecap="round"
-                  stroke="currentColor"
-                  fill="none"
-                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                />
+                <path className="text-slate-100" strokeWidth="3.5" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
+                <path className="text-indigo-600" strokeDasharray={`${completionRatio}, 100`} strokeWidth="3.5" strokeLinecap="round" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
               </svg>
               <div className="absolute text-center">
                 <span className="text-[17px] font-extrabold text-slate-850 font-mono">{completionRatio}%</span>
@@ -169,7 +122,7 @@ export const ReportsPage: React.FC = () => {
               <span className="text-emerald-600">80% secure</span>
             </div>
             <div className="w-full bg-slate-100 rounded-full h-3">
-              <div className="bg-emerald-500 h-3 rounded-full" style={{ width: '80%' }} />
+              <div className="bg-emerald-500 h-3 rounded-full" style={{ width: '80%' }}/>
             </div>
             <p className="text-slate-400 text-[10px] leading-relaxed mt-1">Tracks catalog spare parts, hardware, and container safety allocations.</p>
           </div>
@@ -202,18 +155,12 @@ export const ReportsPage: React.FC = () => {
             </div>
             
             <svg className="w-full h-44 z-10 overflow-visible" viewBox="0 0 400 150" preserveAspectRatio="none">
-              <path 
-                d="M 10 150 Q 80 130 160 90 T 320 40 T 390 10" 
-                fill="none" 
-                stroke="#2563EB" 
-                strokeWidth="4" 
-                strokeLinecap="round"
-              />
-              <circle cx="10" cy="150" r="5" fill="#1D4ED8" stroke="#FFFFFF" strokeWidth="2" />
-              <circle cx="80" cy="140" r="5" fill="#1D4ED8" stroke="#FFFFFF" strokeWidth="2" />
-              <circle cx="160" cy="90" r="5" fill="#1D4ED8" stroke="#FFFFFF" strokeWidth="2" />
-              <circle cx="320" cy="40" r="5" fill="#1D4ED8" stroke="#FFFFFF" strokeWidth="2" />
-              <circle cx="390" cy="10" r="6" fill="#1D4ED8" stroke="#FFFFFF" strokeWidth="2" />
+              <path d="M 10 150 Q 80 130 160 90 T 320 40 T 390 10" fill="none" stroke="#2563EB" strokeWidth="4" strokeLinecap="round"/>
+              <circle cx="10" cy="150" r="5" fill="#1D4ED8" stroke="#FFFFFF" strokeWidth="2"/>
+              <circle cx="80" cy="140" r="5" fill="#1D4ED8" stroke="#FFFFFF" strokeWidth="2"/>
+              <circle cx="160" cy="90" r="5" fill="#1D4ED8" stroke="#FFFFFF" strokeWidth="2"/>
+              <circle cx="320" cy="40" r="5" fill="#1D4ED8" stroke="#FFFFFF" strokeWidth="2"/>
+              <circle cx="390" cy="10" r="6" fill="#1D4ED8" stroke="#FFFFFF" strokeWidth="2"/>
             </svg>
           </div>
           
@@ -244,27 +191,27 @@ export const ReportsPage: React.FC = () => {
 
             {/* Individual Bars */}
             <div className="flex flex-col items-center gap-2 z-10 w-1/5">
-              <div className="w-full bg-blue-600 rounded-lg transition-all hover:opacity-85" style={{ height: '140px' }} />
+              <div className="w-full bg-blue-600 rounded-lg transition-all hover:opacity-85" style={{ height: '140px' }}/>
               <span className="text-[10px] font-bold text-slate-600 font-sans">Stock</span>
             </div>
             
             <div className="flex flex-col items-center gap-2 z-10 w-1/5">
-              <div className="w-full bg-indigo-500 rounded-lg transition-all hover:opacity-85" style={{ height: '90px' }} />
+              <div className="w-full bg-indigo-500 rounded-lg transition-all hover:opacity-85" style={{ height: '90px' }}/>
               <span className="text-[10px] font-bold text-slate-600 font-sans">Users</span>
             </div>
 
             <div className="flex flex-col items-center gap-2 z-10 w-1/5">
-              <div className="w-full bg-violet-500 rounded-lg transition-all hover:opacity-85" style={{ height: '120px' }} />
+              <div className="w-full bg-violet-500 rounded-lg transition-all hover:opacity-85" style={{ height: '120px' }}/>
               <span className="text-[10px] font-bold text-slate-600 font-sans">To-Dos</span>
             </div>
 
             <div className="flex flex-col items-center gap-2 z-10 w-1/5">
-              <div className="w-full bg-amber-55 rounded-lg transition-all hover:opacity-85" style={{ height: '60px' }} />
+              <div className="w-full bg-amber-55 rounded-lg transition-all hover:opacity-85" style={{ height: '60px' }}/>
               <span className="text-[10px] font-bold text-slate-600 font-sans">Auth</span>
             </div>
 
             <div className="flex flex-col items-center gap-2 z-10 w-1/5">
-              <div className="w-full bg-slate-800 rounded-lg transition-all hover:opacity-85" style={{ height: '40px' }} />
+              <div className="w-full bg-slate-800 rounded-lg transition-all hover:opacity-85" style={{ height: '40px' }}/>
               <span className="text-[10px] font-bold text-slate-600 font-sans">Perms</span>
             </div>
           </div>
@@ -287,7 +234,7 @@ export const ReportsPage: React.FC = () => {
           <div className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl shrink-0">
-                <FileText className="w-5.5 h-5.5" />
+                <FileText className="w-5.5 h-5.5"/>
               </div>
               <div className="text-left font-sans text-xs">
                 <h5 className="font-bold text-slate-800 text-sm">System Workforce Directory Report</h5>
@@ -296,22 +243,12 @@ export const ReportsPage: React.FC = () => {
             </div>
             
             <div className="flex items-center gap-2 self-end sm:self-auto">
-              <button 
-                id="raw-user-excel-dl"
-                disabled={downloadingFormat !== null}
-                onClick={() => handleDownload('Workforce_Directory', 'Excel')}
-                className="px-3.5 py-2 bg-slate-50 hover:bg-slate-100 text-slate-650 cursor-pointer border border-slate-200 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-50"
-              >
-                <FileSpreadsheet className="w-4 h-4 text-emerald-500" />
+              <button id="raw-user-excel-dl" disabled={downloadingFormat !== null} onClick={() => handleDownload('Workforce_Directory', 'Excel')} className="px-3.5 py-2 bg-slate-50 hover:bg-slate-100 text-slate-650 cursor-pointer border border-slate-200 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-50">
+                <FileSpreadsheet className="w-4 h-4 text-emerald-500"/>
                 Sheet spread
               </button>
-              <button 
-                id="raw-user-pdf-dl"
-                disabled={downloadingFormat !== null}
-                onClick={() => handleDownload('Workforce_Directory', 'PDF')}
-                className="px-3.5 py-2 bg-slate-50 hover:bg-slate-105 text-slate-650 cursor-pointer border border-slate-200 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-50"
-              >
-                <FileDown className="w-4 h-4 text-rose-500" />
+              <button id="raw-user-pdf-dl" disabled={downloadingFormat !== null} onClick={() => handleDownload('Workforce_Directory', 'PDF')} className="px-3.5 py-2 bg-slate-50 hover:bg-slate-105 text-slate-650 cursor-pointer border border-slate-200 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-50">
+                <FileDown className="w-4 h-4 text-rose-500"/>
                 Document PDF
               </button>
             </div>
@@ -321,7 +258,7 @@ export const ReportsPage: React.FC = () => {
           <div className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl shrink-0">
-                <Shield className="w-5.5 h-5.5" />
+                <Shield className="w-5.5 h-5.5"/>
               </div>
               <div className="text-left font-sans text-xs">
                 <h5 className="font-bold text-slate-850 text-sm">Corporate Security Audit Trail Logs</h5>
@@ -330,22 +267,12 @@ export const ReportsPage: React.FC = () => {
             </div>
 
             <div className="flex items-center gap-2 self-end sm:self-auto">
-              <button 
-                id="raw-audit-excel-dl"
-                disabled={downloadingFormat !== null}
-                onClick={() => handleDownload('Corporate_Audit_Trail', 'Excel')}
-                className="px-3.5 py-2 bg-slate-50 hover:bg-slate-100 text-slate-655 cursor-pointer border border-slate-200 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-50"
-              >
-                <FileSpreadsheet className="w-4 h-4 text-emerald-500" />
+              <button id="raw-audit-excel-dl" disabled={downloadingFormat !== null} onClick={() => handleDownload('Corporate_Audit_Trail', 'Excel')} className="px-3.5 py-2 bg-slate-50 hover:bg-slate-100 text-slate-655 cursor-pointer border border-slate-200 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-50">
+                <FileSpreadsheet className="w-4 h-4 text-emerald-500"/>
                 Sheet spread
               </button>
-              <button 
-                id="raw-audit-pdf-dl"
-                disabled={downloadingFormat !== null}
-                onClick={() => handleDownload('Corporate_Audit_Trail', 'PDF')}
-                className="px-3.5 py-2 bg-slate-50 hover:bg-slate-100 text-slate-655 cursor-pointer border border-slate-200 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-50"
-              >
-                <FileDown className="w-4 h-4 text-rose-500" />
+              <button id="raw-audit-pdf-dl" disabled={downloadingFormat !== null} onClick={() => handleDownload('Corporate_Audit_Trail', 'PDF')} className="px-3.5 py-2 bg-slate-50 hover:bg-slate-100 text-slate-655 cursor-pointer border border-slate-200 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-50">
+                <FileDown className="w-4 h-4 text-rose-500"/>
                 Document PDF
               </button>
             </div>
@@ -355,7 +282,7 @@ export const ReportsPage: React.FC = () => {
           <div className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl shrink-0">
-                <Layers className="w-5.5 h-5.5" />
+                <Layers className="w-5.5 h-5.5"/>
               </div>
               <div className="text-left font-sans text-xs">
                 <h5 className="font-bold text-slate-850 text-sm">Warehouse Assets Allocation Logs</h5>
@@ -364,22 +291,12 @@ export const ReportsPage: React.FC = () => {
             </div>
 
             <div className="flex items-center gap-2 self-end sm:self-auto">
-              <button 
-                id="raw-assets-excel-dl"
-                disabled={downloadingFormat !== null}
-                onClick={() => handleDownload('Warehouse_Assets', 'Excel')}
-                className="px-3.5 py-2 bg-slate-50 hover:bg-slate-100 text-slate-655 cursor-pointer border border-slate-200 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-50"
-              >
-                <FileSpreadsheet className="w-4 h-4 text-emerald-500" />
+              <button id="raw-assets-excel-dl" disabled={downloadingFormat !== null} onClick={() => handleDownload('Warehouse_Assets', 'Excel')} className="px-3.5 py-2 bg-slate-50 hover:bg-slate-100 text-slate-655 cursor-pointer border border-slate-200 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-50">
+                <FileSpreadsheet className="w-4 h-4 text-emerald-500"/>
                 Sheet spread
               </button>
-              <button 
-                id="raw-assets-pdf-dl"
-                disabled={downloadingFormat !== null}
-                onClick={() => handleDownload('Warehouse_Assets', 'PDF')}
-                className="px-3.5 py-2 bg-slate-50 hover:bg-slate-100 text-slate-655 cursor-pointer border border-slate-200 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-50"
-              >
-                <FileDown className="w-4 h-4 text-rose-500" />
+              <button id="raw-assets-pdf-dl" disabled={downloadingFormat !== null} onClick={() => handleDownload('Warehouse_Assets', 'PDF')} className="px-3.5 py-2 bg-slate-50 hover:bg-slate-100 text-slate-655 cursor-pointer border border-slate-200 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-50">
+                <FileDown className="w-4 h-4 text-rose-500"/>
                 Document PDF
               </button>
             </div>
@@ -388,6 +305,5 @@ export const ReportsPage: React.FC = () => {
         </div>
       </div>
 
-    </div>
-  );
+    </div>);
 };
