@@ -7,6 +7,7 @@ import { ToastDisplay } from './components/ToastDisplay';
 import { Toaster } from 'react-hot-toast';
 import { ActivityLoadingBar } from './components/loading/ActivityLoadingBar';
 import { GlobalLoadingOverlay } from './components/loading/GlobalLoadingOverlay';
+import { InstallBanner } from './components/InstallBanner';
 import { useAppSelector } from './store/hooks/reduxHooks';
 import { selectAuthUser, selectIsAuthenticated } from './store/selectors/authSelectors';
 // Individual application modules pages
@@ -66,6 +67,7 @@ function AppContent() {
       <ToastDisplay />
       <ActivityLoadingBar />
       <GlobalLoadingOverlay />
+      <InstallBanner className="fixed bottom-5 left-1/2 z-[120] flex w-[calc(100%-2rem)] max-w-xl -translate-x-1/2 items-center gap-3 rounded-2xl border border-blue-200 bg-white p-4 text-sm text-slate-700 shadow-2xl" />
       <Routes>
         <Route path="/login" element={<GuestGuard>
               <LoginPage />

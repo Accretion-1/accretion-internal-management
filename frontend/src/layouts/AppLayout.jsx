@@ -50,9 +50,11 @@ export const AppLayout = () => {
         {/* Core Title header section */}
         <div className={`h-[72px] border-b border-slate-800 flex items-center shrink-0 ${isSidebarCollapsed ? 'justify-center' : 'justify-between px-6'}`}>
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-blue-600 hover:bg-blue-500 rounded-xl flex items-center justify-center text-white font-extrabold text-lg shadow-md shrink-0 transition-colors">
-              W
-            </div>
+            <img
+              src="/icons/pwa-192x192.png"
+              alt="Accretion"
+              className="h-9 w-9 shrink-0 rounded-xl object-cover shadow-md"
+            />
             {!isSidebarCollapsed && (<span className="font-display font-extrabold text-white text-[17px] tracking-tight">
                 WorkSphere
               </span>)}
@@ -104,7 +106,11 @@ export const AppLayout = () => {
             <motion.div initial={{ x: -250 }} animate={{ x: 0 }} exit={{ x: -250 }} transition={{ type: 'spring', damping: 25 }} className="relative w-72 bg-slate-900 text-slate-400 border-r border-slate-800 flex flex-col p-5 h-full">
               <div className="flex items-center justify-between border-b border-slate-800 pb-5 mb-5 shrink-0">
                 <span className="font-display font-extrabold text-white text-lg tracking-tight flex items-center gap-2">
-                  <span className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white text-md">W</span>
+                  <img
+                    src="/icons/pwa-192x192.png"
+                    alt="Accretion"
+                    className="h-8 w-8 rounded-lg object-cover"
+                  />
                   WorkSphere
                 </span>
                 <button id="mobile-nav-close" onClick={() => setIsMobileSidebarOpen(false)} className="p-1 rounded-lg hover:bg-slate-800 cursor-pointer">

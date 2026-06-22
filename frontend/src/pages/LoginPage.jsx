@@ -80,9 +80,11 @@ export const LoginPage = () => {
       {/* Header */}
       <header className="relative w-full max-w-7xl mx-auto px-6 py-5 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2.5">
-          <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white font-display font-black text-xl shadow-md shadow-blue-200">
-            W
-          </div>
+          <img
+            src="/icons/pwa-192x192.png"
+            alt="Accretion"
+            className="h-10 w-10 rounded-xl object-cover shadow-md shadow-blue-200"
+          />
           <div>
             <span className="font-display font-bold text-slate-900 text-lg tracking-tight">WorkSphere</span>
             <span className="ml-1.5 px-2 py-0.5 text-[10px] uppercase tracking-wider font-semibold bg-blue-55 text-blue-700 rounded-full border border-blue-100">Investor Demo</span>
