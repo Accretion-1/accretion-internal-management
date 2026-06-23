@@ -1,5 +1,5 @@
 import { apiHandler, apiResponse } from "../utils/api.util.js";
-import { CUSTOM_SUCCESS } from "../utils/message.util.js";
+import { ADD_SUCCESS, CUSTOM_SUCCESS, UPDATE_SUCCESS } from "../utils/message.util.js";
 import * as userService from "../services/user.service.js";
 
 export const loginUserController = apiHandler(async (req, res) => {
@@ -20,4 +20,14 @@ export const resendUserOTPController = apiHandler(async (req, res) => {
 export const getUserProfileController = apiHandler(async (req, res) => {
   const user = userService.getUserProfileService(req.user);
   return apiResponse(CUSTOM_SUCCESS, "User profile fetched successfully", user, res, "object");
+});
+
+export const createUserController = apiHandler(async (req, res) => {
+  const user = await userService.createUserService(req.body);
+  return apiResponse(ADD_SUCCESS, "User", user, res, "object");
+});
+
+export const updateUserController = apiHandler(async (req, res) => {
+  const user = await userService.updateUserService(req.params.user_id, req.body);
+  return apiResponse(UPDATE_SUCCESS, "User", user, res, "object");
 });

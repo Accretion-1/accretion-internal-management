@@ -1,8 +1,10 @@
 import jwt from "jsonwebtoken";
 import { JWT_SECRET, NODE_ENV, TEST_OTP } from "../constants.js";
+import * as locationModel from "../model/location.model.js";
+import * as panelModel from "../model/panel.model.js";
 import * as userModel from "../model/user.model.js";
 import { ApiError } from "../utils/api.util.js";
-import { CUSTOM_ERROR, INVALID, NOT_FOUND } from "../utils/message.util.js";
+import { ADD_ERROR, CUSTOM_ERROR, EXISTS, INVALID, NOT_FOUND, UPDATE_ERROR } from "../utils/message.util.js";
 import { generateJWTToken, generateOTPCode, isEmpty } from "../utils/misc.util.js";
 import { sendOTP } from "../utils/twillio.util.js";
 
@@ -57,13 +59,49 @@ const sanitizeUser = (user) => ({
   phone_number: user.phone_number,
   email: user.email,
   full_name: user.full_name,
+  location_id: user.location_id,
   gender: user.gender,
   profile_image: user.profile_image,
   is_verified: Boolean(user.is_verified),
   is_active: Boolean(user.is_active),
   created_at: user.created_at,
+  updated_at: user.updated_at,
   role: user.role,
 });
+
+const normalizeCreateUserPayload = (payload) => ({
+  ...payload,
+  phone_number: String(payload.phone_number || "").replace(/\s/g, ""),
+  email: payload.email || null,
+  full_name: payload.full_name || null,
+  location_id: payload.role === "USER" ? payload.location_id : null,
+  gender: payload.gender || null,
+  profile_image: payload.profile_image || null,
+  is_active: payload.is_active === false ? 0 : 1,
+  panel_ids: [...new Set(payload.panel_ids || [])],
+});
+
+const normalizeUpdateUserPayload = (payload, existingUser) => {
+  const normalizedPayload = {};
+
+  if (Object.prototype.hasOwnProperty.call(payload, "phone_number")) {
+    normalizedPayload.phone_number = String(payload.phone_number || "").replace(/\s/g, "");
+  }
+
+  if (Object.prototype.hasOwnProperty.call(payload, "full_name")) {
+    normalizedPayload.full_name = payload.full_name || null;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(payload, "is_active")) {
+    normalizedPayload.is_active = payload.is_active === false ? 0 : 1;
+  }
+
+  if (existingUser.role === "USER" && Object.prototype.hasOwnProperty.call(payload, "panel_ids")) {
+    normalizedPayload.panel_ids = [...new Set(payload.panel_ids || [])];
+  }
+
+  return normalizedPayload;
+};
 
 export const loginUserService = async ({ phone_number, fcm_token = null }) => {
   try {
@@ -132,3 +170,82 @@ export const verifyUserOTPService = async ({ phone_number, otp }) => {
 };
 
 export const getUserProfileService = (user) => sanitizeUser(user);
+
+export const createUserService = async (payload) => {
+  try {
+    const userPayload = normalizeCreateUserPayload(payload);
+    const existingUsers = await userModel.getUserByPhoneNumberModel(userPayload.phone_number);
+
+    if (!isEmpty(existingUsers)) {
+      throw new ApiError(EXISTS, "Phone number");
+    }
+
+    if (userPayload.role === "USER") {
+      const location = await locationModel.getLocationByIdModel(userPayload.location_id);
+      if (isEmpty(location)) {
+        throw new ApiError(NOT_FOUND, "Location");
+      }
+
+      const panels = await panelModel.getPanelsByIdsModel(userPayload.panel_ids);
+      if (panels.length !== userPayload.panel_ids.length) {
+        throw new ApiError(INVALID, "panel_ids");
+      }
+    } else {
+      userPayload.panel_ids = [];
+    }
+
+    const userId = await userModel.createUserModel(userPayload);
+    const createdUser = await userModel.getUserByIdModel(userId);
+    const panels = userPayload.role === "USER" ? await userModel.getUserPanelsModel(userId) : [];
+
+    return {
+      ...sanitizeUser(createdUser),
+      panels,
+    };
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    throw new ApiError(ADD_ERROR, "User", error, false);
+  }
+};
+
+export const updateUserService = async (userId, payload) => {
+  try {
+    const existingUser = await userModel.getUserByIdModel(userId);
+    if (isEmpty(existingUser)) {
+      throw new ApiError(NOT_FOUND, "User");
+    }
+
+    const userPayload = normalizeUpdateUserPayload(payload, existingUser);
+
+    if (userPayload.phone_number && userPayload.phone_number !== existingUser.phone_number) {
+      const usersWithPhoneNumber = await userModel.getUserByPhoneNumberModel(userPayload.phone_number);
+      const phoneNumberExists = usersWithPhoneNumber.some(
+        (user) => Number(user.user_id) !== Number(userId),
+      );
+
+      if (phoneNumberExists) {
+        throw new ApiError(EXISTS, "Phone number");
+      }
+    }
+
+    if (Object.prototype.hasOwnProperty.call(userPayload, "panel_ids")) {
+      const panels = await panelModel.getPanelsByIdsModel(userPayload.panel_ids);
+      if (panels.length !== userPayload.panel_ids.length) {
+        throw new ApiError(INVALID, "panel_ids");
+      }
+    }
+
+    await userModel.updateUserDetailsModel(userId, userPayload);
+
+    const updatedUser = await userModel.getUserByIdModel(userId);
+    const panels = updatedUser.role === "USER" ? await userModel.getUserPanelsModel(userId) : [];
+
+    return {
+      ...sanitizeUser(updatedUser),
+      panels,
+    };
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    throw new ApiError(UPDATE_ERROR, "User", error, false);
+  }
+};
