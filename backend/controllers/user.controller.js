@@ -33,11 +33,11 @@ export const getUserByIdController = apiHandler(async (req, res) => {
 });
 
 export const createUserController = apiHandler(async (req, res) => {
-  const user = await userService.createUserService(req.body);
+  const user = await userService.createUserService(req.body, req.user);
   return apiResponse(ADD_SUCCESS, "User", user, res, "object");
 });
 
 export const updateUserController = apiHandler(async (req, res) => {
-  const user = await userService.updateUserService(req.params.user_id, req.body);
+  const user = await userService.updateUserService(req.params.user_id, req.body, req.user);
   return apiResponse(UPDATE_SUCCESS, "User", user, res, "object");
 });

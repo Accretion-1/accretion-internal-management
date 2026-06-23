@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate, Outlet } from 'react-router-dom';
 import { useAppState } from '../contexts/StateContext';
-import { LayoutDashboard, Users, Package, BarChart4, Bell, ClipboardList, Settings, LogOut, ChevronLeft, ChevronRight, Menu, X, ShieldAlert, CheckSquare, BellRing, MapPin } from 'lucide-react';
+import { LayoutDashboard, Users, Package, BarChart4, ClipboardList, Settings, LogOut, ChevronLeft, ChevronRight, Menu, X, ShieldAlert, CheckSquare, BellRing, MapPin } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAppDispatch } from '../store/hooks/reduxHooks';
 import { logout as logoutAuth } from '../store/slices/authSlice';
+import { Modal } from '../components/Modal';
 const SIDEBAR_ITEMS = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, allowedRoles: ['Admin', 'Manager', 'User'] },
     { id: 'users', label: 'User Management', icon: Users, allowedRoles: ['Admin', 'Manager'] },
@@ -62,11 +63,11 @@ const MOBILE_SIDEBAR_VARIANTS = {
     },
 };
 export const AppLayout = () => {
-    const { currentUser, logout, notifications, markAllNotificationsAsRead, addNotificationCount } = useAppState();
+    const { currentUser, logout } = useAppState();
     const dispatch = useAppDispatch();
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-    const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+    const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
     if (!currentUser)
         return null;
     const location = useLocation();
@@ -90,12 +91,15 @@ export const AppLayout = () => {
         setIsMobileSidebarOpen(false);
     };
     const openMobileSidebar = () => {
-        setIsNotificationsOpen(false);
         setIsMobileSidebarOpen(true);
     };
     const closeMobileSidebar = () => setIsMobileSidebarOpen(false);
     const handleLogout = () => {
         setIsMobileSidebarOpen(false);
+        setIsLogoutConfirmOpen(true);
+    };
+    const confirmLogout = () => {
+        setIsLogoutConfirmOpen(false);
         logout();
         dispatch(logoutAuth());
     };
@@ -116,6 +120,21 @@ export const AppLayout = () => {
         };
     }, [isMobileSidebarOpen]);
     return (<div className="relative flex h-screen min-h-0 overflow-hidden bg-slate-50 font-sans">
+      <Modal
+        isOpen={isLogoutConfirmOpen}
+        onClose={() => setIsLogoutConfirmOpen(false)}
+        title="Sign Out Session?"
+        maxWidthClass="max-w-md"
+        footerButtons={[
+          { id: 'cancel-logout-btn', label: 'Cancel', onClick: () => setIsLogoutConfirmOpen(false) },
+          { id: 'confirm-logout-btn', label: 'Yes, Sign Out', onClick: confirmLogout, variant: 'danger' },
+        ]}
+      >
+        <div className="rounded-2xl border border-rose-100 bg-rose-50 p-4 text-sm text-rose-700">
+          <p className="font-bold">Are you sure you want to sign out?</p>
+          <p className="mt-1 text-xs leading-relaxed">Your current session will be cleared and you will need to verify your phone number again to access the workspace.</p>
+        </div>
+      </Modal>
       
       {/* BACKGROUND DECORATIONS */}
       <div className="absolute top-0 left-0 w-64 h-64 bg-blue-100/20 rounded-full blur-3xl pointer-events-none"/>
@@ -252,57 +271,9 @@ export const AppLayout = () => {
           </div>
 
           <div className="flex items-center gap-4">
-            
-            {/* Dynamic notifications Bell & Pop-down Overlay (Fulfills unread timelines center) */}
-            <div className="relative">
-              <button id="header-bell-button" onClick={() => setIsNotificationsOpen(!isNotificationsOpen)} className="p-2 bg-slate-50 border border-slate-200/80 rounded-xl text-slate-600 hover:bg-slate-100 transition-all cursor-pointer relative">
-                <Bell className="w-5 h-5"/>
-                {addNotificationCount > 0 && (<span className="absolute top-0 right-0 w-5 h-5 bg-rose-500 border border-white text-white font-mono font-bold text-[9px] rounded-full flex items-center justify-center animate-bounce shadow">
-                    {addNotificationCount}
-                  </span>)}
-              </button>
-
-              {/* Expandable Notification center Timeline dropdown */}
-              <AnimatePresence>
-                {isNotificationsOpen && (<>
-                    <div className="fixed inset-0 z-30" onClick={() => setIsNotificationsOpen(false)}/>
-                    
-                    <motion.div key="notifications-dropdown-overlay" initial={{ opacity: 0, y: 15, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 10, scale: 0.95 }} transition={{ duration: 0.15 }} className="absolute -right-2 sm:right-0 top-12 bg-white border border-slate-200 rounded-3xl shadow-2xl p-5 w-[calc(100vw-2rem)] sm:w-96 max-w-[384px] z-40 text-left flex flex-col gap-4">
-                      <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                        <div className="flex items-center gap-2">
-                          <BellRing className="w-4.5 h-4.5 text-blue-600"/>
-                          <h4 className="font-display text-sm font-bold text-slate-905">Unread Signals ({addNotificationCount})</h4>
-                        </div>
-                        {addNotificationCount > 0 && (<button id="header-mark-all-read" onClick={() => {
-                    markAllNotificationsAsRead();
-                    setIsNotificationsOpen(false);
-                }} className="text-[10px] font-bold text-blue-600 hover:text-blue-700 cursor-pointer">
-                            Mark all read
-                          </button>)}
-                      </div>
-
-                      <div className="flex flex-col gap-3 max-h-80 overflow-y-auto pr-1">
-                        {notifications.length > 0 ? (notifications.map((ntf) => (<div key={ntf.id} className={`p-3.5 rounded-2xl border transition-all flex flex-col gap-1 ${ntf.read
-                    ? 'bg-slate-50 text-slate-500 border-slate-200/40'
-                    : 'bg-blue-50/40 text-slate-800 border-blue-100/60'}`}>
-                              <div className="flex justify-between items-start text-xs font-bold leading-normal">
-                                <span>{ntf.title}</span>
-                                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${ntf.read ? 'bg-transparent' : 'bg-blue-600'}`}/>
-                              </div>
-                              <p className="text-[11px] text-slate-500 leading-relaxed font-sans">{ntf.description}</p>
-                              <span className="font-mono text-[9px] text-slate-400 mt-1">{ntf.timestamp}</span>
-                            </div>))) : (<div className="p-8 text-center text-slate-400 text-xs italic">
-                            All cleared down. No notifications.
-                          </div>)}
-                      </div>
-                    </motion.div>
-                  </>)}
-              </AnimatePresence>
-            </div>
-
             {/* Profile trigger */}
             <div className="flex items-center gap-2">
-              <div onClick={() => handleNavClick('settings')} className="w-9 h-9 bg-slate-900 border border-slate-850 hover:bg-slate-800 rounded-xl text-white flex items-center justify-center font-display font-bold text-xs shadow-sm cursor-pointer shrink-0 transition-colors" title="Your Profile settings">
+              <div className="w-9 h-9 bg-slate-900 border border-slate-850 rounded-xl text-white flex items-center justify-center font-display font-bold text-xs shadow-sm shrink-0 select-none" title={currentUser.name}>
                 {currentUser.name.charAt(0)}
               </div>
               <div className="hidden sm:flex flex-col text-left">

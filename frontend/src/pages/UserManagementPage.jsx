@@ -19,6 +19,11 @@ const roleLabelMap = {
     MANAGER: 'Manager',
     USER: 'User',
 };
+const ROLE_RANK = {
+    USER: 1,
+    MANAGER: 2,
+    ADMIN: 3,
+};
 
 const toApiRole = (role) => String(role || 'USER').toUpperCase();
 const toDisplayRole = (role) => roleLabelMap[toApiRole(role)] || 'User';
@@ -44,7 +49,10 @@ export const UserManagementPage = () => {
     const { currentUser } = useAppState();
     const isManager = currentUser?.role === 'Manager';
     const isAdmin = currentUser?.role === 'Admin';
+    const currentRoleValue = toApiRole(currentUser?.role);
     const canManageUsers = isAdmin || isManager;
+    const canManageRole = (targetRole) => (ROLE_RANK[currentRoleValue] || 0) > (ROLE_RANK[toApiRole(targetRole)] || 0);
+    const canManageUser = (user) => canManageRole(user?.roleValue || user?.role);
 
     const [users, setUsers] = useState([]);
     const [panels, setPanels] = useState([]);
@@ -172,6 +180,7 @@ export const UserManagementPage = () => {
     };
 
     const handleOpenEdit = (user) => {
+        if (!canManageUser(user)) return;
         setActiveUser(user);
         setForm({
             full_name: user.full_name || '',
@@ -271,6 +280,7 @@ export const UserManagementPage = () => {
     };
 
     const handleToggleActive = async (user) => {
+        if (!canManageUser(user)) return;
         setIsSaving(true);
         try {
             const response = await apiHandler({
@@ -458,12 +468,12 @@ export const UserManagementPage = () => {
                                                 <button id={`inspect-user-${user.id}`} onClick={() => handleOpenView(user)} className="cursor-pointer rounded-lg p-1.5 text-slate-450 transition-colors hover:bg-slate-100 hover:text-slate-800" title="Inspect user">
                                                     <Eye className="h-4 w-4" />
                                                 </button>
-                                                {(isAdmin || (isManager && user.role !== 'Admin')) && (
+                                                {canManageUser(user) && (
                                                     <button id={`edit-user-${user.id}`} onClick={() => handleOpenEdit(user)} className="cursor-pointer rounded-lg p-1.5 text-blue-500 transition-colors hover:bg-blue-50 hover:text-blue-700" title="Edit user">
                                                         <Edit2 className="h-4 w-4" />
                                                     </button>
                                                 )}
-                                                {(isAdmin || (isManager && user.role !== 'Admin')) && (
+                                                {canManageUser(user) && (
                                                     <button id={`toggle-user-${user.id}`} onClick={() => handleToggleActive(user)} disabled={isSaving} className={`cursor-pointer rounded-lg p-1.5 transition-colors disabled:opacity-50 ${user.is_active ? 'text-amber-500 hover:bg-amber-50 hover:text-amber-700' : 'text-emerald-500 hover:bg-emerald-50 hover:text-emerald-700'}`} title={user.is_active ? 'Deactivate user' : 'Activate user'}>
                                                         {user.is_active ? <UserX className="h-4 w-4" /> : <UserCheck className="h-4 w-4" />}
                                                     </button>
@@ -518,8 +528,7 @@ export const UserManagementPage = () => {
                             <label className="text-xs font-semibold text-slate-750">Role</label>
                             <select id="create-form-role" value={form.role} onChange={(event) => setForm((prev) => ({ ...prev, role: event.target.value, location_id: event.target.value === 'USER' ? prev.location_id : '', panel_ids: event.target.value === 'USER' ? prev.panel_ids : [] }))} className="cursor-pointer rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-semibold text-slate-800 focus:outline-none">
                                 <option value="USER">User</option>
-                                <option value="MANAGER">Manager</option>
-                                {isAdmin && <option value="ADMIN">Admin</option>}
+                                {canManageRole('MANAGER') && <option value="MANAGER">Manager</option>}
                             </select>
                         </div>
                         <div className="flex flex-col gap-1.5 text-left">
