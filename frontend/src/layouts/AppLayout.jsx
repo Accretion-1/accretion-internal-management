@@ -8,7 +8,6 @@ import { logout as logoutAuth } from '../store/slices/authSlice';
 const SIDEBAR_ITEMS = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, allowedRoles: ['Admin', 'Manager', 'User'] },
     { id: 'users', label: 'User Management', icon: Users, allowedRoles: ['Admin', 'Manager'] },
-    { id: 'reminders', label: 'Reminders', icon: Bell, allowedRoles: ['Admin', 'Manager', 'User'] },
     { id: 'todos', label: 'To-Dos Management', icon: CheckSquare, allowedRoles: ['Admin', 'Manager', 'User'] },
     { id: 'reminder-schedule', label: 'Reminder Schedule Management', icon: BellRing, allowedRoles: ['Admin', 'Manager', 'User'] },
     { id: 'locations', label: 'Locations', icon: MapPin, allowedRoles: ['Admin', 'Manager', 'User'] },
@@ -20,6 +19,29 @@ const ROUTE_ACCESS_ITEMS = [
     { id: 'reports', label: 'Reports & Stats', icon: BarChart4, allowedRoles: ['Admin', 'Manager'] },
     { id: 'activities', label: 'Workspace Audits', icon: ClipboardList, allowedRoles: ['Admin'] },
 ];
+const PANEL_ROUTE_BY_ID = {
+    1: 'dashboard',
+    2: 'users',
+    3: 'todos',
+    4: 'reminder-schedule',
+    5: 'locations',
+    6: 'settings',
+};
+const PANEL_ROUTE_BY_NAME = {
+    dashboard: 'dashboard',
+    'user management': 'users',
+    'to-dos management': 'todos',
+    'todos management': 'todos',
+    'reminder schedule management': 'reminder-schedule',
+    locations: 'locations',
+    settings: 'settings',
+};
+const normalizePanelName = (panelName) => String(panelName || '').trim().toLowerCase();
+const getUserPanelRouteIds = (panels = []) => new Set(
+    panels
+        .map((panel) => PANEL_ROUTE_BY_ID[Number(panel.panel_id)] || PANEL_ROUTE_BY_NAME[normalizePanelName(panel.panel_name)])
+        .filter(Boolean),
+);
 const MOBILE_OVERLAY_TRANSITION = { duration: 0.18, ease: 'easeOut' };
 const MOBILE_SIDEBAR_VARIANTS = {
     closed: {
@@ -50,10 +72,18 @@ export const AppLayout = () => {
     const location = useLocation();
     const navigate = useNavigate();
     const activeTab = location.pathname.substring(1) || 'dashboard';
+    const isPrivilegedRole = currentUser.role === 'Admin' || currentUser.role === 'Manager';
+    const userPanelRouteIds = getUserPanelRouteIds(currentUser.panels);
+    const canAccessRoute = (item) => isPrivilegedRole
+        ? item.allowedRoles.includes(currentUser.role)
+        : userPanelRouteIds.has(item.id);
+    const visibleSidebarItems = isPrivilegedRole
+        ? SIDEBAR_ITEMS
+        : SIDEBAR_ITEMS.filter((item) => canAccessRoute(item));
     // Route protection evaluations
     const currentTabItem = ROUTE_ACCESS_ITEMS.find(item => item.id === activeTab);
     const isTabAllowed = currentTabItem
-        ? currentTabItem.allowedRoles.includes(currentUser.role)
+        ? canAccessRoute(currentTabItem)
         : false;
     const handleNavClick = (tabId) => {
         navigate(`/${tabId}`);
@@ -119,10 +149,10 @@ export const AppLayout = () => {
         {/* Sidebar Nav anchors */}
         <div className="flex min-h-0 flex-1 flex-col px-4 py-4">
           <nav className="m-0 flex min-h-0 flex-1 list-none flex-col gap-1.5 overflow-y-auto overscroll-contain py-2 pr-1 text-left">
-            {SIDEBAR_ITEMS.map((item) => {
+            {visibleSidebarItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
-            const hasAccess = item.allowedRoles.includes(currentUser.role);
+            const hasAccess = canAccessRoute(item);
             if (!hasAccess)
                 return null;
             return (<button key={item.id} id={`sidebar-nav-${item.id}`} onClick={() => handleNavClick(item.id)} className={`w-full flex items-center gap-3 py-2.5 rounded-xl text-xs font-bold transition-all relative cursor-pointer ${isActive
@@ -168,10 +198,10 @@ export const AppLayout = () => {
               </div>
 
               <nav className="relative flex flex-1 flex-col gap-2 overflow-y-auto overscroll-contain px-4 py-5 text-left">
-                {SIDEBAR_ITEMS.map((item) => {
+                {visibleSidebarItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = activeTab === item.id;
-                const hasAccess = item.allowedRoles.includes(currentUser.role);
+                const hasAccess = canAccessRoute(item);
                 if (!hasAccess)
                     return null;
                 return (<button key={item.id} id={`mobile-nav-${item.id}`} type="button" onClick={() => handleNavClick(item.id)} aria-current={isActive ? 'page' : undefined} className={`group relative flex w-full cursor-pointer items-center gap-3.5 rounded-2xl px-4 py-3.5 text-left text-sm font-bold transition-all duration-200 active:scale-[0.98] ${isActive

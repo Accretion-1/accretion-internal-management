@@ -1,7 +1,9 @@
 import express from "express";
 import {
   createUserController,
+  getUserByIdController,
   getUserProfileController,
+  getUsersController,
   loginUserController,
   resendUserOTPController,
   updateUserController,
@@ -24,6 +26,8 @@ router.post("/login", validate(loginUserSchema, "body"), loginUserController);
 router.post("/verify-otp", validate(verifyOTPSchema, "body"), verifyUserOTPController);
 router.post("/resend-otp", validate(resendOTPSchema, "body"), resendUserOTPController);
 router.get("/profile", authGuard, getUserProfileController);
+router.get("/", authGuard, getUsersController);
+router.get("/:user_id", authGuard, validate(userIdParamSchema, "params"), getUserByIdController);
 router.post("/add", authGuard, validate(createUserSchema, "body"), createUserController);
 router.put(
   "/update/:user_id",

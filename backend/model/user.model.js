@@ -19,6 +19,71 @@ export const getUserByIdModel = async (userId) => {
   }
 };
 
+export const getUserDetailByIdModel = async (userId) => {
+  try {
+    const [user] = await db.query(
+      `SELECT
+        u.user_id,
+        u.phone_number,
+        u.email,
+        u.full_name,
+        u.location_id,
+        l.district,
+        l.godown,
+        l.sloc,
+        l.cap,
+        l.remark,
+        u.gender,
+        u.profile_image,
+        u.is_verified,
+        u.is_active,
+        u.created_at,
+        u.updated_at,
+        u.role
+       FROM users u
+       LEFT JOIN locations l ON l.location_id = u.location_id
+       WHERE u.user_id = ?
+       LIMIT 1`,
+      [userId],
+    );
+    return user;
+  } catch (error) {
+    throw new ApiError(DB_ERROR, "Checking User", error, false);
+  }
+};
+
+export const getUsersModel = async (user_id) => {
+  try {
+    return await db.query(
+      `SELECT
+        u.user_id,
+        u.phone_number,
+        u.email,
+        u.full_name,
+        u.location_id,
+        l.district,
+        l.godown,
+        l.sloc,
+        l.cap,
+        l.remark,
+        u.gender,
+        u.profile_image,
+        u.is_verified,
+        u.is_active,
+        u.created_at,
+        u.updated_at,
+        u.role
+      FROM users u
+      LEFT JOIN locations l ON l.location_id = u.location_id
+      WHERE u.user_id != ?
+      ORDER BY u.user_id DESC`,
+      [user_id]
+    );
+  } catch (error) {
+    throw new ApiError(DB_ERROR, "Fetching Users", error, false);
+  }
+};
+
 export const createUserModel = async ({
   phone_number,
   email = null,
@@ -35,8 +100,8 @@ export const createUserModel = async ({
   try {
     const [userResult] = await connection.query(
       `INSERT INTO users
-        (phone_number, email, full_name, location_id, gender, profile_image, role, is_active)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        (phone_number, email, full_name, location_id, gender, profile_image, role, is_active,is_verified)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?,1)`,
       [phone_number, email, full_name, location_id, gender, profile_image, role, is_active],
     );
 

@@ -60,6 +60,16 @@ const sanitizeUser = (user) => ({
   email: user.email,
   full_name: user.full_name,
   location_id: user.location_id,
+  location: user.location_id
+    ? {
+        location_id: user.location_id,
+        district: user.district,
+        godown: user.godown,
+        sloc: user.sloc,
+        cap: user.cap,
+        remark: user.remark,
+      }
+    : null,
   gender: user.gender,
   profile_image: user.profile_image,
   is_verified: Boolean(user.is_verified),
@@ -152,24 +162,75 @@ export const verifyUserOTPService = async ({ phone_number, otp }) => {
 
     await userModel.markUserVerifiedModel(user.user_id);
 
-    const authenticatedUser = {
-      ...user,
-      is_verified: 1,
-    };
+    const authenticatedUser = await userModel.getUserDetailByIdModel(user.user_id);
+    const panels = authenticatedUser.role === "USER"
+      ? await userModel.getUserPanelsModel(user.user_id)
+      : [];
     const token = generateJWTToken({
       user_id: user.user_id,
       role: user.role,
       is_admin: user.role === "ADMIN",
     });
 
-    return { user: sanitizeUser(authenticatedUser), token };
+    return {
+      user: {
+        ...sanitizeUser({ ...authenticatedUser, is_verified: 1 }),
+        panels,
+      },
+      token,
+    };
   } catch (error) {
     if (error instanceof ApiError) throw error;
     throw new ApiError(CUSTOM_ERROR, "Unable to verify OTP", error, false);
   }
 };
 
-export const getUserProfileService = (user) => sanitizeUser(user);
+export const getUserProfileService = async (user) => {
+  const userDetails = await userModel.getUserDetailByIdModel(user.user_id);
+  const panels = userDetails.role === "USER"
+    ? await userModel.getUserPanelsModel(user.user_id)
+    : [];
+
+  return {
+    ...sanitizeUser(userDetails),
+    panels,
+  };
+};
+
+export const getUsersService = async (user_id) => {
+  try {
+    const users = await userModel.getUsersModel(user_id);
+
+    return await Promise.all(
+      users.map(async (user) => ({
+        ...sanitizeUser(user),
+        panels: user.role === "USER" ? await userModel.getUserPanelsModel(user.user_id) : [],
+      })),
+    );
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    throw new ApiError(CUSTOM_ERROR, "Unable to fetch users", error, false);
+  }
+};
+
+export const getUserByIdService = async (userId) => {
+  try {
+    const user = await userModel.getUserDetailByIdModel(userId);
+    if (isEmpty(user)) {
+      throw new ApiError(NOT_FOUND, "User");
+    }
+
+    const panels = user.role === "USER" ? await userModel.getUserPanelsModel(userId) : [];
+
+    return {
+      ...sanitizeUser(user),
+      panels,
+    };
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    throw new ApiError(CUSTOM_ERROR, "Unable to fetch user", error, false);
+  }
+};
 
 export const createUserService = async (payload) => {
   try {
@@ -195,7 +256,7 @@ export const createUserService = async (payload) => {
     }
 
     const userId = await userModel.createUserModel(userPayload);
-    const createdUser = await userModel.getUserByIdModel(userId);
+    const createdUser = await userModel.getUserDetailByIdModel(userId);
     const panels = userPayload.role === "USER" ? await userModel.getUserPanelsModel(userId) : [];
 
     return {
@@ -237,7 +298,7 @@ export const updateUserService = async (userId, payload) => {
 
     await userModel.updateUserDetailsModel(userId, userPayload);
 
-    const updatedUser = await userModel.getUserByIdModel(userId);
+    const updatedUser = await userModel.getUserDetailByIdModel(userId);
     const panels = updatedUser.role === "USER" ? await userModel.getUserPanelsModel(userId) : [];
 
     return {

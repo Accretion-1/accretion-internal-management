@@ -15,7 +15,7 @@ const EMPTY_FORM = {
 const normalizeLocationForm = (form) => ({
     district: form.district.trim() || null,
     godown: form.godown.trim() || null,
-    sloc: form.sloc === '' ? null : Number(form.sloc),
+    sloc: form.sloc.trim() || null,
     cap: form.cap === '' ? null : Number(form.cap),
     remark: form.remark.trim() || null,
 });
@@ -80,10 +80,6 @@ export const LocationsPage = () => {
 
         if (!form.godown.trim()) {
             nextErrors.godown = 'Godown is required.';
-        }
-
-        if (form.sloc !== '' && Number(form.sloc) < 0) {
-            nextErrors.sloc = 'SLOC must be zero or more.';
         }
 
         if (form.cap !== '' && Number(form.cap) < 0) {
@@ -359,8 +355,7 @@ export const LocationsPage = () => {
                     <div className="flex flex-col gap-1.5">
                         <label className="text-xs font-bold text-slate-600">SLOC</label>
                         <input
-                            type="number"
-                            min="0"
+                            type="text"
                             value={form.sloc}
                             onChange={(event) => handleChange('sloc', event.target.value)}
                             className={`rounded-xl border bg-slate-50 px-3.5 py-2.5 text-sm font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-2 ${errors.sloc ? 'border-rose-300 focus:ring-rose-100' : 'border-slate-200 focus:ring-blue-100'}`}

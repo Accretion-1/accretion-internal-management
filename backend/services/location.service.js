@@ -7,6 +7,7 @@ const normalizeLocationPayload = (payload) => ({
   ...payload,
   district: payload.district === "" ? null : payload.district,
   godown: payload.godown === "" ? null : payload.godown,
+  sloc: payload.sloc === "" ? null : payload.sloc,
   remark: payload.remark === "" ? null : payload.remark,
 });
 

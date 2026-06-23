@@ -11,7 +11,7 @@ export const locationIdParamSchema = Joi.object({
 export const createLocationSchema = Joi.object({
   district: nullableTextValidation.optional(),
   godown: nullableTextValidation.optional(),
-  sloc: nullableIntegerValidation.optional(),
+  sloc: nullableTextValidation.optional(),
   cap: nullableIntegerValidation.optional(),
   remark: nullableTextValidation.optional(),
 })
@@ -21,7 +21,7 @@ export const createLocationSchema = Joi.object({
 export const updateLocationSchema = Joi.object({
   district: nullableTextValidation.optional(),
   godown: nullableTextValidation.optional(),
-  sloc: nullableIntegerValidation.optional(),
+  sloc: nullableTextValidation.optional(),
   cap: nullableIntegerValidation.optional(),
   remark: nullableTextValidation.optional(),
 })

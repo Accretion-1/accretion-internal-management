@@ -20,6 +20,35 @@ import { TodoPage } from './pages/TodoPage';
 import { ActivityLogsPage } from './pages/ActivityLogsPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { LocationsPage } from './pages/LocationsPage';
+const PANEL_ROUTE_BY_ID = {
+    1: '/dashboard',
+    2: '/users',
+    3: '/todos',
+    4: '/reminder-schedule',
+    5: '/locations',
+    6: '/settings',
+};
+const PANEL_ROUTE_BY_NAME = {
+    dashboard: '/dashboard',
+    'user management': '/users',
+    'to-dos management': '/todos',
+    'todos management': '/todos',
+    'reminder schedule management': '/reminder-schedule',
+    locations: '/locations',
+    settings: '/settings',
+};
+const normalizePanelName = (panelName) => String(panelName || '').trim().toLowerCase();
+const getAuthenticatedHomePath = (authUser) => {
+    const role = String(authUser?.role || '').toUpperCase();
+    if (role === 'ADMIN' || role === 'MANAGER') {
+        return '/dashboard';
+    }
+    const panels = Array.isArray(authUser?.panels) ? authUser.panels : [];
+    const firstRoute = panels
+        .map((panel) => PANEL_ROUTE_BY_ID[Number(panel.panel_id)] || PANEL_ROUTE_BY_NAME[normalizePanelName(panel.panel_name)])
+        .find(Boolean);
+    return firstRoute || '/settings';
+};
 const AuthGuard = ({ children }) => {
     const isAuthenticated = useAppSelector(selectIsAuthenticated);
     if (!isAuthenticated)
@@ -28,9 +57,14 @@ const AuthGuard = ({ children }) => {
 };
 const GuestGuard = ({ children }) => {
     const isAuthenticated = useAppSelector(selectIsAuthenticated);
+    const authUser = useAppSelector(selectAuthUser);
     if (isAuthenticated)
-        return <Navigate to="/dashboard" replace/>;
+        return <Navigate to={getAuthenticatedHomePath(authUser)} replace/>;
     return <>{children}</>;
+};
+const HomeRedirect = () => {
+    const authUser = useAppSelector(selectAuthUser);
+    return <Navigate to={getAuthenticatedHomePath(authUser)} replace/>;
 };
 const AuthStateBridge = () => {
     const authUser = useAppSelector(selectAuthUser);
@@ -42,19 +76,26 @@ const AuthStateBridge = () => {
                 setCurrentUser(null);
             return;
         }
-        if (currentUser?.id === String(authUser.user_id))
+        const authPanels = Array.isArray(authUser.panels) ? authUser.panels : [];
+        if (currentUser?.id === String(authUser.user_id) && (currentUser.panels?.length || 0) === authPanels.length)
             return;
         const normalizedPhone = String(authUser.phone_number || '').replace(/\D/g, '');
         const existingUser = users.find((user) => user.phone.replace(/\D/g, '') === normalizedPhone);
         const role = `${String(authUser.role || 'USER').charAt(0)}${String(authUser.role || 'USER').slice(1).toLowerCase()}`;
-        setCurrentUser(existingUser || {
+        const panelModules = authPanels.map((panel) => panel.panel_name || String(panel.panel_id));
+        setCurrentUser(existingUser ? {
+            ...existingUser,
+            panels: authPanels,
+            assignedModules: panelModules,
+        } : {
             id: String(authUser.user_id),
             name: authUser.full_name || authUser.phone_number,
             phone: authUser.phone_number,
             email: authUser.email || '',
             role,
             status: authUser.is_active ? 'Active' : 'Inactive',
-            assignedModules: ['dashboard', 'stock', 'todos', 'reminders', 'settings'],
+            panels: authPanels,
+            assignedModules: panelModules,
             createdDate: authUser.created_at || new Date().toISOString(),
             lastLogin: new Date().toISOString(),
         });
@@ -77,7 +118,7 @@ function AppContent() {
         <Route element={<AuthGuard>
               <AppLayout />
             </AuthGuard>}>
-          <Route path="/" element={<Navigate to="/dashboard" replace/>}/>
+          <Route path="/" element={<HomeRedirect />}/>
           <Route path="/dashboard" element={<DashboardPage />}/>
           <Route path="/users" element={<UserManagementPage />}/>
           <Route path="/stock" element={<StockPage />}/>
@@ -89,7 +130,7 @@ function AppContent() {
           <Route path="/activities" element={<ActivityLogsPage />}/>
           <Route path="/settings" element={<SettingsPage />}/>
           
-          <Route path="*" element={<Navigate to="/dashboard" replace/>}/>
+          <Route path="*" element={<HomeRedirect />}/>
         </Route>
       </Routes>
     </>);
