@@ -4,12 +4,22 @@ import * as locationModel from "../model/location.model.js";
 import * as panelModel from "../model/panel.model.js";
 import * as userModel from "../model/user.model.js";
 import { ApiError } from "../utils/api.util.js";
-import { ADD_ERROR, CUSTOM_ERROR, EXISTS, INVALID, NOT_FOUND, UPDATE_ERROR } from "../utils/message.util.js";
+import { ADD_ERROR, CUSTOM_ERROR, EXISTS, FORBIDDEN, INVALID, NOT_FOUND, UPDATE_ERROR } from "../utils/message.util.js";
 import { generateJWTToken, generateOTPCode, isEmpty } from "../utils/misc.util.js";
 import { sendOTP } from "../utils/twillio.util.js";
 
 const OTP_EXPIRY = "5m";
 const isDevelopment = NODE_ENV === "development";
+const ROLE_RANK = {
+  USER: 1,
+  MANAGER: 2,
+  ADMIN: 3,
+};
+
+const canManageRole = (actorRole, targetRole) => (
+  (ROLE_RANK[String(actorRole || "").toUpperCase()] || 0) >
+  (ROLE_RANK[String(targetRole || "").toUpperCase()] || 0)
+);
 
 const getActiveUser = async (phoneNumber) => {
   const [user] = await userModel.getUserByPhoneNumberModel(phoneNumber);
@@ -232,9 +242,13 @@ export const getUserByIdService = async (userId) => {
   }
 };
 
-export const createUserService = async (payload) => {
+export const createUserService = async (payload, actorUser) => {
   try {
     const userPayload = normalizeCreateUserPayload(payload);
+    if (!canManageRole(actorUser?.role, userPayload.role)) {
+      throw new ApiError(FORBIDDEN, "User");
+    }
+
     const existingUsers = await userModel.getUserByPhoneNumberModel(userPayload.phone_number);
 
     if (!isEmpty(existingUsers)) {
@@ -269,11 +283,15 @@ export const createUserService = async (payload) => {
   }
 };
 
-export const updateUserService = async (userId, payload) => {
+export const updateUserService = async (userId, payload, actorUser) => {
   try {
     const existingUser = await userModel.getUserByIdModel(userId);
     if (isEmpty(existingUser)) {
       throw new ApiError(NOT_FOUND, "User");
+    }
+
+    if (!canManageRole(actorUser?.role, existingUser.role)) {
+      throw new ApiError(FORBIDDEN, "User");
     }
 
     const userPayload = normalizeUpdateUserPayload(payload, existingUser);
