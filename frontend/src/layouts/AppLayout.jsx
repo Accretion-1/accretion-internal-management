@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate, Outlet } from 'react-router-dom';
 import { useAppState } from '../contexts/StateContext';
 import { LayoutDashboard, Users, Package, BarChart4, Bell, ClipboardList, Settings, LogOut, ChevronLeft, ChevronRight, Menu, X, ShieldAlert, CheckSquare, BellRing } from 'lucide-react';
@@ -15,6 +15,25 @@ const SIDEBAR_ITEMS = [
     { id: 'activities', label: 'Workspace Audits', icon: ClipboardList, allowedRoles: ['Admin'] },
     { id: 'settings', label: 'Settings', icon: Settings, allowedRoles: ['Admin', 'Manager', 'User'] }
 ];
+const MOBILE_OVERLAY_TRANSITION = { duration: 0.18, ease: 'easeOut' };
+const MOBILE_SIDEBAR_VARIANTS = {
+    closed: {
+        x: '-104%',
+        transition: {
+            duration: 0.24,
+            ease: [0.4, 0, 0.2, 1],
+        },
+    },
+    open: {
+        x: 0,
+        transition: {
+            type: 'spring',
+            stiffness: 300,
+            damping: 34,
+            mass: 0.8,
+        },
+    },
+};
 export const AppLayout = () => {
     const { currentUser, logout, notifications, markAllNotificationsAsRead, addNotificationCount } = useAppState();
     const dispatch = useAppDispatch();
@@ -35,18 +54,40 @@ export const AppLayout = () => {
         navigate(`/${tabId}`);
         setIsMobileSidebarOpen(false);
     };
+    const openMobileSidebar = () => {
+        setIsNotificationsOpen(false);
+        setIsMobileSidebarOpen(true);
+    };
+    const closeMobileSidebar = () => setIsMobileSidebarOpen(false);
     const handleLogout = () => {
+        setIsMobileSidebarOpen(false);
         logout();
         dispatch(logoutAuth());
     };
-    return (<div className="relative min-h-screen bg-slate-50 flex font-sans overflow-hidden">
+    useEffect(() => {
+        if (!isMobileSidebarOpen)
+            return undefined;
+        const originalOverflow = document.body.style.overflow;
+        const handleEscape = (event) => {
+            if (event.key === 'Escape') {
+                closeMobileSidebar();
+            }
+        };
+        document.body.style.overflow = 'hidden';
+        window.addEventListener('keydown', handleEscape);
+        return () => {
+            document.body.style.overflow = originalOverflow;
+            window.removeEventListener('keydown', handleEscape);
+        };
+    }, [isMobileSidebarOpen]);
+    return (<div className="relative flex h-screen min-h-0 overflow-hidden bg-slate-50 font-sans">
       
       {/* BACKGROUND DECORATIONS */}
       <div className="absolute top-0 left-0 w-64 h-64 bg-blue-100/20 rounded-full blur-3xl pointer-events-none"/>
       <div className="absolute bottom-0 right-0 w-80 h-80 bg-indigo-100/10 rounded-full blur-3xl pointer-events-none"/>
 
       {/* SIDEBAR NAVIGATION: Collapsible, Collapsed/Expanded states, Collapsed width 84px, Expanded width 280px */}
-      <div className={`hidden md:flex flex-col bg-slate-900 text-slate-400 border-r border-slate-800 relative z-30 shrink-0 select-none transition-all duration-300 ${isSidebarCollapsed ? 'w-20' : 'w-72'}`}>
+      <div className={`relative z-30 hidden h-screen max-h-screen shrink-0 select-none flex-col overflow-hidden border-r border-slate-800 bg-slate-900 text-slate-400 transition-all duration-300 md:flex ${isSidebarCollapsed ? 'w-20' : 'w-72'}`}>
         {/* Core Title header section */}
         <div className={`h-[72px] border-b border-slate-800 flex items-center shrink-0 ${isSidebarCollapsed ? 'justify-center' : 'justify-between px-6'}`}>
           <div className="flex items-center gap-3">
@@ -71,8 +112,8 @@ export const AppLayout = () => {
           </button>)}
 
         {/* Sidebar Nav anchors */}
-        <div className="flex-1 py-6 flex flex-col justify-between overflow-y-auto px-4 gap-4">
-          <nav className="flex flex-col gap-1.5 list-none m-0 p-0 text-left">
+        <div className="flex min-h-0 flex-1 flex-col px-4 py-4">
+          <nav className="m-0 flex min-h-0 flex-1 list-none flex-col gap-1.5 overflow-y-auto overscroll-contain py-2 pr-1 text-left">
             {SIDEBAR_ITEMS.map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
@@ -92,68 +133,76 @@ export const AppLayout = () => {
           </nav>
 
           {/* Collapsed logout indicator button */}
-          <button id="sidebar-logout-btn" onClick={handleLogout} className={`flex items-center gap-3 py-2.5 rounded-xl text-xs font-bold text-rose-450 hover:bg-rose-900/10 hover:text-rose-400 transition-all cursor-pointer text-left ${isSidebarCollapsed ? 'justify-center px-0' : 'px-4.5'}`}>
+          <div className="mt-3 shrink-0 border-t border-slate-800 pt-4">
+          <button id="sidebar-logout-btn" onClick={handleLogout} className={`flex w-full items-center gap-3 rounded-xl py-2.5 text-left text-xs font-bold text-rose-450 transition-all hover:bg-rose-900/10 hover:text-rose-400 cursor-pointer ${isSidebarCollapsed ? 'justify-center px-0' : 'px-4.5'}`}>
             <LogOut className="w-5 h-5 shrink-0"/>
             {!isSidebarCollapsed && <span className="truncate">Sign out session</span>}
           </button>
+          </div>
         </div>
       </div>
 
       {/* MOBILE COLLAPSIBLE DRAWER SIDEBAR */}
-      <AnimatePresence>
-        {isMobileSidebarOpen && (<div className="fixed inset-0 z-50 md:hidden flex">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-slate-900/60 backdrop-blur-xs" onClick={() => setIsMobileSidebarOpen(false)}/>
-            <motion.div initial={{ x: -250 }} animate={{ x: 0 }} exit={{ x: -250 }} transition={{ type: 'spring', damping: 25 }} className="relative w-72 bg-slate-900 text-slate-400 border-r border-slate-800 flex flex-col p-5 h-full">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-5 mb-5 shrink-0">
-                <span className="font-display font-extrabold text-white text-lg tracking-tight flex items-center gap-2">
+      <AnimatePresence initial={false}>
+        {isMobileSidebarOpen && (<div className="fixed inset-0 z-50 flex md:hidden" role="dialog" aria-modal="true" aria-label="Main navigation">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={MOBILE_OVERLAY_TRANSITION} className="absolute inset-0 bg-slate-950/55 backdrop-blur-sm" onClick={closeMobileSidebar}/>
+            <motion.aside initial="closed" animate="open" exit="closed" variants={MOBILE_SIDEBAR_VARIANTS} className="relative flex h-full w-[min(86vw,22rem)] transform-gpu flex-col overflow-hidden rounded-r-[2rem] border-r border-white/10 bg-slate-950 text-slate-400 shadow-2xl shadow-slate-950/40 will-change-transform">
+              <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-blue-600/15 to-transparent"/>
+              <div className="relative flex shrink-0 items-center justify-between border-b border-white/10 px-5 pb-5 pt-[max(1.25rem,env(safe-area-inset-top))]">
+                <span className="font-display flex items-center gap-3 text-lg font-extrabold tracking-tight text-white">
                   <img
                     src="/icons/pwa-192x192.png"
                     alt="Accretion"
-                    className="h-8 w-8 rounded-lg object-cover"
+                    className="h-10 w-10 rounded-2xl object-cover shadow-lg shadow-blue-950/40"
                   />
-                  WorkSphere
+                  <span className="leading-none">WorkSphere</span>
                 </span>
-                <button id="mobile-nav-close" onClick={() => setIsMobileSidebarOpen(false)} className="p-1 rounded-lg hover:bg-slate-800 cursor-pointer">
-                  <X className="w-5 h-5"/>
+                <button id="mobile-nav-close" type="button" onClick={closeMobileSidebar} className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-slate-300 transition-all hover:bg-white/10 hover:text-white active:scale-95" aria-label="Close navigation">
+                  <X className="h-5 w-5"/>
                 </button>
               </div>
 
-              <nav className="flex-1 flex flex-col gap-1.5 overflow-y-auto text-left py-2">
+              <nav className="relative flex flex-1 flex-col gap-2 overflow-y-auto overscroll-contain px-4 py-5 text-left">
                 {SIDEBAR_ITEMS.map((item) => {
                 const Icon = item.icon;
                 const isActive = activeTab === item.id;
                 const hasAccess = item.allowedRoles.includes(currentUser.role);
                 if (!hasAccess)
                     return null;
-                return (<button key={item.id} id={`mobile-nav-${item.id}`} onClick={() => handleNavClick(item.id)} className={`w-full flex items-center gap-3.5 px-4.5 py-3 rounded-2xl text-xs font-bold transition-all cursor-pointer ${isActive
-                        ? 'bg-blue-600 text-white shadow-lg'
+                return (<button key={item.id} id={`mobile-nav-${item.id}`} type="button" onClick={() => handleNavClick(item.id)} aria-current={isActive ? 'page' : undefined} className={`group relative flex w-full cursor-pointer items-center gap-3.5 rounded-2xl px-4 py-3.5 text-left text-sm font-bold transition-all duration-200 active:scale-[0.98] ${isActive
+                        ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-950/30'
                         : !hasAccess
                             ? 'text-slate-600 hover:bg-transparent opacity-40 cursor-not-allowed'
-                            : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}>
-                      <Icon className="w-5 h-5 shrink-0"/>
-                      <span>{item.label}</span>
+                            : 'text-slate-400 hover:bg-white/7 hover:text-slate-100'}`}>
+                      <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-colors ${isActive ? 'bg-white/15 text-white' : 'bg-white/5 text-slate-400 group-hover:bg-white/10 group-hover:text-slate-100'}`}>
+                        <Icon className="h-4.5 w-4.5"/>
+                      </span>
+                      <span className="min-w-0 flex-1 leading-snug">{item.label}</span>
+                      {isActive && <span className="h-2 w-2 shrink-0 rounded-full bg-white/90 shadow-sm"/>}
                     </button>);
             })}
               </nav>
 
-              <button id="mobile-nav-logout" onClick={handleLogout} className="flex items-center gap-3.5 px-4.5 py-3 rounded-2xl text-xs font-bold text-rose-450 hover:bg-rose-950/20 cursor-pointer transition-colors shrink-0 mt-4 text-left">
-                <LogOut className="w-5 h-5 shrink-0"/>
+              <div className="relative shrink-0 border-t border-white/10 p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+              <button id="mobile-nav-logout" type="button" onClick={handleLogout} className="flex w-full cursor-pointer items-center gap-3.5 rounded-2xl px-4 py-3.5 text-left text-sm font-bold text-rose-300 transition-all hover:bg-rose-500/10 hover:text-rose-200 active:scale-[0.98]">
+                <LogOut className="h-5 w-5 shrink-0"/>
                 <span>Exit session</span>
               </button>
-            </motion.div>
+              </div>
+            </motion.aside>
           </div>)}
       </AnimatePresence>
 
       {/* SHELL HEADER + CLIENT CONTENT CONTAINER */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
+      <div className="relative flex h-screen min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         
         {/* TOP SHELL HEADER: Height 72px */}
         <header className="h-[72px] bg-white border-b border-slate-200 px-4 sm:px-6 flex items-center justify-between shrink-0 relative z-20">
           
           <div className="flex items-center gap-3">
             {/* Mobile Sidebar open trigger */}
-            <button id="mobile-sidebar-hamburger" onClick={() => setIsMobileSidebarOpen(true)} className="md:hidden p-1.5 rounded-lg hover:bg-slate-100 text-slate-600 cursor-pointer">
-              <Menu className="w-5 h-5"/>
+            <button id="mobile-sidebar-hamburger" type="button" onClick={openMobileSidebar} className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-700 shadow-sm transition-all hover:bg-slate-50 active:scale-95 md:hidden" aria-label="Open navigation">
+              <Menu className="h-5 w-5"/>
             </button>
             
             <div className="flex flex-col text-left">
@@ -232,7 +281,7 @@ export const AppLayout = () => {
         </header>
 
         {/* WORKSPACE APP MAIN CLIENT AREA */}
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8 relative">
+        <main className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6 md:p-8">
           
           <AnimatePresence mode="wait">
             {isTabAllowed ? (<motion.div key={activeTab} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.2 }} className="w-full max-w-7xl mx-auto">
