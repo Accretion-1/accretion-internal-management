@@ -19,6 +19,7 @@ import { ReminderPage } from './pages/ReminderPage';
 import { TodoPage } from './pages/TodoPage';
 import { ActivityLogsPage } from './pages/ActivityLogsPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { LocationsPage } from './pages/LocationsPage';
 const AuthGuard = ({ children }) => {
     const isAuthenticated = useAppSelector(selectIsAuthenticated);
     if (!isAuthenticated)
@@ -83,6 +84,8 @@ function AppContent() {
           <Route path="/reports" element={<ReportsPage />}/>
           <Route path="/todos" element={<TodoPage />}/>
           <Route path="/reminders" element={<ReminderPage />}/>
+          <Route path="/reminder-schedule" element={<ReminderPage />}/>
+          <Route path="/locations" element={<LocationsPage />}/>
           <Route path="/activities" element={<ActivityLogsPage />}/>
           <Route path="/settings" element={<SettingsPage />}/>
           

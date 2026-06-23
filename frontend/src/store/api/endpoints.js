@@ -5,6 +5,10 @@ export const API_ENDPOINTS = Object.freeze({
     RESEND_OTP: "/user/resend-otp",
   }),
   USER: Object.freeze({}),
+  LOCATIONS: Object.freeze({
+    BASE: "/locations",
+    BY_ID: (locationId) => `/locations/${locationId}`,
+  }),
   HOSTING: Object.freeze({}),
   SUPPORT: Object.freeze({}),
   BILLING: Object.freeze({}),

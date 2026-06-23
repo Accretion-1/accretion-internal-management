@@ -1,19 +1,24 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate, Outlet } from 'react-router-dom';
 import { useAppState } from '../contexts/StateContext';
-import { LayoutDashboard, Users, Package, BarChart4, Bell, ClipboardList, Settings, LogOut, ChevronLeft, ChevronRight, Menu, X, ShieldAlert, CheckSquare, BellRing } from 'lucide-react';
+import { LayoutDashboard, Users, Package, BarChart4, Bell, ClipboardList, Settings, LogOut, ChevronLeft, ChevronRight, Menu, X, ShieldAlert, CheckSquare, BellRing, MapPin } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAppDispatch } from '../store/hooks/reduxHooks';
 import { logout as logoutAuth } from '../store/slices/authSlice';
 const SIDEBAR_ITEMS = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, allowedRoles: ['Admin', 'Manager', 'User'] },
     { id: 'users', label: 'User Management', icon: Users, allowedRoles: ['Admin', 'Manager'] },
+    { id: 'reminders', label: 'Reminders', icon: Bell, allowedRoles: ['Admin', 'Manager', 'User'] },
+    { id: 'todos', label: 'To-Dos Management', icon: CheckSquare, allowedRoles: ['Admin', 'Manager', 'User'] },
+    { id: 'reminder-schedule', label: 'Reminder Schedule Management', icon: BellRing, allowedRoles: ['Admin', 'Manager', 'User'] },
+    { id: 'locations', label: 'Locations', icon: MapPin, allowedRoles: ['Admin', 'Manager', 'User'] },
+    { id: 'settings', label: 'Settings', icon: Settings, allowedRoles: ['Admin', 'Manager', 'User'] }
+];
+const ROUTE_ACCESS_ITEMS = [
+    ...SIDEBAR_ITEMS,
     { id: 'stock', label: 'Stock Management', icon: Package, allowedRoles: ['Admin', 'Manager', 'User'] },
     { id: 'reports', label: 'Reports & Stats', icon: BarChart4, allowedRoles: ['Admin', 'Manager'] },
-    { id: 'todos', label: 'To-Dos Management', icon: CheckSquare, allowedRoles: ['Admin', 'Manager', 'User'] },
-    { id: 'reminders', label: 'Reminder Schedule Management', icon: BellRing, allowedRoles: ['Admin', 'Manager', 'User'] },
     { id: 'activities', label: 'Workspace Audits', icon: ClipboardList, allowedRoles: ['Admin'] },
-    { id: 'settings', label: 'Settings', icon: Settings, allowedRoles: ['Admin', 'Manager', 'User'] }
 ];
 const MOBILE_OVERLAY_TRANSITION = { duration: 0.18, ease: 'easeOut' };
 const MOBILE_SIDEBAR_VARIANTS = {
@@ -46,7 +51,7 @@ export const AppLayout = () => {
     const navigate = useNavigate();
     const activeTab = location.pathname.substring(1) || 'dashboard';
     // Route protection evaluations
-    const currentTabItem = SIDEBAR_ITEMS.find(item => item.id === activeTab);
+    const currentTabItem = ROUTE_ACCESS_ITEMS.find(item => item.id === activeTab);
     const isTabAllowed = currentTabItem
         ? currentTabItem.allowedRoles.includes(currentUser.role)
         : false;
