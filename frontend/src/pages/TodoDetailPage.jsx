@@ -159,38 +159,11 @@ export const TodoDetailPage = () => {
                             <DetailItem label="Schedule" value={scheduleText} />
                             <DetailItem label="Due Time" value={formatTime(todo.due_time)} />
                             <DetailItem label="Start Date" value={formatDate(todo.start_date)} />
-                            <DetailItem label="End Date" value={formatDate(todo.end_date)} />
+                            <DetailItem label="Task Type" value={todo.type} />
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-                        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xs">
-                            <div className="mb-5 flex items-center gap-3">
-                                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
-                                    <MapPin className="h-5 w-5" />
-                                </div>
-                                <div>
-                                    <h3 className="text-base font-extrabold text-slate-900">Assigned Location</h3>
-                                    <p className="text-xs text-slate-500">{getLocationLabel(todo.location)}</p>
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                <DetailItem label="District" value={todo.location?.district} />
-                                <DetailItem label="Godown" value={todo.location?.godown} />
-                                <DetailItem label="SLOC" value={todo.location?.sloc} />
-                                <DetailItem label="Capacity" value={todo.location?.cap} />
-                            </div>
-
-                            {todo.location?.remark && (
-                                <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-                                    <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Location Remark</p>
-                                    <p className="mt-2 text-sm font-semibold leading-relaxed text-slate-700">{todo.location.remark}</p>
-                                </div>
-                            )}
-                        </div>
-
-                        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xs">
+                                            <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xs">
                             <div className="mb-5 flex items-center gap-3">
                                 <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-violet-50 text-violet-600">
                                     <UserRound className="h-5 w-5" />
@@ -208,19 +181,38 @@ export const TodoDetailPage = () => {
                                 <DetailItem label="Updated At" value={formatDateTime(todo.updated_at)} />
                             </div>
                         </div>
+
+                    <div className="grid grid-cols-1 gap-5">
+                        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xs">
+                            <div className="mb-5 flex items-center gap-3">
+                                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
+                                    <MapPin className="h-5 w-5" />
+                                </div>
+                                <div>
+                                    <h3 className="text-base font-extrabold text-slate-900">Assigned Locations</h3>
+                                    <p className="text-xs text-slate-500">
+                                        {Array.isArray(todo.locations) ? `${todo.locations.length} mapped location(s)` : getLocationLabel(todo.location)}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+                                {(Array.isArray(todo.locations) && todo.locations.length ? todo.locations : [todo.location].filter(Boolean)).map((location) => (
+                                    <div key={location.todo_location_id || location.location_id} className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                                        <p className="text-sm font-extrabold text-slate-900">{getLocationLabel(location)}</p>
+                                        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                            <DetailItem label="District" value={location.district} />
+                                            <DetailItem label="Godown" value={location.godown} />
+                                            <DetailItem label="SLOC" value={location.sloc} />
+                                            <DetailItem label="Capacity" value={location.cap} />
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
                     </div>
 
-                    <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xs">
-                        <h3 className="mb-4 flex items-center gap-2 text-base font-extrabold text-slate-900">
-                            <CalendarDays className="h-5 w-5 text-blue-600" />
-                            Schedule Summary
-                        </h3>
-                        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                            <DetailItem label="Task Type" value={todo.type} />
-                            <DetailItem label="Frequency" value={scheduleText} />
-                            <DetailItem label="Status" value={todo.is_active ? 'Active' : 'Inactive'} />
-                        </div>
-                    </div>
                 </>
             ) : (
                 <div className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-slate-200 bg-white py-20 text-center">

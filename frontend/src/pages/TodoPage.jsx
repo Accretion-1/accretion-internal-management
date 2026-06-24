@@ -21,7 +21,7 @@ const EMPTY_FORM = {
     schedule: 'daily',
     title: '',
     description: '',
-    location_id: '',
+    location_ids: [],
     due_time: '09:00',
     start_date: '',
     day_of_week: '',
@@ -71,6 +71,12 @@ const getLocationLabel = (location) => {
     return [location.district, location.godown, location.sloc].filter(Boolean).join(' • ') || '-';
 };
 
+const getTodoLocations = (todo) => (
+    Array.isArray(todo.locations) && todo.locations.length
+        ? todo.locations
+        : [todo.location].filter(Boolean)
+);
+
 const getTodayDateValue = () => {
     const today = new Date();
     const year = today.getFullYear();
@@ -83,8 +89,14 @@ const isValidDateValue = (value) => {
     if (!value) return true;
     if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
 
-    const date = new Date(`${value}T00:00:00`);
-    return !Number.isNaN(date.getTime()) && date.toISOString().startsWith(value);
+    const [year, month, day] = value.split('-').map(Number);
+    const date = new Date(year, month - 1, day);
+
+    return (
+        date.getFullYear() === year &&
+        date.getMonth() === month - 1 &&
+        date.getDate() === day
+    );
 };
 
 const normalizeTodoPayload = (form) => {
@@ -93,7 +105,7 @@ const normalizeTodoPayload = (form) => {
         schedule: form.schedule,
         title: form.title.trim(),
         description: form.description.trim() || null,
-        location_id: Number(form.location_id),
+        location_ids: form.location_ids.map((locationId) => Number(locationId)),
         due_time: form.due_time || null,
         start_date: form.start_date || null,
         is_active: true,
@@ -115,7 +127,7 @@ export const TodoPage = () => {
     const navigate = useNavigate();
     const [todos, setTodos] = useState([]);
     const [locations, setLocations] = useState([]);
-    const [selectedLocationId, setSelectedLocationId] = useState('');
+    const [statusFilter, setStatusFilter] = useState('active');
     const [isLoading, setIsLoading] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -130,7 +142,6 @@ export const TodoPage = () => {
             const response = await apiHandler({
                 method: 'GET',
                 url: API_ENDPOINTS.TODOS.BASE,
-                params: selectedLocationId ? { location_id: selectedLocationId } : undefined,
             });
             setTodos(Array.isArray(response?.data) ? response.data : []);
         }
@@ -149,13 +160,17 @@ export const TodoPage = () => {
 
     useEffect(() => {
         fetchTodos();
-    }, [selectedLocationId]);
+    }, []);
 
     useEffect(() => {
         fetchLocations();
     }, []);
 
-    const filteredTodos = useMemo(() => todos.filter((todo) => todo.is_active), [todos]);
+    const filteredTodos = useMemo(() => {
+        if (statusFilter === 'all') return todos;
+        if (statusFilter === 'inactive') return todos.filter((todo) => !todo.is_active);
+        return todos.filter((todo) => todo.is_active);
+    }, [statusFilter, todos]);
 
     const validateForm = () => {
         const nextErrors = {};
@@ -172,8 +187,8 @@ export const TodoPage = () => {
             nextErrors.schedule = 'Schedule is required.';
         }
 
-        if (!form.location_id) {
-            nextErrors.location_id = 'Location is required.';
+        if (!form.location_ids.length) {
+            nextErrors.location_ids = 'At least one location is required.';
         }
 
         if (!form.start_date) {
@@ -217,6 +232,21 @@ export const TodoPage = () => {
             return next;
         });
         setErrors((prev) => ({ ...prev, [field]: undefined }));
+    };
+
+    const handleLocationToggle = (locationId) => {
+        setForm((prev) => {
+            const locationIdValue = String(locationId);
+            const nextLocationIds = prev.location_ids.includes(locationIdValue)
+                ? prev.location_ids.filter((existingLocationId) => existingLocationId !== locationIdValue)
+                : [...prev.location_ids, locationIdValue];
+
+            return {
+                ...prev,
+                location_ids: nextLocationIds,
+            };
+        });
+        setErrors((prev) => ({ ...prev, location_ids: undefined }));
     };
 
     const handleOpenCreate = () => {
@@ -289,27 +319,24 @@ export const TodoPage = () => {
             <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs">
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_auto] md:items-end">
                     <div className="flex flex-col gap-1.5">
-                        <label className="text-xs font-extrabold uppercase tracking-wider text-slate-400">Filter by Location</label>
+                        <label className="text-xs font-extrabold uppercase tracking-wider text-slate-400">Filter by Status</label>
                         <select
-                            id="todo-location-filter"
-                            value={selectedLocationId}
-                            onChange={(event) => setSelectedLocationId(event.target.value)}
+                            id="todo-status-filter"
+                            value={statusFilter}
+                            onChange={(event) => setStatusFilter(event.target.value)}
                             className="w-full cursor-pointer rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm font-semibold text-slate-700 transition-all focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
                         >
-                            <option value="">All locations</option>
-                            {locations.map((location) => (
-                                <option key={location.location_id} value={location.location_id}>
-                                    {getLocationLabel(location)}
-                                </option>
-                            ))}
+                            <option value="active">Active todos</option>
+                            <option value="inactive">Inactive todos</option>
+                            <option value="all">All todos</option>
                         </select>
                     </div>
 
-                    {selectedLocationId && (
+                    {statusFilter !== 'active' && (
                         <button
-                            id="clear-todo-location-filter"
+                            id="clear-todo-status-filter"
                             type="button"
-                            onClick={() => setSelectedLocationId('')}
+                            onClick={() => setStatusFilter('active')}
                             className="inline-flex cursor-pointer items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-600 transition-all hover:bg-slate-50"
                         >
                             Clear Filter
@@ -318,74 +345,98 @@ export const TodoPage = () => {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 xl:grid-cols-3">
+            <div className="flex flex-col gap-4">
                 {isLoading ? (
-                    <div className="col-span-full flex items-center justify-center rounded-2xl border border-slate-200 bg-white py-16 text-sm font-semibold text-slate-400">
+                    <div className="flex items-center justify-center rounded-2xl border border-slate-200 bg-white py-16 text-sm font-semibold text-slate-400">
                         Loading To-Dos...
                     </div>
                 ) : filteredTodos.length > 0 ? (
-                    filteredTodos.map((todo) => (
-                        <div key={todo.todo_id} className="relative flex flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-xs transition-all duration-300 hover:border-slate-300 hover:shadow-md">
-                            <div className="flex flex-1 flex-col gap-3">
-                                <div className="flex items-start justify-between gap-3">
-                                    <div>
-                                        <h3 className="text-sm font-bold tracking-tight text-slate-900">{todo.title}</h3>
-                                        {todo.description && (
-                                            <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-slate-500">{todo.description}</p>
-                                        )}
+                    filteredTodos.map((todo) => {
+                        const todoLocations = getTodoLocations(todo);
+                        const visibleLocations = todoLocations.slice(0, 4);
+                        const hiddenLocationCount = Math.max(todoLocations.length - visibleLocations.length, 0);
+
+                        return (
+                            <div key={todo.todo_id} className="relative rounded-3xl border border-slate-200 bg-white p-5 shadow-xs transition-all duration-300 hover:border-slate-300 hover:shadow-md">
+                                <div className="flex flex-col gap-4">
+                                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                        <div className="min-w-0">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <h3 className="text-base font-extrabold tracking-tight text-slate-900">{todo.title}</h3>
+                                                <span className={`rounded-full px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide ${todo.is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+                                                    {todo.is_active ? 'Active' : 'Inactive'}
+                                                </span>
+                                            </div>
+                                            {todo.description && (
+                                                <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-slate-500">{todo.description}</p>
+                                            )}
+                                        </div>
+
+                                        <div className="flex flex-wrap gap-2">
+                                            <div className="flex items-center gap-1.5 rounded-lg bg-blue-50 px-2.5 py-1 text-[10px] font-bold capitalize text-blue-700">
+                                                <ClipboardList className="h-3.5 w-3.5" />
+                                                {todo.type}
+                                            </div>
+                                            <div className="flex items-center gap-1.5 rounded-lg bg-slate-100 px-2.5 py-1 text-[10px] font-bold capitalize text-slate-600">
+                                                <RefreshCw className="h-3.5 w-3.5" />
+                                                {todo.schedule}
+                                            </div>
+                                            <div className="flex items-center gap-1.5 rounded-lg bg-slate-100 px-2.5 py-1 text-[10px] font-bold text-slate-600">
+                                                <Clock className="h-3.5 w-3.5" />
+                                                {formatTime(todo.due_time)}
+                                            </div>
+                                        </div>
                                     </div>
-                                    <span className={`rounded-full px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide ${todo.is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
-                                        {todo.is_active ? 'Active' : 'Inactive'}
-                                    </span>
+
+                                    <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4">
+                                        <div className="mb-2 flex items-center justify-between gap-2">
+                                            <div className="flex items-center gap-2 text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
+                                                <MapPin className="h-3.5 w-3.5 shrink-0" />
+                                                Locations
+                                            </div>
+                                            {hiddenLocationCount > 0 && (
+                                                <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-extrabold text-blue-700">
+                                                    +{hiddenLocationCount} more
+                                                </span>
+                                            )}
+                                        </div>
+                                        <ul className="grid grid-cols-1 gap-1.5 text-xs font-bold leading-relaxed text-slate-700 md:grid-cols-2">
+                                            {visibleLocations.map((location) => (
+                                                <li key={location.todo_location_id || location.location_id} className="flex gap-2">
+                                                    <span className="text-blue-500">•</span>
+                                                    <span>{getLocationLabel(location)}</span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+
+                                    <div className="flex flex-col gap-3 border-t border-slate-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
+                                        <div className="flex flex-wrap items-center gap-3 text-xs font-semibold text-slate-600">
+                                            <div className="flex items-center gap-2">
+                                                <CalendarDays className="h-4 w-4 text-slate-400" />
+                                                <span>{formatDate(todo.start_date)}</span>
+                                            </div>
+                                            {(todo.day_of_week || todo.day_of_month) && (
+                                                <div className="rounded-xl bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-500">
+                                                    {todo.day_of_week ? `Weekly on ${WEEK_DAYS.find((day) => day.value === Number(todo.day_of_week))?.label || `Day ${todo.day_of_week}`}` : ''}
+                                                    {todo.day_of_month ? `Monthly on day ${todo.day_of_month}` : ''}
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        <button
+                                            id={`view-todo-${todo.todo_id}`}
+                                            onClick={() => navigate(`/todos/${todo.todo_id}`)}
+                                            className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-blue-100 bg-blue-50 px-4 py-2.5 text-xs font-extrabold text-blue-700 transition-all hover:bg-blue-100 sm:w-auto"
+                                        >
+                                            <Eye className="h-4 w-4" />
+                                            View Details
+                                        </button>
+                                    </div>
                                 </div>
-
-                                <div className="mt-auto flex flex-wrap gap-2 border-t border-slate-100 pt-4">
-                                    <div className="flex items-center gap-1.5 rounded-lg bg-blue-50 px-2.5 py-1 text-[10px] font-bold capitalize text-blue-700">
-                                        <ClipboardList className="h-3.5 w-3.5" />
-                                        {todo.type}
-                                    </div>
-                                    <div className="flex items-center gap-1.5 rounded-lg bg-slate-100 px-2.5 py-1 text-[10px] font-bold capitalize text-slate-600">
-                                        <RefreshCw className="h-3.5 w-3.5" />
-                                        {todo.schedule}
-                                    </div>
-                                    <div className="flex items-center gap-1.5 rounded-lg bg-slate-100 px-2.5 py-1 text-[10px] font-bold text-slate-600">
-                                        <Clock className="h-3.5 w-3.5" />
-                                        {formatTime(todo.due_time)}
-                                    </div>
-                                </div>
-
-                                <div className="grid grid-cols-1 gap-2 text-xs font-semibold text-slate-600">
-                                    <div className="flex items-center gap-2">
-                                        <MapPin className="h-4 w-4 text-slate-400" />
-                                        <span>{getLocationLabel(todo.location)}</span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <CalendarDays className="h-4 w-4 text-slate-400" />
-                                        <span>
-                                            {formatDate(todo.start_date)}
-                                            {todo.end_date ? ` → ${formatDate(todo.end_date)}` : ''}
-                                        </span>
-                                    </div>
-                                </div>
-
-                                {(todo.day_of_week || todo.day_of_month) && (
-                                    <div className="rounded-xl bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-500">
-                                        {todo.day_of_week ? `Weekly on ${WEEK_DAYS.find((day) => day.value === Number(todo.day_of_week))?.label || `Day ${todo.day_of_week}`}` : ''}
-                                        {todo.day_of_month ? `Monthly on day ${todo.day_of_month}` : ''}
-                                    </div>
-                                )}
-
-                                <button
-                                    id={`view-todo-${todo.todo_id}`}
-                                    onClick={() => navigate(`/todos/${todo.todo_id}`)}
-                                    className="mt-2 inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs font-extrabold text-blue-700 transition-all hover:bg-blue-100"
-                                >
-                                    <Eye className="h-4 w-4" />
-                                    View Details
-                                </button>
                             </div>
-                        </div>
-                    ))
+                        );
+                    })
                 ) : (
                     <div className="col-span-full flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white py-16 text-center">
                         <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-slate-50 text-slate-300">
@@ -459,20 +510,33 @@ export const TodoPage = () => {
                     </div>
 
                     <div className="flex flex-col gap-1.5 sm:col-span-2">
-                        <label className="text-xs font-bold text-slate-600">Location</label>
-                        <select
-                            value={form.location_id}
-                            onChange={(event) => handleChange('location_id', event.target.value)}
-                            className={`cursor-pointer rounded-xl border bg-slate-50 px-3.5 py-2.5 text-sm font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-2 ${errors.location_id ? 'border-rose-300 focus:ring-rose-100' : 'border-slate-200 focus:ring-blue-100'}`}
-                        >
-                            <option value="">Select location</option>
-                            {locations.map((location) => (
-                                <option key={location.location_id} value={location.location_id}>
-                                    {getLocationLabel(location)}
-                                </option>
-                            ))}
-                        </select>
-                        {errors.location_id && <span className="text-xs text-rose-600">{errors.location_id}</span>}
+                        <label className="text-xs font-bold text-slate-600">Locations</label>
+                        <div className={`grid max-h-44 grid-cols-1 gap-2 overflow-y-auto rounded-xl border bg-slate-50 p-2 ${errors.location_ids ? 'border-rose-300' : 'border-slate-200'}`}>
+                            {locations.length > 0 ? (
+                                locations.map((location) => {
+                                    const locationId = String(location.location_id);
+                                    const isSelected = form.location_ids.includes(locationId);
+
+                                    return (
+                                        <label
+                                            key={location.location_id}
+                                            className={`flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2 text-xs font-bold transition-all ${isSelected ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                checked={isSelected}
+                                                onChange={() => handleLocationToggle(locationId)}
+                                                className="h-4 w-4 rounded border-slate-300 text-blue-600"
+                                            />
+                                            <span>{getLocationLabel(location)}</span>
+                                        </label>
+                                    );
+                                })
+                            ) : (
+                                <p className="px-3 py-2 text-xs font-semibold text-slate-400">No locations available.</p>
+                            )}
+                        </div>
+                        {errors.location_ids && <span className="text-xs text-rose-600">{errors.location_ids}</span>}
                     </div>
 
                     <div className="flex flex-col gap-1.5">

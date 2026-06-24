@@ -18,7 +18,6 @@ CREATE TABLE todos (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
 
-    INDEX idx_location (location_id),
     INDEX idx_schedule (schedule),
     INDEX idx_active (is_active)
 );

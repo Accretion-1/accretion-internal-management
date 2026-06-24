@@ -29,7 +29,12 @@ export const createTodoSchema = Joi.object({
   schedule: Joi.string().valid(...todoSchedules).required(),
   title: Joi.string().trim().min(2).max(255).required(),
   description: nullableTextValidation.optional(),
-  location_id: Joi.number().integer().positive().required(),
+  location_id: Joi.number().integer().positive().optional(),
+  location_ids: Joi.array()
+    .items(Joi.number().integer().positive())
+    .min(1)
+    .unique()
+    .optional(),
   due_time: dueTimeValidation.required(),
   start_date: dateValidation
     .custom((value, helpers) => {
@@ -54,4 +59,6 @@ export const createTodoSchema = Joi.object({
     otherwise: Joi.valid(null).optional(),
   }),
   is_active: Joi.boolean().optional(),
-}).messages(messages);
+})
+  .or("location_id", "location_ids")
+  .messages(messages);
