@@ -1,12 +1,29 @@
 import * as locationModel from "../model/location.model.js";
 import * as todoModel from "../model/todo.model.js";
 import { ApiError } from "../utils/api.util.js";
-import { ADD_ERROR, CUSTOM_ERROR, FETCH_ERROR, NOT_FOUND } from "../utils/message.util.js";
+import { ADD_ERROR, CUSTOM_ERROR, FETCH_ERROR, NOT_FOUND, UPDATE_ERROR } from "../utils/message.util.js";
 import { isEmpty } from "../utils/misc.util.js";
 
 const normalizeOptionalText = (value) => {
   if (value === undefined || value === null || value === "") return null;
   return value;
+};
+
+const normalizeOptionalDate = (value) => {
+  if (value === undefined || value === null || value === "") return null;
+
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return value;
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
 };
 
 const normalizeOptionalNumber = (value) => {
@@ -26,12 +43,57 @@ const normalizeTodoPayload = (payload, createdBy) => {
     location_ids: [...new Set(locationIds.map((locationId) => Number(locationId)))],
     created_by: createdBy,
     due_time: normalizeOptionalText(payload.due_time),
-    start_date: normalizeOptionalText(payload.start_date),
-    end_date: normalizeOptionalText(payload.end_date),
+    start_date: normalizeOptionalDate(payload.start_date),
+    end_date: normalizeOptionalDate(payload.end_date),
     day_of_week: schedule === "weekly" ? normalizeOptionalNumber(payload.day_of_week) : null,
     day_of_month: schedule === "monthly" ? normalizeOptionalNumber(payload.day_of_month) : null,
     is_active: payload.is_active === false ? 0 : 1,
   };
+};
+
+const hasOwnValue = (payload, key) => Object.prototype.hasOwnProperty.call(payload, key);
+
+const normalizeUpdateTodoPayload = (payload) => {
+  const normalized = {};
+
+  if (hasOwnValue(payload, "title")) {
+    normalized.title = payload.title;
+  }
+
+  if (hasOwnValue(payload, "description")) {
+    normalized.description = normalizeOptionalText(payload.description);
+  }
+
+  if (hasOwnValue(payload, "schedule")) {
+    normalized.schedule = payload.schedule;
+    normalized.day_of_week =
+      payload.schedule === "weekly" ? normalizeOptionalNumber(payload.day_of_week) : null;
+    normalized.day_of_month =
+      payload.schedule === "monthly" ? normalizeOptionalNumber(payload.day_of_month) : null;
+  } else {
+    if (hasOwnValue(payload, "day_of_week")) {
+      normalized.day_of_week = normalizeOptionalNumber(payload.day_of_week);
+    }
+
+    if (hasOwnValue(payload, "day_of_month")) {
+      normalized.day_of_month = normalizeOptionalNumber(payload.day_of_month);
+    }
+  }
+
+  if (hasOwnValue(payload, "start_date")) {
+    normalized.start_date = normalizeOptionalDate(payload.start_date);
+  }
+
+  if (hasOwnValue(payload, "is_active")) {
+    normalized.is_active = payload.is_active === false ? 0 : 1;
+  }
+
+  if (hasOwnValue(payload, "location_ids") || hasOwnValue(payload, "location_id")) {
+    const locationIds = payload.location_ids || (payload.location_id ? [payload.location_id] : []);
+    normalized.location_ids = [...new Set(locationIds.map((locationId) => Number(locationId)))];
+  }
+
+  return normalized;
 };
 
 const formatLocation = (location) => ({
@@ -160,5 +222,26 @@ export const getTodoByIdService = async (todoId) => {
   } catch (error) {
     if (error instanceof ApiError) throw error;
     throw new ApiError(FETCH_ERROR, "Todo", error, false);
+  }
+};
+
+export const updateTodoService = async (todoId, payload) => {
+  try {
+    await ensureTodoExists(todoId);
+
+    const todoPayload = normalizeUpdateTodoPayload(payload);
+
+    if (Array.isArray(todoPayload.location_ids)) {
+      await ensureLocationsExist(todoPayload.location_ids);
+    }
+
+    await todoModel.updateTodoModel(todoId, todoPayload);
+
+    const todo = await ensureTodoExists(todoId);
+    const locations = await todoModel.getTodoLocationsByTodoIdsModel([todoId]);
+    return formatTodo(todo, locations.map(formatLocation));
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    throw new ApiError(UPDATE_ERROR, "Todo", error, false);
   }
 };

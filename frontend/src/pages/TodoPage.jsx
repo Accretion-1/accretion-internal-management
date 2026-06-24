@@ -8,6 +8,7 @@ import {
     ClipboardList,
     MapPin,
     Eye,
+    Pencil,
     Plus,
     RefreshCw,
 } from 'lucide-react';
@@ -26,6 +27,7 @@ const EMPTY_FORM = {
     start_date: '',
     day_of_week: '',
     day_of_month: '',
+    is_active: true,
 };
 
 const TODO_TYPES = [
@@ -52,15 +54,6 @@ const WEEK_DAYS = [
     { value: 7, label: 'Sunday' },
 ];
 
-const formatDate = (value) => {
-    if (!value) return '-';
-    return new Date(value).toLocaleDateString('en-IN', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-    });
-};
-
 const formatTime = (value) => {
     if (!value) return 'Any time';
     return String(value).slice(0, 5);
@@ -76,6 +69,40 @@ const getTodoLocations = (todo) => (
         ? todo.locations
         : [todo.location].filter(Boolean)
 );
+
+const getDateInputValue = (value) => {
+    if (!value) return '';
+    if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+        return value;
+    }
+
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
+const localDateToUtcISOString = (value) => {
+    if (!value || !isValidDateValue(value)) return null;
+
+    const [year, month, day] = value.split('-').map(Number);
+    return new Date(year, month - 1, day).toISOString();
+};
+
+const formatDate = (value) => {
+    const dateValue = getDateInputValue(value);
+    if (!dateValue) return '-';
+
+    const [year, month, day] = dateValue.split('-').map(Number);
+    return new Date(year, month - 1, day).toLocaleDateString('en-IN', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+    });
+};
 
 const getTodayDateValue = () => {
     const today = new Date();
@@ -107,8 +134,29 @@ const normalizeTodoPayload = (form) => {
         description: form.description.trim() || null,
         location_ids: form.location_ids.map((locationId) => Number(locationId)),
         due_time: form.due_time || null,
-        start_date: form.start_date || null,
+        start_date: localDateToUtcISOString(form.start_date),
         is_active: true,
+    };
+
+    if (form.schedule === 'weekly') {
+        payload.day_of_week = Number(form.day_of_week);
+    }
+
+    if (form.schedule === 'monthly') {
+        payload.day_of_month = Number(form.day_of_month);
+    }
+
+    return payload;
+};
+
+const normalizeTodoUpdatePayload = (form) => {
+    const payload = {
+        title: form.title.trim(),
+        description: form.description.trim() || null,
+        schedule: form.schedule,
+        location_ids: form.location_ids.map((locationId) => Number(locationId)),
+        start_date: localDateToUtcISOString(form.start_date),
+        is_active: Boolean(form.is_active),
     };
 
     if (form.schedule === 'weekly') {
@@ -131,10 +179,12 @@ export const TodoPage = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [isCreateOpen, setIsCreateOpen] = useState(false);
+    const [editingTodo, setEditingTodo] = useState(null);
     const [form, setForm] = useState(EMPTY_FORM);
     const [errors, setErrors] = useState({});
 
     const isAdminOrManager = currentUser?.role === 'Admin' || currentUser?.role === 'Manager';
+    const isEditMode = Boolean(editingTodo);
 
     const fetchTodos = async () => {
         setIsLoading(true);
@@ -179,7 +229,7 @@ export const TodoPage = () => {
             nextErrors.title = 'Title must be at least 2 characters.';
         }
 
-        if (!form.type) {
+        if (!isEditMode && !form.type) {
             nextErrors.type = 'Task type is required.';
         }
 
@@ -199,7 +249,7 @@ export const TodoPage = () => {
             nextErrors.start_date = 'Start date cannot be a previous date.';
         }
 
-        if (!form.due_time) {
+        if (!isEditMode && !form.due_time) {
             nextErrors.due_time = 'Due time is required.';
         }
 
@@ -250,7 +300,29 @@ export const TodoPage = () => {
     };
 
     const handleOpenCreate = () => {
-        setForm(EMPTY_FORM);
+        setEditingTodo(null);
+        setForm({ ...EMPTY_FORM });
+        setErrors({});
+        setIsCreateOpen(true);
+    };
+
+    const handleOpenEdit = (todo) => {
+        const todoLocations = getTodoLocations(todo);
+
+        setEditingTodo(todo);
+        setForm({
+            ...EMPTY_FORM,
+            type: todo.type || EMPTY_FORM.type,
+            schedule: todo.schedule || EMPTY_FORM.schedule,
+            title: todo.title || '',
+            description: todo.description || '',
+            location_ids: todoLocations.map((location) => String(location.location_id)).filter(Boolean),
+            due_time: todo.due_time ? String(todo.due_time).slice(0, 5) : EMPTY_FORM.due_time,
+            start_date: getDateInputValue(todo.start_date),
+            day_of_week: todo.day_of_week ? String(todo.day_of_week) : '',
+            day_of_month: todo.day_of_month ? String(todo.day_of_month) : '',
+            is_active: Boolean(todo.is_active),
+        });
         setErrors({});
         setIsCreateOpen(true);
     };
@@ -258,6 +330,7 @@ export const TodoPage = () => {
     const handleCloseCreate = () => {
         if (isSaving) return;
         setIsCreateOpen(false);
+        setEditingTodo(null);
         setErrors({});
     };
 
@@ -266,7 +339,7 @@ export const TodoPage = () => {
 
         setIsSaving(true);
         try {
-            const response = await apiHandler({
+            await apiHandler({
                 method: 'POST',
                 url: API_ENDPOINTS.TODOS.ADD,
                 data: normalizeTodoPayload(form),
@@ -275,6 +348,28 @@ export const TodoPage = () => {
             await fetchTodos();
 
             setIsCreateOpen(false);
+            setErrors({});
+        }
+        finally {
+            setIsSaving(false);
+        }
+    };
+
+    const handleUpdateTodo = async () => {
+        if (!isAdminOrManager || !editingTodo || !validateForm()) return;
+
+        setIsSaving(true);
+        try {
+            await apiHandler({
+                method: 'PUT',
+                url: API_ENDPOINTS.TODOS.UPDATE(editingTodo.todo_id),
+                data: normalizeTodoUpdatePayload(form),
+            });
+
+            await fetchTodos();
+
+            setIsCreateOpen(false);
+            setEditingTodo(null);
             setErrors({});
         }
         finally {
@@ -424,14 +519,26 @@ export const TodoPage = () => {
                                             )}
                                         </div>
 
-                                        <button
-                                            id={`view-todo-${todo.todo_id}`}
-                                            onClick={() => navigate(`/todos/${todo.todo_id}`)}
-                                            className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-blue-100 bg-blue-50 px-4 py-2.5 text-xs font-extrabold text-blue-700 transition-all hover:bg-blue-100 sm:w-auto"
-                                        >
-                                            <Eye className="h-4 w-4" />
-                                            View Details
-                                        </button>
+                                        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+                                            {isAdminOrManager && (
+                                                <button
+                                                    id={`edit-todo-${todo.todo_id}`}
+                                                    onClick={() => handleOpenEdit(todo)}
+                                                    className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-extrabold text-slate-700 transition-all hover:bg-slate-50 sm:w-auto"
+                                                >
+                                                    <Pencil className="h-4 w-4" />
+                                                    Edit
+                                                </button>
+                                            )}
+                                            <button
+                                                id={`view-todo-${todo.todo_id}`}
+                                                onClick={() => navigate(`/todos/${todo.todo_id}`)}
+                                                className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-blue-100 bg-blue-50 px-4 py-2.5 text-xs font-extrabold text-blue-700 transition-all hover:bg-blue-100 sm:w-auto"
+                                            >
+                                                <Eye className="h-4 w-4" />
+                                                View Details
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -455,11 +562,16 @@ export const TodoPage = () => {
             <Modal
                 isOpen={isCreateOpen}
                 onClose={handleCloseCreate}
-                title="Create New To-Do Task"
+                title={isEditMode ? 'Update To-Do Task' : 'Create New To-Do Task'}
                 maxWidthClass="max-w-3xl"
                 footerButtons={[
                     { label: 'Cancel', onClick: handleCloseCreate },
-                    { label: 'Schedule To-Do', onClick: handleSaveTodo, variant: 'primary', isLoading: isSaving },
+                    {
+                        label: isEditMode ? 'Update To-Do' : 'Schedule To-Do',
+                        onClick: isEditMode ? handleUpdateTodo : handleSaveTodo,
+                        variant: 'primary',
+                        isLoading: isSaving,
+                    },
                 ]}
             >
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -490,10 +602,12 @@ export const TodoPage = () => {
                         <select
                             value={form.type}
                             onChange={(event) => handleChange('type', event.target.value)}
-                            className={`cursor-pointer rounded-xl border bg-slate-50 px-3.5 py-2.5 text-sm font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-2 ${errors.type ? 'border-rose-300 focus:ring-rose-100' : 'border-slate-200 focus:ring-blue-100'}`}
+                            disabled={isEditMode}
+                            className={`cursor-pointer rounded-xl border bg-slate-50 px-3.5 py-2.5 text-sm font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 ${errors.type ? 'border-rose-300 focus:ring-rose-100' : 'border-slate-200 focus:ring-blue-100'}`}
                         >
                             {TODO_TYPES.map((type) => <option key={type.value} value={type.value}>{type.label}</option>)}
                         </select>
+                        {isEditMode && <span className="text-xs font-semibold text-slate-400">Task type cannot be changed after creation.</span>}
                         {errors.type && <span className="text-xs text-rose-600">{errors.type}</span>}
                     </div>
 
@@ -551,16 +665,33 @@ export const TodoPage = () => {
                         {errors.start_date && <span className="text-xs text-rose-600">{errors.start_date}</span>}
                     </div>
 
-                    <div className="flex flex-col gap-1.5">
-                        <label className="text-xs font-bold text-slate-600">Due Time</label>
-                        <input
-                            type="time"
-                            value={form.due_time}
-                            onChange={(event) => handleChange('due_time', event.target.value)}
-                            className={`rounded-xl border bg-slate-50 px-3.5 py-2.5 text-sm font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-2 ${errors.due_time ? 'border-rose-300 focus:ring-rose-100' : 'border-slate-200 focus:ring-blue-100'}`}
-                        />
-                        {errors.due_time && <span className="text-xs text-rose-600">{errors.due_time}</span>}
-                    </div>
+                    {!isEditMode && (
+                        <div className="flex flex-col gap-1.5">
+                            <label className="text-xs font-bold text-slate-600">Due Time</label>
+                            <input
+                                type="time"
+                                value={form.due_time}
+                                onChange={(event) => handleChange('due_time', event.target.value)}
+                                className={`rounded-xl border bg-slate-50 px-3.5 py-2.5 text-sm font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-2 ${errors.due_time ? 'border-rose-300 focus:ring-rose-100' : 'border-slate-200 focus:ring-blue-100'}`}
+                            />
+                            {errors.due_time && <span className="text-xs text-rose-600">{errors.due_time}</span>}
+                        </div>
+                    )}
+
+                    {isEditMode && (
+                        <label className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5">
+                            <span>
+                                <span className="block text-xs font-bold text-slate-600">Todo Status</span>
+                                <span className="block text-xs font-semibold text-slate-400">Toggle active or inactive</span>
+                            </span>
+                            <input
+                                type="checkbox"
+                                checked={form.is_active}
+                                onChange={(event) => handleChange('is_active', event.target.checked)}
+                                className="h-4 w-4 rounded border-slate-300 text-blue-600"
+                            />
+                        </label>
+                    )}
 
                     {form.schedule === 'weekly' && (
                         <div className="flex flex-col gap-1.5">

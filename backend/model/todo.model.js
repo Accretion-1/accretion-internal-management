@@ -150,3 +150,91 @@ export const getTodoByIdModel = async (todoId) => {
     throw new ApiError(DB_ERROR, "Checking Todo", error, false);
   }
 };
+
+export const updateTodoModel = async (todoId, payload) => {
+  const connection = await db.begin();
+
+  try {
+    const { location_ids, ...todoPayload } = payload;
+    const fields = [];
+    const values = [];
+
+    Object.entries(todoPayload).forEach(([key, value]) => {
+      fields.push(`${key} = ?`);
+      values.push(value);
+    });
+
+    if (fields.length) {
+      await connection.query(
+        `UPDATE todos
+         SET ${fields.join(", ")}, updated_at = CURRENT_TIMESTAMP
+         WHERE todo_id = ?`,
+        [...values, todoId],
+      );
+    }
+
+    if (Array.isArray(location_ids)) {
+      const [existingMappings] = await connection.query(
+        `SELECT todo_location_id, location_id, is_deleted
+         FROM todo_locations
+         WHERE todo_id = ?`,
+        [todoId],
+      );
+
+      const requestedLocationIds = [...new Set(location_ids.map((locationId) => Number(locationId)))];
+      const requestedLocationSet = new Set(requestedLocationIds);
+      const existingLocationSet = new Set(
+        existingMappings.map((mapping) => Number(mapping.location_id)),
+      );
+      const activeLocationIds = existingMappings
+        .filter((mapping) => Number(mapping.is_deleted) === 0)
+        .map((mapping) => Number(mapping.location_id));
+      const softDeleteLocationIds = activeLocationIds.filter(
+        (locationId) => !requestedLocationSet.has(locationId),
+      );
+      const reactivateLocationIds = existingMappings
+        .filter(
+          (mapping) =>
+            Number(mapping.is_deleted) === 1 &&
+            requestedLocationSet.has(Number(mapping.location_id)),
+        )
+        .map((mapping) => Number(mapping.location_id));
+      const insertLocationIds = requestedLocationIds.filter(
+        (locationId) => !existingLocationSet.has(locationId),
+      );
+
+      if (softDeleteLocationIds.length) {
+        await connection.query(
+          `UPDATE todo_locations
+           SET is_deleted = 1, updated_at = CURRENT_TIMESTAMP
+           WHERE todo_id = ? AND location_id IN (?)`,
+          [todoId, softDeleteLocationIds],
+        );
+      }
+
+      if (reactivateLocationIds.length) {
+        await connection.query(
+          `UPDATE todo_locations
+           SET is_deleted = 0, updated_at = CURRENT_TIMESTAMP
+           WHERE todo_id = ? AND location_id IN (?)`,
+          [todoId, reactivateLocationIds],
+        );
+      }
+
+      if (insertLocationIds.length) {
+        const locationValues = insertLocationIds.map((locationId) => [todoId, locationId]);
+        await connection.query(
+          `INSERT INTO todo_locations (todo_id, location_id)
+           VALUES ?`,
+          [locationValues],
+        );
+      }
+    }
+
+    await db.commit(connection);
+    return true;
+  } catch (error) {
+    await db.rollback(connection);
+    throw new ApiError(DB_ERROR, "Updating Todo", error, false);
+  }
+};
