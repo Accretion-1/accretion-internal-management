@@ -16,10 +16,16 @@ app.use(
 );
 app.use(express.urlencoded({ extended: true }));
 
-app.use("/api", routes);
+app.get("/health", (req, res) => {
+  res.send(`Server is running On Port ${PORT}`);
+});
 
-app.use("/", (req, res) => {
-  res.send("Server is running On Port " + PORT);
+// 404 handler (must be last)
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    message: `Route not found: ${req.method} ${req.originalUrl}`,
+  });
 });
 
 export default app;
