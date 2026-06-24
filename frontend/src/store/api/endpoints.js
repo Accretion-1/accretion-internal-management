@@ -17,6 +17,11 @@ export const API_ENDPOINTS = Object.freeze({
     BASE: "/locations",
     BY_ID: (locationId) => `/locations/${locationId}`,
   }),
+  TODOS: Object.freeze({
+    BASE: "/todos",
+    ADD: "/todos/add-todos",
+    BY_ID: (todoId) => `/todos/${todoId}`,
+  }),
   HOSTING: Object.freeze({}),
   SUPPORT: Object.freeze({}),
   BILLING: Object.freeze({}),

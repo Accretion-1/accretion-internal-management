@@ -4,7 +4,6 @@ CREATE TABLE todos (
     schedule ENUM('daily', 'weekly', 'monthly', 'single') NOT NULL,
     title VARCHAR(255) NOT NULL,
     description TEXT,
-    location_id BIGINT NULL,
     created_by BIGINT NOT NULL,
 
     -- Scheduling
@@ -61,3 +60,24 @@ CREATE TABLE todo_completion_files (
 
     INDEX idx_completion (completion_id)
 );
+
+CREATE TABLE todo_locations (
+    todo_location_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    todo_id BIGINT NOT NULL,
+    location_id BIGINT NOT NULL,
+    is_deleted BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_todo_location_todo
+        FOREIGN KEY (todo_id) REFERENCES todos(todo_id) ON DELETE CASCADE,
+
+    -- Prevent duplicate active location mappings for same todo
+    UNIQUE KEY uq_todo_location (todo_id, location_id),
+
+    INDEX idx_todo_location_todo (todo_id),
+    INDEX idx_todo_location_location (location_id),
+    INDEX idx_todo_location_deleted (is_deleted)
+);
+
+ALTER TABLE `todo_completions` ADD `todo_location_id` BIGINT NOT NULL COMMENT 'Which location this completion was done at' AFTER `todo_id`;
