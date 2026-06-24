@@ -56,7 +56,7 @@ jobs:
 
   deploy:
     needs: build-and-push
-    runs-on: [self-hosted, Linux, X64, skyrack-new-vps]
+    runs-on: ubuntu-latest
     environment: ${{ github.ref_name == 'main' && 'production' || 'development' }}
 
     steps:
@@ -74,30 +74,29 @@ jobs:
             echo "FRONTEND_SVC=accretion-frontend-dev" >> $GITHUB_ENV
           fi
 
-      - name: Deploy Application
-        run: |
-          sudo bash -c '
-          set -e
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          envs: ENV_TAG,DEPLOY_DIR,BACKEND_SVC,FRONTEND_SVC
+          script: |
+            set -e
 
-          DEPLOY_DIR="${{ env.DEPLOY_DIR }}"
-          ENV_TAG="${{ env.ENV_TAG }}"
-          BACKEND_SVC="${{ env.BACKEND_SVC }}"
-          FRONTEND_SVC="${{ env.FRONTEND_SVC }}"
+            echo "=============================="
+            echo "Branch  : ${{ github.ref_name }}"
+            echo "Tag     : $ENV_TAG"
+            echo "Dir     : $DEPLOY_DIR"
+            echo "=============================="
 
-          echo "=============================="
-          echo "Branch  : ${{ github.ref_name }}"
-          echo "Tag     : $ENV_TAG"
-          echo "Dir     : $DEPLOY_DIR"
-          echo "=============================="
+            cd $DEPLOY_DIR
 
-          cd $DEPLOY_DIR
+            sed -i "s|skyrack2026/accretion-backend:.*|skyrack2026/accretion-backend:$ENV_TAG|" docker-compose.yml
+            sed -i "s|skyrack2026/accretion-frontend:.*|skyrack2026/accretion-frontend:$ENV_TAG|" docker-compose.yml
 
-          sed -i "s|skyrack2026/accretion-backend:.*|skyrack2026/accretion-backend:$ENV_TAG|" docker-compose.yml
-          sed -i "s|skyrack2026/accretion-frontend:.*|skyrack2026/accretion-frontend:$ENV_TAG|" docker-compose.yml
+            docker compose pull $BACKEND_SVC $FRONTEND_SVC
+            docker compose up -d --no-deps --force-recreate $BACKEND_SVC $FRONTEND_SVC
+            docker image prune -af
 
-          docker compose pull $BACKEND_SVC $FRONTEND_SVC
-          docker compose up -d --no-deps --force-recreate $BACKEND_SVC $FRONTEND_SVC
-          docker image prune -af
-
-          echo "✅ Accretion [$ENV_TAG] deployed successfully"
-          '
+            echo "✅ Accretion [$ENV_TAG] deployed successfully"
