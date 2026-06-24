@@ -17,6 +17,7 @@ import { StockPage } from './pages/StockPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { ReminderPage } from './pages/ReminderPage';
 import { TodoPage } from './pages/TodoPage';
+import { TodoDetailPage } from './pages/TodoDetailPage';
 import { ActivityLogsPage } from './pages/ActivityLogsPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { LocationsPage } from './pages/LocationsPage';
@@ -124,6 +125,7 @@ function AppContent() {
           <Route path="/stock" element={<StockPage />}/>
           <Route path="/reports" element={<ReportsPage />}/>
           <Route path="/todos" element={<TodoPage />}/>
+          <Route path="/todos/:todoId" element={<TodoDetailPage />}/>
           <Route path="/reminders" element={<ReminderPage />}/>
           <Route path="/reminder-schedule" element={<ReminderPage />}/>
           <Route path="/locations" element={<LocationsPage />}/>

@@ -72,7 +72,7 @@ export const AppLayout = () => {
         return null;
     const location = useLocation();
     const navigate = useNavigate();
-    const activeTab = location.pathname.substring(1) || 'dashboard';
+    const activeTab = location.pathname.split('/').filter(Boolean)[0] || 'dashboard';
     const isPrivilegedRole = currentUser.role === 'Admin' || currentUser.role === 'Manager';
     const userPanelRouteIds = getUserPanelRouteIds(currentUser.panels);
     const canAccessRoute = (item) => isPrivilegedRole
