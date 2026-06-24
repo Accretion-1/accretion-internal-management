@@ -16,7 +16,9 @@ app.use(
 );
 app.use(express.urlencoded({ extended: true }));
 
-app.get("/health", (req, res) => {
+app.use("/", routes);
+
+app.get("/", (req, res) => {
   res.send(`Server is running On Port ${PORT}`);
 });
 
@@ -27,5 +29,4 @@ app.use((req, res) => {
     message: `Route not found: ${req.method} ${req.originalUrl}`,
   });
 });
-
 export default app;
