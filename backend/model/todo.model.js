@@ -24,6 +24,87 @@ const TODO_SELECT = `
   LEFT JOIN users u ON u.user_id = t.created_by
 `;
 
+const USER_TODO_SELECT = `
+  SELECT
+    t.todo_id,
+    t.type,
+    t.schedule,
+    t.title,
+    t.description,
+    t.created_by,
+    u.full_name AS created_by_name,
+    u.phone_number AS created_by_phone_number,
+    t.due_time,
+    t.start_date,
+    t.end_date,
+    t.day_of_week,
+    t.day_of_month,
+    t.is_active,
+    t.created_at,
+    t.updated_at,
+    tl.todo_location_id,
+    tl.location_id,
+    l.district,
+    l.godown,
+    l.sloc,
+    l.cap,
+    l.remark,
+    tl.created_at AS todo_location_created_at,
+    tl.updated_at AS todo_location_updated_at,
+    CASE WHEN tc.completion_id IS NOT NULL THEN TRUE ELSE FALSE END AS is_completed
+  FROM todos t
+  INNER JOIN todo_locations tl ON tl.todo_id = t.todo_id
+  INNER JOIN locations l ON l.location_id = tl.location_id
+  LEFT JOIN users u ON u.user_id = t.created_by
+`;
+
+const USER_TODO_COMPLETION_JOIN = `
+  LEFT JOIN (
+    SELECT
+      MIN(completion_id) AS completion_id,
+      todo_id,
+      todo_location_id,
+      completed_by,
+      MAX(completion_date = CURDATE()) AS completed_today
+    FROM todo_completions
+    GROUP BY todo_id, todo_location_id, completed_by
+  ) tc ON tc.todo_id = t.todo_id
+    AND tc.todo_location_id = tl.todo_location_id
+    AND tc.completed_by = ?
+    AND (
+      t.schedule = 'single'
+      OR tc.completed_today = 1
+    )
+`;
+
+const USER_TODO_WHERE = `
+  WHERE tl.location_id = ?
+    AND tl.is_deleted = FALSE
+    AND t.is_active = TRUE
+    AND t.start_date <= CURDATE()
+    AND (t.end_date IS NULL OR t.end_date >= CURDATE())
+    AND (
+      t.schedule = 'daily'
+      OR (t.schedule = 'weekly' AND t.day_of_week = CASE WHEN DAYOFWEEK(CURDATE()) = 1 THEN 7 ELSE DAYOFWEEK(CURDATE()) - 1 END)
+      OR (t.schedule = 'monthly' AND t.day_of_month = DAY(CURDATE()))
+      OR (t.schedule = 'single' AND CURDATE() BETWEEN t.start_date AND t.end_date)
+    )
+`;
+
+const buildUserTodoStatusFilter = (status, values) => {
+  if (status === "active") {
+    values.push(0);
+    return " AND (tc.completion_id IS NOT NULL) = ? ";
+  }
+
+  if (status === "completed") {
+    values.push(1);
+    return " AND (tc.completion_id IS NOT NULL) = ? ";
+  }
+
+  return "";
+};
+
 export const createTodoModel = async ({
   type,
   schedule,
@@ -236,5 +317,80 @@ export const updateTodoModel = async (todoId, payload) => {
   } catch (error) {
     await db.rollback(connection);
     throw new ApiError(DB_ERROR, "Updating Todo", error, false);
+  }
+};
+
+export const getUserEligibleTodosModel = async ({
+  user_id,
+  location_id,
+  status = null,
+  page = 1,
+  limit = 10,
+}) => {
+  try {
+    const offset = (page - 1) * limit;
+    const values = [user_id, location_id];
+    const statusSql = buildUserTodoStatusFilter(status, values);
+
+    return await db.query(
+      `${USER_TODO_SELECT}
+       ${USER_TODO_COMPLETION_JOIN}
+       ${USER_TODO_WHERE}
+       ${statusSql}
+       ORDER BY t.todo_id DESC
+       LIMIT ? OFFSET ?`,
+      [...values, limit, offset],
+    );
+  } catch (error) {
+    throw new ApiError(DB_ERROR, "Fetching User Todos", error, false);
+  }
+};
+
+export const countUserEligibleTodosModel = async ({
+  user_id,
+  location_id,
+  status = null,
+}) => {
+  try {
+    const values = [user_id, location_id];
+    const statusSql = buildUserTodoStatusFilter(status, values);
+    const [result] = await db.query(
+      `SELECT COUNT(*) AS total_records
+       FROM todos t
+       INNER JOIN todo_locations tl ON tl.todo_id = t.todo_id
+       ${USER_TODO_COMPLETION_JOIN}
+       ${USER_TODO_WHERE}
+       ${statusSql}`,
+      values,
+    );
+
+    return Number(result?.total_records || 0);
+  } catch (error) {
+    throw new ApiError(DB_ERROR, "Counting User Todos", error, false);
+  }
+};
+
+export const getUserEligibleTodoByIdModel = async ({
+  todo_id,
+  user_id,
+  location_id,
+  status = null,
+}) => {
+  try {
+    const values = [user_id, location_id, todo_id];
+    const statusSql = buildUserTodoStatusFilter(status, values);
+    const [todo] = await db.query(
+      `${USER_TODO_SELECT}
+       ${USER_TODO_COMPLETION_JOIN}
+       ${USER_TODO_WHERE}
+       AND t.todo_id = ?
+       ${statusSql}
+       LIMIT 1`,
+      values,
+    );
+
+    return todo;
+  } catch (error) {
+    throw new ApiError(DB_ERROR, "Fetching User Todo", error, false);
   }
 };

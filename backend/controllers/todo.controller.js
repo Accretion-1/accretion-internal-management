@@ -21,3 +21,17 @@ export const updateTodoController = apiHandler(async (req, res) => {
   const todo = await todoService.updateTodoService(req.params.todo_id, req.body);
   return apiResponse(UPDATE_SUCCESS, "Todo", todo, res, "object");
 });
+
+export const getLoggedInUserTodosController = apiHandler(async (req, res) => {
+  const todos = await todoService.getLoggedInUserTodosService(req.query, req.user);
+  return apiResponse(FETCH, "User Todos", todos, res, "object");
+});
+
+export const getLoggedInUserTodoByIdController = apiHandler(async (req, res) => {
+  const todo = await todoService.getLoggedInUserTodoByIdService(
+    req.params.todo_id,
+    req.query,
+    req.user,
+  );
+  return apiResponse(FETCH, "User Todo", todo, res, "object");
+});

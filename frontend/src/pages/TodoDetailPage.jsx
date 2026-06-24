@@ -174,13 +174,16 @@ export const TodoDetailPage = () => {
     const [isSaving, setIsSaving] = useState(false);
 
     const isAdminOrManager = currentUser?.role === 'Admin' || currentUser?.role === 'Manager';
+    const isUserRole = currentUser?.role === 'User';
 
     const fetchTodo = async () => {
         setIsLoading(true);
         try {
             const response = await apiHandler({
                 method: 'GET',
-                url: API_ENDPOINTS.TODOS.BY_ID(todoId),
+                url: currentUser?.role === 'User'
+                    ? API_ENDPOINTS.TODOS.MY_BY_ID(todoId)
+                    : API_ENDPOINTS.TODOS.BY_ID(todoId),
             });
             setTodo(response?.data || null);
         }
@@ -199,11 +202,13 @@ export const TodoDetailPage = () => {
 
     useEffect(() => {
         fetchTodo();
-    }, [todoId]);
+    }, [todoId, currentUser?.role]);
 
     useEffect(() => {
-        fetchLocations();
-    }, []);
+        if (isAdminOrManager) {
+            fetchLocations();
+        }
+    }, [isAdminOrManager]);
 
     const scheduleText = useMemo(() => {
         if (!todo) return '-';
@@ -387,7 +392,7 @@ export const TodoDetailPage = () => {
                                             {todo.type}
                                         </span>
                                         <span className={`rounded-full px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider ${todo.is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
-                                            {todo.is_active ? 'Active' : 'Inactive'}
+                                            {isUserRole ? (todo.is_completed ? 'Completed' : 'Pending') : (todo.is_active ? 'Active' : 'Inactive')}
                                         </span>
                                     </div>
                                     <h3 className="mt-4 text-2xl font-extrabold tracking-tight text-slate-900">{todo.title}</h3>
@@ -404,14 +409,18 @@ export const TodoDetailPage = () => {
                         </div>
 
                         <div className="grid grid-cols-1 gap-4 p-6 md:grid-cols-2 xl:grid-cols-4">
-                            <DetailItem label="Schedule" value={scheduleText} />
+                            {!isUserRole && <DetailItem label="Schedule" value={scheduleText} />}
                             <DetailItem label="Due Time" value={formatTime(todo.due_time)} />
-                            <DetailItem label="Start Date" value={formatDate(todo.start_date)} />
                             <DetailItem label="Task Type" value={todo.type} />
+                            {isUserRole ? (
+                                <DetailItem label="Status" value={todo.is_completed ? 'Completed' : 'Pending'} />
+                            ) : (
+                                <DetailItem label="Start Date" value={formatDate(todo.start_date)} />
+                            )}
                         </div>
                     </div>
 
-                                            <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xs">
+                    <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xs">
                             <div className="mb-5 flex items-center gap-3">
                                 <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-violet-50 text-violet-600">
                                     <UserRound className="h-5 w-5" />
@@ -425,41 +434,42 @@ export const TodoDetailPage = () => {
                             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                 <DetailItem label="Created By" value={todo.created_by_user?.full_name || `User #${todo.created_by}`} />
                                 <DetailItem label="Phone Number" value={todo.created_by_user?.phone_number} />
-                                <DetailItem label="Created At" value={formatDateTime(todo.created_at)} />
-                                <DetailItem label="Updated At" value={formatDateTime(todo.updated_at)} />
+                                {!isUserRole && <DetailItem label="Created At" value={formatDateTime(todo.created_at)} />}
+                                {!isUserRole && <DetailItem label="Updated At" value={formatDateTime(todo.updated_at)} />}
                             </div>
                         </div>
 
-                    <div className="grid grid-cols-1 gap-5">
-                        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xs">
-                            <div className="mb-5 flex items-center gap-3">
-                                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
-                                    <MapPin className="h-5 w-5" />
-                                </div>
-                                <div>
-                                    <h3 className="text-base font-extrabold text-slate-900">Assigned Locations</h3>
-                                    <p className="text-xs text-slate-500">
-                                        {Array.isArray(todo.locations) ? `${todo.locations.length} mapped location(s)` : getLocationLabel(todo.location)}
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-                                {(Array.isArray(todo.locations) && todo.locations.length ? todo.locations : [todo.location].filter(Boolean)).map((location) => (
-                                    <div key={location.todo_location_id || location.location_id} className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-                                        <p className="text-sm font-extrabold text-slate-900">{getLocationLabel(location)}</p>
-                                        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                            <DetailItem label="District" value={location.district} />
-                                            <DetailItem label="Godown" value={location.godown} />
-                                            <DetailItem label="SLOC" value={location.sloc} />
-                                            <DetailItem label="Capacity" value={location.cap} />
-                                        </div>
+                    {!isUserRole && (
+                        <div className="grid grid-cols-1 gap-5">
+                            <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xs">
+                                <div className="mb-5 flex items-center gap-3">
+                                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
+                                        <MapPin className="h-5 w-5" />
                                     </div>
-                                ))}
+                                    <div>
+                                        <h3 className="text-base font-extrabold text-slate-900">Assigned Locations</h3>
+                                        <p className="text-xs text-slate-500">
+                                            {Array.isArray(todo.locations) ? `${todo.locations.length} mapped location(s)` : getLocationLabel(todo.location)}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+                                    {(Array.isArray(todo.locations) && todo.locations.length ? todo.locations : [todo.location].filter(Boolean)).map((location) => (
+                                        <div key={location.todo_location_id || location.location_id} className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                                            <p className="text-sm font-extrabold text-slate-900">{getLocationLabel(location)}</p>
+                                            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                                <DetailItem label="District" value={location.district} />
+                                                <DetailItem label="Godown" value={location.godown} />
+                                                <DetailItem label="SLOC" value={location.sloc} />
+                                                <DetailItem label="Capacity" value={location.cap} />
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
                         </div>
-
-                    </div>
+                    )}
 
                 </>
             ) : (

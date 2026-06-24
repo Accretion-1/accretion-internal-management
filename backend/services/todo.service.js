@@ -1,7 +1,15 @@
 import * as locationModel from "../model/location.model.js";
 import * as todoModel from "../model/todo.model.js";
 import { ApiError } from "../utils/api.util.js";
-import { ADD_ERROR, CUSTOM_ERROR, FETCH_ERROR, NOT_FOUND, UPDATE_ERROR } from "../utils/message.util.js";
+import {
+  ADD_ERROR,
+  CUSTOM_ERROR,
+  FETCH_ERROR,
+  FORBIDDEN,
+  NOT_FOUND,
+  REQUIRED,
+  UPDATE_ERROR,
+} from "../utils/message.util.js";
 import { isEmpty } from "../utils/misc.util.js";
 
 const normalizeOptionalText = (value) => {
@@ -104,8 +112,8 @@ const formatLocation = (location) => ({
   sloc: location.sloc,
   cap: location.cap,
   remark: location.remark,
-  created_at: location.created_at,
-  updated_at: location.updated_at,
+  created_at: location.todo_location_created_at || location.created_at,
+  updated_at: location.todo_location_updated_at || location.updated_at,
 });
 
 const groupLocationsByTodoId = (locations = []) => locations.reduce((acc, location) => {
@@ -147,6 +155,16 @@ const formatTodo = (todo, locations = []) => {
   };
 };
 
+const formatUserTodo = (todo) => {
+  const location = formatLocation(todo);
+
+  return {
+    ...formatTodo(todo, [location]),
+    todo_location_id: todo.todo_location_id,
+    is_completed: Boolean(todo.is_completed),
+  };
+};
+
 const ensureLocationExists = async (locationId) => {
   const location = await locationModel.getLocationByIdModel(locationId);
 
@@ -175,6 +193,31 @@ const ensureTodoExists = async (todoId) => {
   }
 
   return todo;
+};
+
+const ensureUserTodoAccess = (user) => {
+  if (user?.role !== "USER") {
+    throw new ApiError(FORBIDDEN, "User todo");
+  }
+
+  if (!user?.user_id) {
+    throw new ApiError(REQUIRED, "User");
+  }
+
+  if (!user?.location_id) {
+    throw new ApiError(REQUIRED, "User location");
+  }
+};
+
+const normalizeUserTodoQuery = (query = {}) => {
+  const page = Number(query.page || 1);
+  const limit = Number(query.limit || 10);
+
+  return {
+    status: query.status || null,
+    page,
+    limit,
+  };
 };
 
 export const createTodoService = async (payload, user) => {
@@ -243,5 +286,61 @@ export const updateTodoService = async (todoId, payload) => {
   } catch (error) {
     if (error instanceof ApiError) throw error;
     throw new ApiError(UPDATE_ERROR, "Todo", error, false);
+  }
+};
+
+export const getLoggedInUserTodosService = async (query = {}, user) => {
+  try {
+    ensureUserTodoAccess(user);
+
+    const filters = normalizeUserTodoQuery(query);
+    const basePayload = {
+      user_id: Number(user.user_id),
+      location_id: Number(user.location_id),
+      status: filters.status,
+    };
+
+    const [todos, totalRecords] = await Promise.all([
+      todoModel.getUserEligibleTodosModel({
+        ...basePayload,
+        page: filters.page,
+        limit: filters.limit,
+      }),
+      todoModel.countUserEligibleTodosModel(basePayload),
+    ]);
+
+    return {
+      records: todos.map(formatUserTodo),
+      total_records: totalRecords,
+      total_pages: Math.ceil(totalRecords / filters.limit),
+      current_page: filters.page,
+      limit: filters.limit,
+    };
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    throw new ApiError(FETCH_ERROR, "User Todos", error, false);
+  }
+};
+
+export const getLoggedInUserTodoByIdService = async (todoId, query = {}, user) => {
+  try {
+    ensureUserTodoAccess(user);
+
+    const filters = normalizeUserTodoQuery(query);
+    const todo = await todoModel.getUserEligibleTodoByIdModel({
+      todo_id: Number(todoId),
+      user_id: Number(user.user_id),
+      location_id: Number(user.location_id),
+      status: filters.status,
+    });
+
+    if (isEmpty(todo)) {
+      throw new ApiError(NOT_FOUND, "Todo");
+    }
+
+    return formatUserTodo(todo);
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    throw new ApiError(FETCH_ERROR, "User Todo", error, false);
   }
 };

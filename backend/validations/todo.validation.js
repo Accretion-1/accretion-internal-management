@@ -34,6 +34,12 @@ export const getTodosQuerySchema = Joi.object({
   location_id: Joi.number().integer().positive().optional(),
 }).messages(messages);
 
+export const getUserTodosQuerySchema = Joi.object({
+  status: Joi.string().valid("active", "completed").optional(),
+  page: Joi.number().integer().positive().default(1).optional(),
+  limit: Joi.number().integer().positive().max(100).default(10).optional(),
+}).messages(messages);
+
 export const createTodoSchema = Joi.object({
   type: Joi.string().valid(...todoTypes).required(),
   schedule: Joi.string().valid(...todoSchedules).required(),

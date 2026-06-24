@@ -22,6 +22,8 @@ export const API_ENDPOINTS = Object.freeze({
     ADD: "/todos/add-todos",
     BY_ID: (todoId) => `/todos/${todoId}`,
     UPDATE: (todoId) => `/todos/${todoId}`,
+    MY: "/todos/my",
+    MY_BY_ID: (todoId) => `/todos/my/${todoId}`,
   }),
   HOSTING: Object.freeze({}),
   SUPPORT: Object.freeze({}),

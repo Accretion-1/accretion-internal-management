@@ -11,6 +11,7 @@ import {
     Pencil,
     Plus,
     RefreshCw,
+    UserRound,
 } from 'lucide-react';
 import { Modal } from '../components/Modal';
 import { useAppState } from '../contexts/StateContext';
@@ -176,6 +177,12 @@ export const TodoPage = () => {
     const [todos, setTodos] = useState([]);
     const [locations, setLocations] = useState([]);
     const [statusFilter, setStatusFilter] = useState('active');
+    const [userPagination, setUserPagination] = useState({
+        total_records: 0,
+        total_pages: 1,
+        current_page: 1,
+        limit: 10,
+    });
     const [isLoading, setIsLoading] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -184,16 +191,39 @@ export const TodoPage = () => {
     const [errors, setErrors] = useState({});
 
     const isAdminOrManager = currentUser?.role === 'Admin' || currentUser?.role === 'Manager';
+    const isUserRole = currentUser?.role === 'User';
     const isEditMode = Boolean(editingTodo);
 
     const fetchTodos = async () => {
         setIsLoading(true);
         try {
+            const isUserTodoRequest = currentUser?.role === 'User';
+            const userStatus = ['active', 'completed'].includes(statusFilter) ? statusFilter : null;
             const response = await apiHandler({
                 method: 'GET',
-                url: API_ENDPOINTS.TODOS.BASE,
+                url: isUserTodoRequest ? API_ENDPOINTS.TODOS.MY : API_ENDPOINTS.TODOS.BASE,
+                params: isUserTodoRequest
+                    ? {
+                        page: userPagination.current_page,
+                        limit: userPagination.limit,
+                        ...(userStatus ? { status: userStatus } : {}),
+                    }
+                    : undefined,
             });
-            setTodos(Array.isArray(response?.data) ? response.data : []);
+
+            if (isUserTodoRequest) {
+                const data = response?.data || {};
+                setTodos(Array.isArray(data.records) ? data.records : []);
+                setUserPagination((prev) => ({
+                    ...prev,
+                    total_records: Number(data.total_records || 0),
+                    total_pages: Math.max(Number(data.total_pages || 1), 1),
+                    current_page: Number(data.current_page || prev.current_page),
+                    limit: Number(data.limit || prev.limit),
+                }));
+            } else {
+                setTodos(Array.isArray(response?.data) ? response.data : []);
+            }
         }
         finally {
             setIsLoading(false);
@@ -210,17 +240,43 @@ export const TodoPage = () => {
 
     useEffect(() => {
         fetchTodos();
-    }, []);
+    }, [currentUser?.role, statusFilter, userPagination.current_page]);
 
     useEffect(() => {
-        fetchLocations();
-    }, []);
+        if (isAdminOrManager) {
+            fetchLocations();
+        }
+    }, [isAdminOrManager]);
+
+    useEffect(() => {
+        if (isUserRole && statusFilter === 'inactive') {
+            setStatusFilter('active');
+            return;
+        }
+
+        if (!isUserRole && statusFilter === 'completed') {
+            setStatusFilter('active');
+        }
+    }, [isUserRole, statusFilter]);
 
     const filteredTodos = useMemo(() => {
+        if (isUserRole) return todos;
         if (statusFilter === 'all') return todos;
         if (statusFilter === 'inactive') return todos.filter((todo) => !todo.is_active);
         return todos.filter((todo) => todo.is_active);
-    }, [statusFilter, todos]);
+    }, [isUserRole, statusFilter, todos]);
+
+    const handleStatusFilterChange = (value) => {
+        setStatusFilter(value);
+        setUserPagination((prev) => ({ ...prev, current_page: 1 }));
+    };
+
+    const handleUserPageChange = (page) => {
+        setUserPagination((prev) => ({
+            ...prev,
+            current_page: Math.min(Math.max(page, 1), prev.total_pages || 1),
+        }));
+    };
 
     const validateForm = () => {
         const nextErrors = {};
@@ -418,11 +474,15 @@ export const TodoPage = () => {
                         <select
                             id="todo-status-filter"
                             value={statusFilter}
-                            onChange={(event) => setStatusFilter(event.target.value)}
+                            onChange={(event) => handleStatusFilterChange(event.target.value)}
                             className="w-full cursor-pointer rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm font-semibold text-slate-700 transition-all focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
                         >
-                            <option value="active">Active todos</option>
-                            <option value="inactive">Inactive todos</option>
+                            <option value="active">{isUserRole ? 'Pending todos' : 'Active todos'}</option>
+                            {isUserRole ? (
+                                <option value="completed">Completed todos</option>
+                            ) : (
+                                <option value="inactive">Inactive todos</option>
+                            )}
                             <option value="all">All todos</option>
                         </select>
                     </div>
@@ -431,7 +491,7 @@ export const TodoPage = () => {
                         <button
                             id="clear-todo-status-filter"
                             type="button"
-                            onClick={() => setStatusFilter('active')}
+                            onClick={() => handleStatusFilterChange('active')}
                             className="inline-flex cursor-pointer items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-600 transition-all hover:bg-slate-50"
                         >
                             Clear Filter
@@ -459,7 +519,7 @@ export const TodoPage = () => {
                                             <div className="flex flex-wrap items-center gap-2">
                                                 <h3 className="text-base font-extrabold tracking-tight text-slate-900">{todo.title}</h3>
                                                 <span className={`rounded-full px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide ${todo.is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
-                                                    {todo.is_active ? 'Active' : 'Inactive'}
+                                                    {isUserRole ? (todo.is_completed ? 'Completed' : 'Pending') : (todo.is_active ? 'Active' : 'Inactive')}
                                                 </span>
                                             </div>
                                             {todo.description && (
@@ -483,39 +543,56 @@ export const TodoPage = () => {
                                         </div>
                                     </div>
 
-                                    <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4">
-                                        <div className="mb-2 flex items-center justify-between gap-2">
-                                            <div className="flex items-center gap-2 text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
-                                                <MapPin className="h-3.5 w-3.5 shrink-0" />
-                                                Locations
+                                    {!isUserRole && (
+                                        <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4">
+                                            <div className="mb-2 flex items-center justify-between gap-2">
+                                                <div className="flex items-center gap-2 text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
+                                                    <MapPin className="h-3.5 w-3.5 shrink-0" />
+                                                    Locations
+                                                </div>
+                                                {hiddenLocationCount > 0 && (
+                                                    <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-extrabold text-blue-700">
+                                                        +{hiddenLocationCount} more
+                                                    </span>
+                                                )}
                                             </div>
-                                            {hiddenLocationCount > 0 && (
-                                                <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-extrabold text-blue-700">
-                                                    +{hiddenLocationCount} more
-                                                </span>
-                                            )}
+                                            <ul className="grid grid-cols-1 gap-1.5 text-xs font-bold leading-relaxed text-slate-700 md:grid-cols-2">
+                                                {visibleLocations.map((location) => (
+                                                    <li key={location.todo_location_id || location.location_id} className="flex gap-2">
+                                                        <span className="text-blue-500">•</span>
+                                                        <span>{getLocationLabel(location)}</span>
+                                                    </li>
+                                                ))}
+                                            </ul>
                                         </div>
-                                        <ul className="grid grid-cols-1 gap-1.5 text-xs font-bold leading-relaxed text-slate-700 md:grid-cols-2">
-                                            {visibleLocations.map((location) => (
-                                                <li key={location.todo_location_id || location.location_id} className="flex gap-2">
-                                                    <span className="text-blue-500">•</span>
-                                                    <span>{getLocationLabel(location)}</span>
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    </div>
+                                    )}
 
                                     <div className="flex flex-col gap-3 border-t border-slate-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
                                         <div className="flex flex-wrap items-center gap-3 text-xs font-semibold text-slate-600">
-                                            <div className="flex items-center gap-2">
-                                                <CalendarDays className="h-4 w-4 text-slate-400" />
-                                                <span>{formatDate(todo.start_date)}</span>
-                                            </div>
-                                            {(todo.day_of_week || todo.day_of_month) && (
-                                                <div className="rounded-xl bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-500">
-                                                    {todo.day_of_week ? `Weekly on ${WEEK_DAYS.find((day) => day.value === Number(todo.day_of_week))?.label || `Day ${todo.day_of_week}`}` : ''}
-                                                    {todo.day_of_month ? `Monthly on day ${todo.day_of_month}` : ''}
-                                                </div>
+                                            {isUserRole ? (
+                                                <>
+                                                    <div className="flex items-center gap-2">
+                                                        <UserRound className="h-4 w-4 text-slate-400" />
+                                                        <span>Creator: {todo.created_by_user?.full_name || `User #${todo.created_by}`}</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <Clock className="h-4 w-4 text-slate-400" />
+                                                        <span>Due: {formatTime(todo.due_time)}</span>
+                                                    </div>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <div className="flex items-center gap-2">
+                                                        <CalendarDays className="h-4 w-4 text-slate-400" />
+                                                        <span>{formatDate(todo.start_date)}</span>
+                                                    </div>
+                                                    {(todo.day_of_week || todo.day_of_month) && (
+                                                        <div className="rounded-xl bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-500">
+                                                            {todo.day_of_week ? `Weekly on ${WEEK_DAYS.find((day) => day.value === Number(todo.day_of_week))?.label || `Day ${todo.day_of_week}`}` : ''}
+                                                            {todo.day_of_month ? `Monthly on day ${todo.day_of_month}` : ''}
+                                                        </div>
+                                                    )}
+                                                </>
                                             )}
                                         </div>
 
@@ -558,6 +635,32 @@ export const TodoPage = () => {
                     </div>
                 )}
             </div>
+
+            {isUserRole && userPagination.total_pages > 1 && (
+                <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-xs sm:flex-row sm:items-center sm:justify-between">
+                    <p className="text-xs font-bold text-slate-500">
+                        Showing page {userPagination.current_page} of {userPagination.total_pages} • {userPagination.total_records} todos
+                    </p>
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={() => handleUserPageChange(userPagination.current_page - 1)}
+                            disabled={userPagination.current_page <= 1}
+                            className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-600 transition-all hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                            Previous
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => handleUserPageChange(userPagination.current_page + 1)}
+                            disabled={userPagination.current_page >= userPagination.total_pages}
+                            className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-600 transition-all hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                            Next
+                        </button>
+                    </div>
+                </div>
+            )}
 
             <Modal
                 isOpen={isCreateOpen}
