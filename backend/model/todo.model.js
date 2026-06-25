@@ -460,3 +460,91 @@ export const completeTodoModel = async ({
     throw new ApiError(DB_ERROR, "Completing Todo", error, false);
   }
 };
+
+export const getTodoCompletionsModel = async ({
+  todo_id,
+  location_id = null,
+  page = 1,
+  limit = 10,
+}) => {
+  try {
+    const offset = (page - 1) * limit;
+    const values = [todo_id];
+    const locationFilter = location_id ? " AND tl.location_id = ? " : "";
+
+    if (location_id) values.push(location_id);
+
+    return await db.query(
+      `SELECT
+        tc.completion_id,
+        tc.todo_id,
+        tc.todo_location_id,
+        tc.completed_by,
+        u.full_name AS completed_by_name,
+        u.phone_number AS completed_by_phone_number,
+        tc.completion_date,
+        tc.ppc,
+        tc.wp,
+        tc.\`super\`,
+        tc.checkbox_status,
+        tc.remarks,
+        tc.completed_at,
+        tc.updated_at,
+        tl.location_id,
+        l.district,
+        l.godown,
+        l.sloc,
+        l.cap,
+        l.remark AS location_remark
+       FROM todo_completions tc
+       INNER JOIN todo_locations tl ON tl.todo_location_id = tc.todo_location_id
+       INNER JOIN locations l ON l.location_id = tl.location_id
+       LEFT JOIN users u ON u.user_id = tc.completed_by
+       WHERE tc.todo_id = ?
+       ${locationFilter}
+       ORDER BY tc.completion_date DESC, tc.completed_at DESC, tc.completion_id DESC
+       LIMIT ? OFFSET ?`,
+      [...values, limit, offset],
+    );
+  } catch (error) {
+    throw new ApiError(DB_ERROR, "Fetching Todo Completions", error, false);
+  }
+};
+
+export const countTodoCompletionsModel = async ({ todo_id, location_id = null }) => {
+  try {
+    const values = [todo_id];
+    const locationFilter = location_id ? " AND tl.location_id = ? " : "";
+
+    if (location_id) values.push(location_id);
+
+    const [result] = await db.query(
+      `SELECT COUNT(*) AS total_records
+       FROM todo_completions tc
+       INNER JOIN todo_locations tl ON tl.todo_location_id = tc.todo_location_id
+       WHERE tc.todo_id = ?
+       ${locationFilter}`,
+      values,
+    );
+
+    return Number(result?.total_records || 0);
+  } catch (error) {
+    throw new ApiError(DB_ERROR, "Counting Todo Completions", error, false);
+  }
+};
+
+export const getCompletionFilesByCompletionIdsModel = async (completionIds = []) => {
+  try {
+    if (!completionIds.length) return [];
+
+    return await db.query(
+      `SELECT file_id, completion_id, file_type, file_url, created_at
+       FROM todo_completion_files
+       WHERE completion_id IN (?)
+       ORDER BY file_id ASC`,
+      [completionIds],
+    );
+  } catch (error) {
+    throw new ApiError(DB_ERROR, "Fetching Todo Completion Files", error, false);
+  }
+};

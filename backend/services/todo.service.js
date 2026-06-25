@@ -12,7 +12,7 @@ import {
   REQUIRED,
   UPDATE_ERROR,
 } from "../utils/message.util.js";
-import { isEmpty } from "../utils/misc.util.js";
+import { CustomImagePath, isEmpty } from "../utils/misc.util.js";
 
 const normalizeOptionalText = (value) => {
   if (value === undefined || value === null || value === "") return null;
@@ -211,6 +211,12 @@ const ensureUserTodoAccess = (user) => {
   }
 };
 
+const ensureAdminOrManagerAccess = (user) => {
+  if (!["ADMIN", "MANAGER"].includes(user?.role)) {
+    throw new ApiError(FORBIDDEN, "Todo completions");
+  }
+};
+
 const normalizeUserTodoQuery = (query = {}) => {
   const page = Number(query.page || 1);
   const limit = Number(query.limit || 10);
@@ -221,6 +227,66 @@ const normalizeUserTodoQuery = (query = {}) => {
     limit,
   };
 };
+
+const normalizePaginationQuery = (query = {}) => {
+  const page = Number(query.page || 1);
+  const limit = Number(query.limit || 10);
+
+  return {
+    page,
+    limit,
+  };
+};
+
+const groupFilesByCompletionId = (files = []) => files.reduce((acc, file) => {
+  const completionId = Number(file.completion_id);
+  if (!acc.has(completionId)) acc.set(completionId, []);
+  acc.get(completionId).push(file);
+  return acc;
+}, new Map());
+
+const getStoredFileName = (fileUrl) => {
+  if (!fileUrl) return null;
+  if (/^https?:\/\//i.test(fileUrl)) return fileUrl;
+  return String(fileUrl).split("/").filter(Boolean).pop();
+};
+
+const formatCompletionFile = (file) => ({
+  ...file,
+  file_name: getStoredFileName(file.file_url),
+  file_url: CustomImagePath(getStoredFileName(file.file_url)),
+});
+
+const formatTodoCompletion = (completion, files = []) => ({
+  completion_id: completion.completion_id,
+  todo_id: completion.todo_id,
+  todo_location_id: completion.todo_location_id,
+  completed_by: completion.completed_by,
+  completed_by_user: completion.completed_by
+    ? {
+        user_id: completion.completed_by,
+        full_name: completion.completed_by_name,
+        phone_number: completion.completed_by_phone_number,
+      }
+    : null,
+  completion_date: completion.completion_date,
+  ppc: completion.ppc,
+  wp: completion.wp,
+  super: completion.super,
+  checkbox_status: completion.checkbox_status,
+  remarks: completion.remarks,
+  completed_at: completion.completed_at,
+  updated_at: completion.updated_at,
+  location: {
+    location_id: completion.location_id,
+    district: completion.district,
+    godown: completion.godown,
+    sloc: completion.sloc,
+    cap: completion.cap,
+    remark: completion.location_remark,
+  },
+  files: files.map(formatCompletionFile),
+});
 
 const normalizeBoolean = (value) => {
   if (value === true || value === 1 || value === "1" || value === "true") return true;
@@ -240,7 +306,7 @@ const normalizeCompletionFiles = (files = {}) => {
     mimetype: file.mimetype,
     path: file.path,
     file_type: file.mimetype?.startsWith("video/") ? "video" : "photo",
-    file_url: `/public/${file.filename}`,
+    file_url: file.filename,
   }));
 };
 
@@ -495,5 +561,47 @@ export const completeLoggedInUserTodoService = async (todoId, body = {}, files =
     cleanupUploadedFiles(uploadedFiles);
     if (error instanceof ApiError) throw error;
     throw new ApiError(UPDATE_ERROR, "Todo completion", error, false);
+  }
+};
+
+export const getTodoCompletionsService = async (todoId, query = {}, user) => {
+  try {
+    ensureAdminOrManagerAccess(user);
+    await ensureTodoExists(todoId);
+
+    const { page, limit } = normalizePaginationQuery(query);
+    const basePayload = {
+      todo_id: Number(todoId),
+      location_id: query.location_id ? Number(query.location_id) : null,
+    };
+
+    const [completions, totalRecords] = await Promise.all([
+      todoModel.getTodoCompletionsModel({
+        ...basePayload,
+        page,
+        limit,
+      }),
+      todoModel.countTodoCompletionsModel(basePayload),
+    ]);
+
+    const completionIds = completions.map((completion) => completion.completion_id);
+    const files = await todoModel.getCompletionFilesByCompletionIdsModel(completionIds);
+    const filesByCompletionId = groupFilesByCompletionId(files);
+
+    return {
+      records: completions.map((completion) =>
+        formatTodoCompletion(
+          completion,
+          filesByCompletionId.get(Number(completion.completion_id)) || [],
+        ),
+      ),
+      total_records: totalRecords,
+      total_pages: Math.ceil(totalRecords / limit),
+      current_page: page,
+      limit,
+    };
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    throw new ApiError(FETCH_ERROR, "Todo Completions", error, false);
   }
 };

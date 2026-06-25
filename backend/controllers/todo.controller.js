@@ -45,3 +45,12 @@ export const completeLoggedInUserTodoController = apiHandler(async (req, res) =>
   );
   return apiResponse(UPDATE_SUCCESS, "Todo completed", completion, res, "object");
 });
+
+export const getTodoCompletionsController = apiHandler(async (req, res) => {
+  const completions = await todoService.getTodoCompletionsService(
+    req.params.todo_id,
+    req.query,
+    req.user,
+  );
+  return apiResponse(FETCH, "Todo Completions", completions, res, "object");
+});

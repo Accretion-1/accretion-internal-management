@@ -6,6 +6,8 @@ import {
     CheckCircle,
     Clock,
     ClipboardList,
+    FileVideo,
+    ImageIcon,
     MapPin,
     Pencil,
     RefreshCw,
@@ -112,6 +114,21 @@ const formatDate = (value) => {
     });
 };
 
+const getBackendFileUrl = (fileUrl) => {
+    if (!fileUrl) return '';
+    if (/^https?:\/\//i.test(fileUrl)) return fileUrl;
+
+    try {
+        const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api/';
+        const filePath = fileUrl.startsWith('/public/') ? fileUrl : `/public/${fileUrl.replace(/^\/+/, '')}`;
+        return `${new URL(apiBaseUrl).origin}${filePath}`;
+    } catch {
+        return fileUrl;
+    }
+};
+
+const getCompletionDateKey = (completion) => getDateInputValue(completion?.completion_date || completion?.completed_at) || 'unknown';
+
 const getTodayDateValue = () => {
     const today = new Date();
     const year = today.getFullYear();
@@ -158,9 +175,81 @@ const normalizeTodoUpdatePayload = (form) => {
 const DetailItem = ({ label, value }) => (
     <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
         <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">{label}</p>
-        <p className="mt-2 text-sm font-bold text-slate-800">{value || '-'}</p>
+        <p className="mt-2 text-sm font-bold text-slate-800">{value ?? '-'}</p>
     </div>
 );
+
+const CompletionMediaPreview = ({ file }) => {
+    const fileUrl = getBackendFileUrl(file?.file_url);
+    const isPhoto = file?.file_type === 'photo';
+
+    return (
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+            <div className="flex items-center gap-2 border-b border-slate-100 px-3 py-2 text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
+                {isPhoto ? <ImageIcon className="h-4 w-4 text-blue-600" /> : <FileVideo className="h-4 w-4 text-violet-600" />}
+                {isPhoto ? 'Photo' : 'Video'}
+            </div>
+            {isPhoto ? (
+                <img src={fileUrl} alt="Completion attachment" className="h-36 w-full object-cover" />
+            ) : (
+                <video src={fileUrl} controls className="h-36 w-full bg-slate-950 object-cover" />
+            )}
+        </div>
+    );
+};
+
+const CompletionRecordCard = ({ completion, todoType }) => {
+    const files = Array.isArray(completion.files) ? completion.files : [];
+
+    return (
+        <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-xs">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <span className="rounded-full bg-emerald-50 px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider text-emerald-700">
+                            Completed
+                        </span>
+                        <span className="text-xs font-bold text-slate-400">{formatDateTime(completion.completed_at)}</span>
+                    </div>
+                    <h4 className="mt-3 text-sm font-extrabold text-slate-900">
+                        {completion.completed_by_user?.full_name || `User #${completion.completed_by}`}
+                    </h4>
+                    <p className="mt-1 text-xs font-semibold text-slate-500">
+                        {completion.completed_by_user?.phone_number || 'No phone number'}
+                    </p>
+                </div>
+                <div className="rounded-2xl bg-blue-50 px-3 py-2 text-xs font-extrabold text-blue-700">
+                    {getLocationLabel(completion.location)}
+                </div>
+            </div>
+
+            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <DetailItem label="Completion Date" value={formatDate(completion.completion_date)} />
+                {todoType === 'stock' && <DetailItem label="PPC" value={completion.ppc} />}
+                {todoType === 'stock' && <DetailItem label="WP" value={completion.wp} />}
+                {todoType === 'stock' && <DetailItem label="Super" value={completion.super} />}
+                {todoType === 'checkbox' && (
+                    <DetailItem label="Checkbox Status" value={completion.checkbox_status ? 'Checked' : 'Unchecked'} />
+                )}
+            </div>
+
+            {completion.remarks && (
+                <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                    <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Remarks</p>
+                    <p className="mt-2 text-sm font-semibold leading-relaxed text-slate-700">{completion.remarks}</p>
+                </div>
+            )}
+
+            {files.length > 0 && (
+                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                    {files.map((file) => (
+                        <CompletionMediaPreview key={file.file_id || file.file_url} file={file} />
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+};
 
 export const TodoDetailPage = () => {
     const { todoId } = useParams();
@@ -174,6 +263,15 @@ export const TodoDetailPage = () => {
     const [isCompleteOpen, setIsCompleteOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
+    const [completions, setCompletions] = useState([]);
+    const [completionLocationFilter, setCompletionLocationFilter] = useState('');
+    const [completionPagination, setCompletionPagination] = useState({
+        total_records: 0,
+        total_pages: 1,
+        current_page: 1,
+        limit: 10,
+    });
+    const [isCompletionsLoading, setIsCompletionsLoading] = useState(false);
 
     const isAdminOrManager = currentUser?.role === 'Admin' || currentUser?.role === 'Manager';
     const isUserRole = currentUser?.role === 'User';
@@ -202,6 +300,36 @@ export const TodoDetailPage = () => {
         setLocations(Array.isArray(response?.data) ? response.data : []);
     };
 
+    const fetchCompletions = async (page = completionPagination.current_page) => {
+        if (!isAdminOrManager || !todoId) return;
+
+        setIsCompletionsLoading(true);
+        try {
+            const response = await apiHandler({
+                method: 'GET',
+                url: API_ENDPOINTS.TODOS.COMPLETIONS(todoId),
+                params: {
+                    page,
+                    limit: completionPagination.limit,
+                    ...(completionLocationFilter ? { location_id: completionLocationFilter } : {}),
+                },
+            });
+            const payload = response?.data || {};
+
+            setCompletions(Array.isArray(payload.records) ? payload.records : []);
+            setCompletionPagination((prev) => ({
+                ...prev,
+                total_records: Number(payload.total_records || 0),
+                total_pages: Math.max(Number(payload.total_pages || 1), 1),
+                current_page: Number(payload.current_page || page || 1),
+                limit: Number(payload.limit || prev.limit),
+            }));
+        }
+        finally {
+            setIsCompletionsLoading(false);
+        }
+    };
+
     useEffect(() => {
         fetchTodo();
     }, [todoId, currentUser?.role]);
@@ -211,6 +339,12 @@ export const TodoDetailPage = () => {
             fetchLocations();
         }
     }, [isAdminOrManager]);
+
+    useEffect(() => {
+        if (isAdminOrManager) {
+            fetchCompletions(completionPagination.current_page);
+        }
+    }, [isAdminOrManager, todoId, completionLocationFilter, completionPagination.current_page]);
 
     const scheduleText = useMemo(() => {
         if (!todo) return '-';
@@ -222,6 +356,27 @@ export const TodoDetailPage = () => {
         }
         return String(todo.schedule || '-').replace(/^\w/, (letter) => letter.toUpperCase());
     }, [todo]);
+
+    const completionsByDate = useMemo(() => {
+        const groupedCompletions = completions.reduce((groups, completion) => {
+            const dateKey = getCompletionDateKey(completion);
+            const existingGroup = groups[dateKey] || {
+                dateKey,
+                label: dateKey === 'unknown' ? 'Unknown date' : formatDate(dateKey),
+                records: [],
+            };
+
+            existingGroup.records.push(completion);
+            return {
+                ...groups,
+                [dateKey]: existingGroup,
+            };
+        }, {});
+
+        return Object.values(groupedCompletions);
+    }, [completions]);
+
+    const assignedTodoLocations = useMemo(() => getTodoLocations(todo), [todo]);
 
     const validateForm = () => {
         const nextErrors = {};
@@ -341,6 +496,18 @@ export const TodoDetailPage = () => {
     const handleCompletionDone = (completion) => {
         setTodo(completion?.todo || todo);
         setIsCompleteOpen(false);
+    };
+
+    const handleCompletionLocationFilterChange = (value) => {
+        setCompletionLocationFilter(value);
+        setCompletionPagination((prev) => ({ ...prev, current_page: 1 }));
+    };
+
+    const handleCompletionPageChange = (page) => {
+        setCompletionPagination((prev) => ({
+            ...prev,
+            current_page: Math.min(Math.max(page, 1), prev.total_pages || 1),
+        }));
     };
 
     return (
@@ -484,6 +651,114 @@ export const TodoDetailPage = () => {
                                         </div>
                                     ))}
                                 </div>
+                            </div>
+
+                            <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xs">
+                                <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
+                                            <CheckCircle className="h-5 w-5" />
+                                        </div>
+                                        <div>
+                                            <h3 className="text-base font-extrabold text-slate-900">Completed Submissions</h3>
+                                            <p className="text-xs text-slate-500">
+                                                Date-wise completion history with media, remarks, and location filters.
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <button
+                                        onClick={() => fetchCompletions(completionPagination.current_page)}
+                                        className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 shadow-xs transition-all hover:bg-slate-50"
+                                    >
+                                        <RefreshCw className={`h-4 w-4 ${isCompletionsLoading ? 'animate-spin' : ''}`} />
+                                        Refresh
+                                    </button>
+                                </div>
+
+                                <div className="mb-5 grid grid-cols-1 gap-3 lg:grid-cols-[1fr_auto] lg:items-end">
+                                    <div className="flex flex-col gap-1.5">
+                                        <label className="text-xs font-extrabold uppercase tracking-wider text-slate-400">Filter by Location</label>
+                                        <select
+                                            value={completionLocationFilter}
+                                            onChange={(event) => handleCompletionLocationFilterChange(event.target.value)}
+                                            className="cursor-pointer rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm font-bold text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
+                                        >
+                                            <option value="">All locations</option>
+                                            {assignedTodoLocations.map((location) => (
+                                                <option key={location.location_id} value={location.location_id}>
+                                                    {getLocationLabel(location)}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs font-bold text-slate-500">
+                                        {completionPagination.total_records} completed record(s)
+                                    </div>
+                                </div>
+
+                                {isCompletionsLoading ? (
+                                    <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 py-12 text-center text-sm font-semibold text-slate-400">
+                                        Loading completed submissions...
+                                    </div>
+                                ) : completionsByDate.length > 0 ? (
+                                    <div className="space-y-6">
+                                        {completionsByDate.map((group) => (
+                                            <div key={group.dateKey} className="space-y-3">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-slate-500">
+                                                        <CalendarDays className="h-4 w-4" />
+                                                    </div>
+                                                    <div>
+                                                        <h4 className="text-sm font-extrabold text-slate-900">{group.label}</h4>
+                                                        <p className="text-xs font-semibold text-slate-400">{group.records.length} submission(s)</p>
+                                                    </div>
+                                                </div>
+
+                                                <div className="space-y-3">
+                                                    {group.records.map((completion) => (
+                                                        <CompletionRecordCard
+                                                            key={completion.completion_id}
+                                                            completion={completion}
+                                                            todoType={todo.type}
+                                                        />
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ))}
+
+                                        <div className="flex flex-col gap-3 border-t border-slate-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
+                                            <p className="text-xs font-bold text-slate-500">
+                                                Page {completionPagination.current_page} of {completionPagination.total_pages}
+                                            </p>
+                                            <div className="flex items-center gap-2">
+                                                <button
+                                                    disabled={completionPagination.current_page <= 1}
+                                                    onClick={() => handleCompletionPageChange(completionPagination.current_page - 1)}
+                                                    className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 disabled:cursor-not-allowed disabled:opacity-40"
+                                                >
+                                                    Previous
+                                                </button>
+                                                <button
+                                                    disabled={completionPagination.current_page >= completionPagination.total_pages}
+                                                    onClick={() => handleCompletionPageChange(completionPagination.current_page + 1)}
+                                                    className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 disabled:cursor-not-allowed disabled:opacity-40"
+                                                >
+                                                    Next
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 py-12 text-center">
+                                        <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-white text-slate-300">
+                                            <CheckCircle className="h-5 w-5" />
+                                        </div>
+                                        <h4 className="text-sm font-extrabold text-slate-800">No completed submissions found</h4>
+                                        <p className="mt-1 text-xs text-slate-500">Try changing the location filter or refresh after users complete this task.</p>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}

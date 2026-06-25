@@ -4,6 +4,7 @@ import {
   createTodoController,
   getLoggedInUserTodoByIdController,
   getLoggedInUserTodosController,
+  getTodoCompletionsController,
   getTodoByIdController,
   getTodosController,
   updateTodoController,
@@ -14,6 +15,7 @@ import { validate } from "../middlewares/validation.middleware.js";
 import {
   completeTodoSchema,
   createTodoSchema,
+  getTodoCompletionsQuerySchema,
   getTodosQuerySchema,
   getUserTodosQuerySchema,
   todoIdParamSchema,
@@ -42,6 +44,12 @@ router.get(
   validate(todoIdParamSchema, "params"),
   validate(getUserTodosQuerySchema, "query"),
   getLoggedInUserTodoByIdController,
+);
+router.get(
+  "/:todo_id/completions",
+  validate(todoIdParamSchema, "params"),
+  validate(getTodoCompletionsQuerySchema, "query"),
+  getTodoCompletionsController,
 );
 router.get("/:todo_id", validate(todoIdParamSchema, "params"), getTodoByIdController);
 router.post("/add-todos", validate(createTodoSchema, "body"), createTodoController);
