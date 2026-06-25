@@ -14,6 +14,7 @@ import {
     UserRound,
 } from 'lucide-react';
 import { Modal } from '../components/Modal';
+import { TodoCompletionModal } from '../components/TodoCompletionModal';
 import { useAppState } from '../contexts/StateContext';
 import apiHandler from '../store/api/apiHandler';
 import { API_ENDPOINTS } from '../store/api/endpoints';
@@ -187,6 +188,7 @@ export const TodoPage = () => {
     const [isSaving, setIsSaving] = useState(false);
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [editingTodo, setEditingTodo] = useState(null);
+    const [completionTodo, setCompletionTodo] = useState(null);
     const [form, setForm] = useState(EMPTY_FORM);
     const [errors, setErrors] = useState({});
 
@@ -433,6 +435,11 @@ export const TodoPage = () => {
         }
     };
 
+    const handleCompletionDone = async () => {
+        setCompletionTodo(null);
+        await fetchTodos();
+    };
+
     return (
         <div className="flex flex-col gap-6 pb-12 text-left font-sans">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -597,6 +604,16 @@ export const TodoPage = () => {
                                         </div>
 
                                         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+                                            {isUserRole && !todo.is_completed && (
+                                                <button
+                                                    id={`complete-todo-${todo.todo_id}`}
+                                                    onClick={() => setCompletionTodo(todo)}
+                                                    className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-extrabold text-white transition-all hover:bg-emerald-700 sm:w-auto"
+                                                >
+                                                    <CheckCircle className="h-4 w-4" />
+                                                    Complete Task
+                                                </button>
+                                            )}
                                             {isAdminOrManager && (
                                                 <button
                                                     id={`edit-todo-${todo.todo_id}`}
@@ -829,6 +846,13 @@ export const TodoPage = () => {
 
                 </div>
             </Modal>
+
+            <TodoCompletionModal
+                isOpen={Boolean(completionTodo)}
+                todo={completionTodo}
+                onClose={() => setCompletionTodo(null)}
+                onCompleted={handleCompletionDone}
+            />
         </div>
     );
 };

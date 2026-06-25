@@ -12,6 +12,7 @@ import {
     UserRound,
 } from 'lucide-react';
 import { Modal } from '../components/Modal';
+import { TodoCompletionModal } from '../components/TodoCompletionModal';
 import { useAppState } from '../contexts/StateContext';
 import apiHandler from '../store/api/apiHandler';
 import { API_ENDPOINTS } from '../store/api/endpoints';
@@ -170,6 +171,7 @@ export const TodoDetailPage = () => {
     const [form, setForm] = useState(EMPTY_FORM);
     const [errors, setErrors] = useState({});
     const [isEditOpen, setIsEditOpen] = useState(false);
+    const [isCompleteOpen, setIsCompleteOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
 
@@ -336,6 +338,11 @@ export const TodoDetailPage = () => {
         }
     };
 
+    const handleCompletionDone = (completion) => {
+        setTodo(completion?.todo || todo);
+        setIsCompleteOpen(false);
+    };
+
     return (
         <div className="flex flex-col gap-6 pb-12 text-left font-sans">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -356,6 +363,16 @@ export const TodoDetailPage = () => {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
+                    {isUserRole && todo && !todo.is_completed && (
+                        <button
+                            id="complete-todo-detail-btn"
+                            onClick={() => setIsCompleteOpen(true)}
+                            className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-xs transition-all hover:bg-emerald-700"
+                        >
+                            <CheckCircle className="h-4 w-4" />
+                            Complete Task
+                        </button>
+                    )}
                     {isAdminOrManager && todo && (
                         <button
                             id="edit-todo-detail-btn"
@@ -626,6 +643,13 @@ export const TodoDetailPage = () => {
                     )}
                 </div>
             </Modal>
+
+            <TodoCompletionModal
+                isOpen={isCompleteOpen}
+                todo={todo}
+                onClose={() => setIsCompleteOpen(false)}
+                onCompleted={handleCompletionDone}
+            />
         </div>
     );
 };
