@@ -52,6 +52,8 @@ export const TodoCompletionModal = ({ isOpen, todo, onClose, onCompleted }) => {
     const [cameraAvailable, setCameraAvailable] = useState(true);
     const [isCameraReady, setIsCameraReady] = useState(false);
     const [isRecording, setIsRecording] = useState(false);
+    const [photoPreviews, setPhotoPreviews] = useState([]);
+    const [videoPreviews, setVideoPreviews] = useState([]);
 
     const todoType = todo?.type;
     const isMediaTodo = todoType === 'photo' || todoType === 'video';
@@ -131,6 +133,26 @@ export const TodoCompletionModal = ({ isOpen, todo, onClose, onCompleted }) => {
 
         return () => stopCamera();
     }, [isOpen, todo?.todo_id, todo?.type]);
+
+    useEffect(() => {
+        const previews = form.photos.map((file) => ({
+            file,
+            url: URL.createObjectURL(file),
+        }));
+
+        setPhotoPreviews(previews);
+        return () => previews.forEach((preview) => URL.revokeObjectURL(preview.url));
+    }, [form.photos]);
+
+    useEffect(() => {
+        const previews = form.videos.map((file) => ({
+            file,
+            url: URL.createObjectURL(file),
+        }));
+
+        setVideoPreviews(previews);
+        return () => previews.forEach((preview) => URL.revokeObjectURL(preview.url));
+    }, [form.videos]);
 
     const handleChange = (field, value) => {
         setForm((prev) => ({ ...prev, [field]: value }));
@@ -382,6 +404,25 @@ export const TodoCompletionModal = ({ isOpen, todo, onClose, onCompleted }) => {
                                     Capture Photo
                                 </button>
                                 {errors.photos && <span className="mt-2 block text-xs text-rose-600">{errors.photos}</span>}
+                                {photoPreviews.length > 0 && (
+                                    <div className="mt-3 grid grid-cols-2 gap-3">
+                                        {photoPreviews.map((preview, index) => (
+                                            <div key={preview.url} className="group relative overflow-hidden rounded-xl border border-slate-200 bg-white">
+                                                <img src={preview.url} alt={preview.file.name} className="aspect-video w-full object-cover" />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleRemoveFile('photos', index)}
+                                                    className="absolute right-2 top-2 inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg bg-white/90 text-rose-500 shadow-sm transition-all hover:bg-rose-50"
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </button>
+                                                <div className="p-2">
+                                                    <p className="truncate text-[11px] font-bold text-slate-700">{preview.file.name}</p>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                                 <FileList files={form.photos} onRemove={(index) => handleRemoveFile('photos', index)} />
                             </div>
                         )}
@@ -405,6 +446,25 @@ export const TodoCompletionModal = ({ isOpen, todo, onClose, onCompleted }) => {
                                     {isRecording ? 'Stop Recording' : 'Start Recording'}
                                 </button>
                                 {errors.videos && <span className="mt-2 block text-xs text-rose-600">{errors.videos}</span>}
+                                {videoPreviews.length > 0 && (
+                                    <div className="mt-3 grid grid-cols-1 gap-3">
+                                        {videoPreviews.map((preview, index) => (
+                                            <div key={preview.url} className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+                                                <video src={preview.url} controls playsInline className="aspect-video w-full bg-black object-contain" />
+                                                <div className="flex items-center justify-between gap-3 p-2">
+                                                    <p className="truncate text-[11px] font-bold text-slate-700">{preview.file.name}</p>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleRemoveFile('videos', index)}
+                                                        className="inline-flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-rose-500 transition-all hover:bg-rose-50"
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                                 <FileList files={form.videos} onRemove={(index) => handleRemoveFile('videos', index)} />
                             </div>
                         )}
@@ -445,7 +505,21 @@ export const TodoCompletionModal = ({ isOpen, todo, onClose, onCompleted }) => {
                         {isMediaTodo && (
                             <div className="rounded-xl bg-slate-50 p-3">
                                 <p className="text-xs font-bold text-slate-400">Files</p>
-                                <ul className="mt-2 list-disc space-y-1 pl-4 text-xs font-semibold text-slate-700">
+                                {todoType === 'photo' && (
+                                    <div className="mt-3 grid grid-cols-2 gap-3">
+                                        {photoPreviews.map((preview) => (
+                                            <img key={preview.url} src={preview.url} alt={preview.file.name} className="aspect-video w-full rounded-xl border border-slate-200 object-cover" />
+                                        ))}
+                                    </div>
+                                )}
+                                {todoType === 'video' && (
+                                    <div className="mt-3 grid grid-cols-1 gap-3">
+                                        {videoPreviews.map((preview) => (
+                                            <video key={preview.url} src={preview.url} controls playsInline className="aspect-video w-full rounded-xl border border-slate-200 bg-black object-contain" />
+                                        ))}
+                                    </div>
+                                )}
+                                <ul className="mt-3 list-disc space-y-1 pl-4 text-xs font-semibold text-slate-700">
                                     {selectedFiles.map((file, index) => <li key={`${file.name}-${index}`}>{file.name}</li>)}
                                 </ul>
                             </div>
