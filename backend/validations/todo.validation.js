@@ -103,3 +103,12 @@ export const updateTodoSchema = Joi.object({
     "is_active",
   )
   .messages(messages);
+
+export const completeTodoSchema = Joi.object({
+  ppc: Joi.number().integer().min(0).optional(),
+  wp: Joi.number().integer().min(0).optional(),
+  super: Joi.number().integer().min(0).optional(),
+  super_stocks: Joi.number().integer().min(0).optional(),
+  checkbox_status: Joi.boolean().optional(),
+  remarks: nullableTextValidation.optional(),
+}).messages(messages);

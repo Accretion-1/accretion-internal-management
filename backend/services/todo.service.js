@@ -1,11 +1,13 @@
 import * as locationModel from "../model/location.model.js";
 import * as todoModel from "../model/todo.model.js";
+import fs from "fs";
 import { ApiError } from "../utils/api.util.js";
 import {
   ADD_ERROR,
   CUSTOM_ERROR,
   FETCH_ERROR,
   FORBIDDEN,
+  INVALID,
   NOT_FOUND,
   REQUIRED,
   UPDATE_ERROR,
@@ -220,6 +222,114 @@ const normalizeUserTodoQuery = (query = {}) => {
   };
 };
 
+const normalizeBoolean = (value) => {
+  if (value === true || value === 1 || value === "1" || value === "true") return true;
+  if (value === false || value === 0 || value === "0" || value === "false") return false;
+  return null;
+};
+
+const normalizeCompletionFiles = (files = {}) => {
+  const allFiles = [
+    ...(files.photos || []),
+    ...(files.videos || []),
+    ...(files.files || []),
+  ];
+
+  return allFiles.map((file) => ({
+    originalname: file.originalname,
+    mimetype: file.mimetype,
+    path: file.path,
+    file_type: file.mimetype?.startsWith("video/") ? "video" : "photo",
+    file_url: `/public/${file.filename}`,
+  }));
+};
+
+const cleanupUploadedFiles = (files = []) => {
+  files.forEach((file) => {
+    if (!file.path) return;
+    fs.unlink(file.path, () => {});
+  });
+};
+
+const buildCompletionPayload = (todo, body = {}, files = {}) => {
+  const uploadedFiles = normalizeCompletionFiles(files);
+  const remarks = normalizeOptionalText(body.remarks);
+
+  if (todo.type === "stock") {
+    const superValue = body.super ?? body.super_stocks;
+
+    if (uploadedFiles.length) {
+      throw new ApiError(INVALID, "files for stock todo");
+    }
+
+    if (body.ppc === undefined || body.wp === undefined || superValue === undefined) {
+      throw new ApiError(REQUIRED, "ppc, wp and super");
+    }
+
+    return {
+      ppc: Number(body.ppc),
+      wp: Number(body.wp),
+      super: Number(superValue),
+      remarks,
+      files: [],
+    };
+  }
+
+  if (todo.type === "checkbox") {
+    const checkboxStatus = normalizeBoolean(body.checkbox_status);
+
+    if (uploadedFiles.length) {
+      throw new ApiError(INVALID, "files for checkbox todo");
+    }
+
+    if (checkboxStatus === null) {
+      throw new ApiError(REQUIRED, "checkbox_status");
+    }
+
+    return {
+      checkbox_status: checkboxStatus,
+      remarks,
+      files: [],
+    };
+  }
+
+  if (todo.type === "photo") {
+    const photoFiles = uploadedFiles.filter((file) => file.mimetype?.startsWith("image/"));
+
+    if (!photoFiles.length) {
+      throw new ApiError(REQUIRED, "Photo files");
+    }
+
+    if (photoFiles.length !== uploadedFiles.length) {
+      throw new ApiError(INVALID, "Photo files");
+    }
+
+    return {
+      remarks,
+      files: photoFiles.map(({ file_type, file_url }) => ({ file_type, file_url })),
+    };
+  }
+
+  if (todo.type === "video") {
+    const videoFiles = uploadedFiles.filter((file) => file.mimetype?.startsWith("video/"));
+
+    if (!videoFiles.length) {
+      throw new ApiError(REQUIRED, "Video files");
+    }
+
+    if (videoFiles.length !== uploadedFiles.length) {
+      throw new ApiError(INVALID, "Video files");
+    }
+
+    return {
+      remarks,
+      files: videoFiles.map(({ file_type, file_url }) => ({ file_type, file_url })),
+    };
+  }
+
+  throw new ApiError(INVALID, "Todo type");
+};
+
 export const createTodoService = async (payload, user) => {
   try {
     const todoPayload = normalizeTodoPayload(payload, user.user_id);
@@ -342,5 +452,48 @@ export const getLoggedInUserTodoByIdService = async (todoId, query = {}, user) =
   } catch (error) {
     if (error instanceof ApiError) throw error;
     throw new ApiError(FETCH_ERROR, "User Todo", error, false);
+  }
+};
+
+export const completeLoggedInUserTodoService = async (todoId, body = {}, files = {}, user) => {
+  const uploadedFiles = normalizeCompletionFiles(files);
+
+  try {
+    ensureUserTodoAccess(user);
+
+    const todo = await todoModel.getUserEligibleTodoByIdModel({
+      todo_id: Number(todoId),
+      user_id: Number(user.user_id),
+      location_id: Number(user.location_id),
+    });
+
+    if (isEmpty(todo)) {
+      throw new ApiError(NOT_FOUND, "Todo");
+    }
+
+    if (Boolean(todo.is_completed)) {
+      throw new ApiError(CUSTOM_ERROR, "Todo is already completed");
+    }
+
+    const completionPayload = buildCompletionPayload(todo, body, files);
+
+    const completion = await todoModel.completeTodoModel({
+      todo_id: Number(todo.todo_id),
+      todo_location_id: Number(todo.todo_location_id),
+      completed_by: Number(user.user_id),
+      ...completionPayload,
+    });
+
+    return {
+      ...completion,
+      todo: {
+        ...formatUserTodo(todo),
+        is_completed: true,
+      },
+    };
+  } catch (error) {
+    cleanupUploadedFiles(uploadedFiles);
+    if (error instanceof ApiError) throw error;
+    throw new ApiError(UPDATE_ERROR, "Todo completion", error, false);
   }
 };

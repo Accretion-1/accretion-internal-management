@@ -35,3 +35,13 @@ export const getLoggedInUserTodoByIdController = apiHandler(async (req, res) => 
   );
   return apiResponse(FETCH, "User Todo", todo, res, "object");
 });
+
+export const completeLoggedInUserTodoController = apiHandler(async (req, res) => {
+  const completion = await todoService.completeLoggedInUserTodoService(
+    req.params.todo_id,
+    req.body,
+    req.files,
+    req.user,
+  );
+  return apiResponse(UPDATE_SUCCESS, "Todo completed", completion, res, "object");
+});

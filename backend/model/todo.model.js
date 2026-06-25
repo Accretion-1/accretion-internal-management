@@ -394,3 +394,69 @@ export const getUserEligibleTodoByIdModel = async ({
     throw new ApiError(DB_ERROR, "Fetching User Todo", error, false);
   }
 };
+
+export const completeTodoModel = async ({
+  todo_id,
+  todo_location_id,
+  completed_by,
+  ppc = null,
+  wp = null,
+  super: superValue = null,
+  checkbox_status = null,
+  remarks = null,
+  files = [],
+}) => {
+  const connection = await db.begin();
+
+  try {
+    const [completionResult] = await connection.query(
+      `INSERT INTO todo_completions
+        (todo_id, todo_location_id, completed_by, completion_date, ppc, wp, \`super\`, checkbox_status, remarks)
+       VALUES (?, ?, ?, CURDATE(), ?, ?, ?, ?, ?)`,
+      [
+        todo_id,
+        todo_location_id,
+        completed_by,
+        ppc,
+        wp,
+        superValue,
+        checkbox_status,
+        remarks,
+      ],
+    );
+
+    const completionId = completionResult.insertId;
+
+    if (files.length) {
+      const fileValues = files.map((file) => [
+        completionId,
+        file.file_type,
+        file.file_url,
+      ]);
+
+      await connection.query(
+        `INSERT INTO todo_completion_files (completion_id, file_type, file_url)
+         VALUES ?`,
+        [fileValues],
+      );
+    }
+
+    await db.commit(connection);
+
+    return {
+      completion_id: completionId,
+      todo_id,
+      todo_location_id,
+      completed_by,
+      ppc,
+      wp,
+      super: superValue,
+      checkbox_status,
+      remarks,
+      files,
+    };
+  } catch (error) {
+    await db.rollback(connection);
+    throw new ApiError(DB_ERROR, "Completing Todo", error, false);
+  }
+};

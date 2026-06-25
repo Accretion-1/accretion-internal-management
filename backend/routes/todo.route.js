@@ -1,5 +1,6 @@
 import express from "express";
 import {
+  completeLoggedInUserTodoController,
   createTodoController,
   getLoggedInUserTodoByIdController,
   getLoggedInUserTodosController,
@@ -8,8 +9,10 @@ import {
   updateTodoController,
 } from "../controllers/todo.controller.js";
 import { authGuard } from "../middlewares/guard.middleware.js";
+import { fields as uploadFields } from "../middlewares/multer.middleware.js";
 import { validate } from "../middlewares/validation.middleware.js";
 import {
+  completeTodoSchema,
   createTodoSchema,
   getTodosQuerySchema,
   getUserTodosQuerySchema,
@@ -23,6 +26,17 @@ router.use(authGuard);
 
 router.get("/", validate(getTodosQuerySchema, "query"), getTodosController);
 router.get("/my", validate(getUserTodosQuerySchema, "query"), getLoggedInUserTodosController);
+router.post(
+  "/my/:todo_id/complete",
+  validate(todoIdParamSchema, "params"),
+  uploadFields("", [
+    { name: "photos", maxCount: 10 },
+    { name: "videos", maxCount: 10 },
+    { name: "files", maxCount: 10 },
+  ]),
+  validate(completeTodoSchema, "body"),
+  completeLoggedInUserTodoController,
+);
 router.get(
   "/my/:todo_id",
   validate(todoIdParamSchema, "params"),
