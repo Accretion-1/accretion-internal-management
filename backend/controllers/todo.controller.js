@@ -54,3 +54,9 @@ export const getTodoCompletionsController = apiHandler(async (req, res) => {
   );
   return apiResponse(FETCH, "Todo Completions", completions, res, "object");
 });
+
+export const getAdminManagerTodayTodosController = apiHandler(async (req, res) => {
+  const result = await todoService.getAdminManagerTodayTodosService(req.query, req.user);
+  return apiResponse(FETCH, "Today Todos", result, res, "object");
+});
+

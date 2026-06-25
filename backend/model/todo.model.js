@@ -548,3 +548,173 @@ export const getCompletionFilesByCompletionIdsModel = async (completionIds = [])
     throw new ApiError(DB_ERROR, "Fetching Todo Completion Files", error, false);
   }
 };
+
+export const getAdminManagerTodayTodosModel = async ({
+  location_id = null,
+  status = null,
+  page = 1,
+  limit = 10,
+}) => {
+  try {
+    const offset = (page - 1) * limit;
+    const values = [];
+
+    let whereSql = `
+      WHERE tl.is_deleted = FALSE
+        AND t.is_active = TRUE
+        AND t.start_date <= CURDATE()
+        AND (t.end_date IS NULL OR t.end_date >= CURDATE())
+        AND (
+          t.schedule = 'daily'
+          OR (t.schedule = 'weekly' AND t.day_of_week = CASE WHEN DAYOFWEEK(CURDATE()) = 1 THEN 7 ELSE DAYOFWEEK(CURDATE()) - 1 END)
+          OR (t.schedule = 'monthly' AND t.day_of_month = DAY(CURDATE()))
+          OR (t.schedule = 'single' AND CURDATE() BETWEEN t.start_date AND t.end_date)
+        )
+    `;
+
+    if (location_id) {
+      whereSql += ` AND tl.location_id = ? `;
+      values.push(location_id);
+    }
+
+    if (status === "active") {
+      whereSql += ` AND tc.completion_id IS NULL `;
+    } else if (status === "completed") {
+      whereSql += ` AND tc.completion_id IS NOT NULL `;
+    }
+
+    const querySql = `
+      SELECT
+        t.todo_id,
+        t.type,
+        t.schedule,
+        t.title,
+        t.description,
+        t.created_by,
+        u_creator.full_name AS created_by_name,
+        u_creator.phone_number AS created_by_phone_number,
+        t.due_time,
+        t.start_date,
+        t.end_date,
+        t.day_of_week,
+        t.day_of_month,
+        t.is_active,
+        t.created_at,
+        t.updated_at,
+        tl.todo_location_id,
+        tl.location_id,
+        l.district,
+        l.godown,
+        l.sloc,
+        l.cap,
+        l.remark AS location_remark,
+        tl.created_at AS todo_location_created_at,
+        tl.updated_at AS todo_location_updated_at,
+        CASE WHEN tc.completion_id IS NOT NULL THEN TRUE ELSE FALSE END AS is_completed,
+        tc.completion_id,
+        tc.completed_by,
+        u_completer.full_name AS completed_by_name,
+        u_completer.phone_number AS completed_by_phone_number,
+        tc.completion_date,
+        tc.completed_at,
+        tc.ppc,
+        tc.wp,
+        tc.super,
+        tc.checkbox_status,
+        tc.remarks
+      FROM todos t
+      INNER JOIN todo_locations tl ON tl.todo_id = t.todo_id
+      INNER JOIN locations l ON l.location_id = tl.location_id
+      LEFT JOIN users u_creator ON u_creator.user_id = t.created_by
+      LEFT JOIN (
+        SELECT
+          tc_sub.completion_id,
+          tc_sub.todo_id,
+          tc_sub.todo_location_id,
+          tc_sub.completed_by,
+          tc_sub.completion_date,
+          tc_sub.completed_at,
+          tc_sub.ppc,
+          tc_sub.wp,
+          tc_sub.super,
+          tc_sub.checkbox_status,
+          tc_sub.remarks
+        FROM todo_completions tc_sub
+        INNER JOIN (
+          SELECT 
+            todo_id,
+            todo_location_id,
+            MAX(completion_id) AS max_completion_id
+          FROM todo_completions
+          WHERE completion_date = CURDATE()
+             OR todo_id IN (SELECT todo_id FROM todos WHERE schedule = 'single')
+          GROUP BY todo_id, todo_location_id
+        ) latest ON tc_sub.completion_id = latest.max_completion_id
+      ) tc ON tc.todo_id = t.todo_id AND tc.todo_location_id = tl.todo_location_id
+      LEFT JOIN users u_completer ON u_completer.user_id = tc.completed_by
+      ${whereSql}
+      ORDER BY t.todo_id DESC, tl.location_id ASC
+      LIMIT ? OFFSET ?
+    `;
+
+    return await db.query(querySql, [...values, limit, offset]);
+  } catch (error) {
+    throw new ApiError(DB_ERROR, "Fetching Admin/Manager Today Todos", error, false);
+  }
+};
+
+export const countAdminManagerTodayTodosModel = async ({
+  location_id = null,
+  status = null,
+}) => {
+  try {
+    const values = [];
+
+    let whereSql = `
+      WHERE tl.is_deleted = FALSE
+        AND t.is_active = TRUE
+        AND t.start_date <= CURDATE()
+        AND (t.end_date IS NULL OR t.end_date >= CURDATE())
+        AND (
+          t.schedule = 'daily'
+          OR (t.schedule = 'weekly' AND t.day_of_week = CASE WHEN DAYOFWEEK(CURDATE()) = 1 THEN 7 ELSE DAYOFWEEK(CURDATE()) - 1 END)
+          OR (t.schedule = 'monthly' AND t.day_of_month = DAY(CURDATE()))
+          OR (t.schedule = 'single' AND CURDATE() BETWEEN t.start_date AND t.end_date)
+        )
+    `;
+
+    if (location_id) {
+      whereSql += ` AND tl.location_id = ? `;
+      values.push(location_id);
+    }
+
+    if (status === "active") {
+      whereSql += ` AND tc.completion_id IS NULL `;
+    } else if (status === "completed") {
+      whereSql += ` AND tc.completion_id IS NOT NULL `;
+    }
+
+    const countSql = `
+      SELECT COUNT(*) AS total_records
+      FROM todos t
+      INNER JOIN todo_locations tl ON tl.todo_id = t.todo_id
+      LEFT JOIN (
+        SELECT
+          todo_id,
+          todo_location_id,
+          MAX(completion_id) AS completion_id
+        FROM todo_completions
+        WHERE completion_date = CURDATE()
+           OR todo_id IN (SELECT todo_id FROM todos WHERE schedule = 'single')
+        GROUP BY todo_id, todo_location_id
+      ) tc ON tc.todo_id = t.todo_id AND tc.todo_location_id = tl.todo_location_id
+      ${whereSql}
+    `;
+
+    const [result] = await db.query(countSql, values);
+    return Number(result?.total_records || 0);
+  } catch (error) {
+    throw new ApiError(DB_ERROR, "Counting Admin/Manager Today Todos", error, false);
+  }
+};
+

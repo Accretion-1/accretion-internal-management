@@ -257,6 +257,21 @@ const formatCompletionFile = (file) => ({
   file_url: CustomImagePath(getStoredFileName(file.file_url)),
 });
 
+const convertLocalToUtcDate = (dateVal) => {
+  if (!dateVal) return null;
+  const d = new Date(dateVal);
+  if (isNaN(d.getTime())) return dateVal;
+  return new Date(Date.UTC(
+    d.getFullYear(),
+    d.getMonth(),
+    d.getDate(),
+    d.getHours(),
+    d.getMinutes(),
+    d.getSeconds(),
+    d.getMilliseconds()
+  ));
+};
+
 const formatTodoCompletion = (completion, files = []) => ({
   completion_id: completion.completion_id,
   todo_id: completion.todo_id,
@@ -275,7 +290,7 @@ const formatTodoCompletion = (completion, files = []) => ({
   super: completion.super,
   checkbox_status: completion.checkbox_status,
   remarks: completion.remarks,
-  completed_at: completion.completed_at,
+  completed_at: convertLocalToUtcDate(completion.completed_at),
   updated_at: completion.updated_at,
   location: {
     location_id: completion.location_id,
@@ -605,3 +620,137 @@ export const getTodoCompletionsService = async (todoId, query = {}, user) => {
     throw new ApiError(FETCH_ERROR, "Todo Completions", error, false);
   }
 };
+
+export const getAdminManagerTodayTodosService = async (query = {}, user) => {
+  try {
+    ensureAdminOrManagerAccess(user);
+
+    const page = Number(query.page || 1);
+    const limit = Number(query.limit || 10);
+    const locationId = query.location_id ? Number(query.location_id) : null;
+    const status = query.status || null;
+
+    const [records, totalRecords, totalCount, completedCount, activeCount] = await Promise.all([
+      todoModel.getAdminManagerTodayTodosModel({
+        location_id: locationId,
+        status,
+        page,
+        limit,
+      }),
+      todoModel.countAdminManagerTodayTodosModel({
+        location_id: locationId,
+        status,
+      }),
+      todoModel.countAdminManagerTodayTodosModel({
+        location_id: locationId,
+        status: null,
+      }),
+      todoModel.countAdminManagerTodayTodosModel({
+        location_id: locationId,
+        status: 'completed',
+      }),
+      todoModel.countAdminManagerTodayTodosModel({
+        location_id: locationId,
+        status: 'active',
+      }),
+    ]);
+
+    const completionIds = records
+      .map((r) => r.completion_id)
+      .filter(Boolean);
+
+    let filesByCompletionId = new Map();
+    if (completionIds.length) {
+      const files = await todoModel.getCompletionFilesByCompletionIdsModel(completionIds);
+      filesByCompletionId = groupFilesByCompletionId(files);
+    }
+
+    const formattedRecords = records.map((record) => {
+      const location = {
+        todo_location_id: record.todo_location_id,
+        location_id: record.location_id,
+        district: record.district,
+        godown: record.godown,
+        sloc: record.sloc,
+        cap: record.cap,
+        remark: record.location_remark,
+      };
+
+      const baseTodo = {
+        todo_id: record.todo_id,
+        type: record.type,
+        schedule: record.schedule,
+        title: record.title,
+        description: record.description,
+        location_id: record.location_id,
+        location,
+        location_ids: [record.location_id],
+        locations: [location],
+        created_by: record.created_by,
+        created_by_user: record.created_by
+          ? {
+              user_id: record.created_by,
+              full_name: record.created_by_name,
+              phone_number: record.created_by_phone_number,
+            }
+          : null,
+        due_time: record.due_time,
+        start_date: record.start_date,
+        end_date: record.end_date,
+        day_of_week: record.day_of_week,
+        day_of_month: record.day_of_month,
+        is_active: Boolean(record.is_active),
+        created_at: record.created_at,
+        updated_at: record.updated_at,
+      };
+
+      const completion = record.completion_id
+        ? {
+            completion_id: record.completion_id,
+            todo_id: record.todo_id,
+            todo_location_id: record.todo_location_id,
+            completed_by: record.completed_by,
+            completed_by_user: record.completed_by
+              ? {
+                  user_id: record.completed_by,
+                  full_name: record.completed_by_name,
+                  phone_number: record.completed_by_phone_number,
+                }
+              : null,
+            completion_date: record.completion_date,
+            completed_at: convertLocalToUtcDate(record.completed_at),
+            ppc: record.ppc,
+            wp: record.wp,
+            super: record.super,
+            checkbox_status: record.checkbox_status,
+            remarks: record.remarks,
+            files: (filesByCompletionId.get(Number(record.completion_id)) || []).map(formatCompletionFile),
+          }
+        : null;
+
+      return {
+        ...baseTodo,
+        todo_location_id: record.todo_location_id,
+        is_completed: Boolean(record.is_completed),
+        completion,
+      };
+    });
+
+    return {
+      records: formattedRecords,
+      total_records: totalRecords,
+      total_pages: Math.ceil(totalRecords / limit),
+      current_page: page,
+      limit,
+      stats: {
+        total: totalCount,
+        completed: completedCount,
+        pending: activeCount,
+      },
+    };
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    throw new ApiError(FETCH_ERROR, "Today's Todos", error, false);
+  }
+};
+
