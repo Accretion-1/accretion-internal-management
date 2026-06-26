@@ -56,7 +56,7 @@ jobs:
 
   deploy:
     needs: build-and-push
-    runs-on: skyrack-new-vps
+    runs-on: self-hosted
     environment: ${{ github.ref_name == 'main' && 'production' || 'development' }}
 
     steps:
