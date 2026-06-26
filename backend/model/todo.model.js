@@ -568,7 +568,7 @@ export const getAdminManagerTodayTodosModel = async ({
           t.schedule = 'daily'
           OR (t.schedule = 'weekly' AND t.day_of_week = CASE WHEN DAYOFWEEK(CURDATE()) = 1 THEN 7 ELSE DAYOFWEEK(CURDATE()) - 1 END)
           OR (t.schedule = 'monthly' AND t.day_of_month = DAY(CURDATE()))
-          OR (t.schedule = 'single' AND CURDATE() BETWEEN t.start_date AND t.end_date)
+          OR (t.schedule = 'single' AND t.start_date <= CURDATE() AND (t.end_date IS NULL OR t.end_date >= CURDATE()))
         )
     `;
 
@@ -679,7 +679,7 @@ export const countAdminManagerTodayTodosModel = async ({
           t.schedule = 'daily'
           OR (t.schedule = 'weekly' AND t.day_of_week = CASE WHEN DAYOFWEEK(CURDATE()) = 1 THEN 7 ELSE DAYOFWEEK(CURDATE()) - 1 END)
           OR (t.schedule = 'monthly' AND t.day_of_month = DAY(CURDATE()))
-          OR (t.schedule = 'single' AND CURDATE() BETWEEN t.start_date AND t.end_date)
+          OR (t.schedule = 'single' AND t.start_date <= CURDATE() AND (t.end_date IS NULL OR t.end_date >= CURDATE()))
         )
     `;
 
@@ -717,4 +717,3 @@ export const countAdminManagerTodayTodosModel = async ({
     throw new ApiError(DB_ERROR, "Counting Admin/Manager Today Todos", error, false);
   }
 };
-
