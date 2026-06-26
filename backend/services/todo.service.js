@@ -29,12 +29,10 @@ const normalizeOptionalDate = (value) => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
 
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-
-  return `${year}-${month}-${day}`;
+  return date.toISOString().slice(0, 10);
 };
+
+const formatDateOnly = (value) => normalizeOptionalDate(value);
 
 const normalizeOptionalNumber = (value) => {
   if (value === undefined || value === null || value === "") return null;
@@ -147,8 +145,8 @@ const formatTodo = (todo, locations = []) => {
         }
       : null,
     due_time: todo.due_time,
-    start_date: todo.start_date,
-    end_date: todo.end_date,
+    start_date: formatDateOnly(todo.start_date),
+    end_date: formatDateOnly(todo.end_date),
     day_of_week: todo.day_of_week,
     day_of_month: todo.day_of_month,
     is_active: Boolean(todo.is_active),
@@ -257,21 +255,6 @@ const formatCompletionFile = (file) => ({
   file_url: CustomImagePath(getStoredFileName(file.file_url)),
 });
 
-const convertLocalToUtcDate = (dateVal) => {
-  if (!dateVal) return null;
-  const d = new Date(dateVal);
-  if (isNaN(d.getTime())) return dateVal;
-  return new Date(Date.UTC(
-    d.getFullYear(),
-    d.getMonth(),
-    d.getDate(),
-    d.getHours(),
-    d.getMinutes(),
-    d.getSeconds(),
-    d.getMilliseconds()
-  ));
-};
-
 const formatTodoCompletion = (completion, files = []) => ({
   completion_id: completion.completion_id,
   todo_id: completion.todo_id,
@@ -284,13 +267,13 @@ const formatTodoCompletion = (completion, files = []) => ({
         phone_number: completion.completed_by_phone_number,
       }
     : null,
-  completion_date: completion.completion_date,
+  completion_date: formatDateOnly(completion.completion_date),
   ppc: completion.ppc,
   wp: completion.wp,
   super: completion.super,
   checkbox_status: completion.checkbox_status,
   remarks: completion.remarks,
-  completed_at: convertLocalToUtcDate(completion.completed_at),
+  completed_at: completion.completed_at,
   updated_at: completion.updated_at,
   location: {
     location_id: completion.location_id,
@@ -695,8 +678,8 @@ export const getAdminManagerTodayTodosService = async (query = {}, user) => {
             }
           : null,
         due_time: record.due_time,
-        start_date: record.start_date,
-        end_date: record.end_date,
+        start_date: formatDateOnly(record.start_date),
+        end_date: formatDateOnly(record.end_date),
         day_of_week: record.day_of_week,
         day_of_month: record.day_of_month,
         is_active: Boolean(record.is_active),
@@ -717,8 +700,8 @@ export const getAdminManagerTodayTodosService = async (query = {}, user) => {
                   phone_number: record.completed_by_phone_number,
                 }
               : null,
-            completion_date: record.completion_date,
-            completed_at: convertLocalToUtcDate(record.completed_at),
+            completion_date: formatDateOnly(record.completion_date),
+            completed_at: record.completed_at,
             ppc: record.ppc,
             wp: record.wp,
             super: record.super,
@@ -753,4 +736,3 @@ export const getAdminManagerTodayTodosService = async (query = {}, user) => {
     throw new ApiError(FETCH_ERROR, "Today's Todos", error, false);
   }
 };
-

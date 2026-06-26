@@ -5,17 +5,16 @@ const todoTypes = ["stock", "photo", "video", "checkbox"];
 const todoSchedules = ["daily", "weekly", "monthly", "single"];
 
 const nullableTextValidation = Joi.string().trim().allow("", null);
-const dateValidation = Joi.date().iso();
-const todayStart = () => {
+const dateValidation = Joi.string().trim().pattern(/^\d{4}-\d{2}-\d{2}$/);
+const getTodayDateValue = () => {
   const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  return today;
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  const day = String(today.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 };
 const startDateValidation = dateValidation.custom((value, helpers) => {
-  const selectedDate = new Date(value);
-  selectedDate.setHours(0, 0, 0, 0);
-
-  if (selectedDate < todayStart()) {
+  if (value < getTodayDateValue()) {
     return helpers.message("start_date cannot be a previous date");
   }
 
