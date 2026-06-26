@@ -56,7 +56,7 @@ jobs:
 
   deploy:
     needs: build-and-push
-    runs-on: ubuntu-latest
+    runs-on: skyrack-new-vps
     environment: ${{ github.ref_name == 'main' && 'production' || 'development' }}
 
     steps:
