@@ -8,13 +8,20 @@ const INITIAL_FORM = {
     ppc: '',
     wp: '',
     super_stocks: '',
-    checkbox_status: '',
+    checkbox_items_response: [],
     remarks: '',
     photos: [],
     videos: [],
 };
 
 const getTaskTypeLabel = (type) => String(type || '').replace(/^\w/, (letter) => letter.toUpperCase());
+
+const getCheckboxItems = (todo) => (
+    Array.isArray(todo?.checkbox_items) ? todo.checkbox_items : []
+).map((item, index) => ({
+    key: item.key || `checkbox_${index + 1}`,
+    label: item.label || '',
+})).filter((item) => item.label);
 
 const FileList = ({ files, onRemove }) => {
     if (!files.length) return null;
@@ -120,7 +127,14 @@ export const TodoCompletionModal = ({ isOpen, todo, onClose, onCompleted }) => {
             return undefined;
         }
 
-        setForm(INITIAL_FORM);
+        const checkboxItems = getCheckboxItems(todo);
+        setForm({
+            ...INITIAL_FORM,
+            checkbox_items_response: checkboxItems.map((item) => ({
+                ...item,
+                response: true,
+            })),
+        });
         setErrors({});
         setStep('form');
 
@@ -157,6 +171,16 @@ export const TodoCompletionModal = ({ isOpen, todo, onClose, onCompleted }) => {
     const handleChange = (field, value) => {
         setForm((prev) => ({ ...prev, [field]: value }));
         setErrors((prev) => ({ ...prev, [field]: undefined }));
+    };
+
+    const handleCheckboxResponseToggle = (key) => {
+        setForm((prev) => ({
+            ...prev,
+            checkbox_items_response: prev.checkbox_items_response.map((item) => (
+                item.key === key ? { ...item, response: !item.response } : item
+            )),
+        }));
+        setErrors((prev) => ({ ...prev, checkbox_items_response: undefined }));
     };
 
     const addCapturedFile = (field, file) => {
@@ -237,8 +261,8 @@ export const TodoCompletionModal = ({ isOpen, todo, onClose, onCompleted }) => {
             if (form.super_stocks === '') nextErrors.super_stocks = 'Super stock value is required.';
         }
 
-        if (todoType === 'checkbox' && form.checkbox_status === '') {
-            nextErrors.checkbox_status = 'Checkbox status is required.';
+        if (todoType === 'checkbox' && !form.checkbox_items_response.length) {
+            nextErrors.checkbox_items_response = 'No checkbox items are configured for this task.';
         }
 
         if (todoType === 'photo' && !form.photos.length) {
@@ -272,7 +296,7 @@ export const TodoCompletionModal = ({ isOpen, todo, onClose, onCompleted }) => {
         }
 
         if (todoType === 'checkbox') {
-            formData.append('checkbox_status', form.checkbox_status);
+            formData.append('checkbox_items_response', JSON.stringify(form.checkbox_items_response));
         }
 
         if (todoType === 'photo') {
@@ -370,18 +394,29 @@ export const TodoCompletionModal = ({ isOpen, todo, onClose, onCompleted }) => {
                         )}
 
                         {todoType === 'checkbox' && (
-                            <div className="flex flex-col gap-1.5">
-                                <label className="text-xs font-bold text-slate-600">Checkbox Status</label>
-                                <select
-                                    value={form.checkbox_status}
-                                    onChange={(event) => handleChange('checkbox_status', event.target.value)}
-                                    className={`cursor-pointer rounded-xl border bg-slate-50 px-3.5 py-2.5 text-sm font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-2 ${errors.checkbox_status ? 'border-rose-300 focus:ring-rose-100' : 'border-slate-200 focus:ring-blue-100'}`}
-                                >
-                                    <option value="">Select status</option>
-                                    <option value="true">Checked / Done</option>
-                                    <option value="false">Unchecked / Not Done</option>
-                                </select>
-                                {errors.checkbox_status && <span className="text-xs text-rose-600">{errors.checkbox_status}</span>}
+                            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                                <label className="mb-3 flex items-center gap-2 text-xs font-bold text-slate-600">
+                                    <CheckCircle className="h-4 w-4 text-emerald-600" />
+                                    Checklist Items
+                                </label>
+                                <div className="grid gap-2">
+                                    {form.checkbox_items_response.map((item) => (
+                                        <label
+                                            key={item.key}
+                                            className={`flex cursor-pointer items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-sm font-bold transition-all ${item.response ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-white text-slate-600'}`}
+                                        >
+                                            <span>{item.label}</span>
+                                            <input
+                                                type="checkbox"
+                                                checked={Boolean(item.response)}
+                                                onChange={() => handleCheckboxResponseToggle(item.key)}
+                                                className="h-4 w-4 rounded border-slate-300 text-emerald-600"
+                                            />
+                                        </label>
+                                    ))}
+                                </div>
+                                <p className="mt-2 text-[11px] font-semibold text-slate-400">All items are selected by default. Uncheck only if not completed.</p>
+                                {errors.checkbox_items_response && <span className="mt-2 block text-xs text-rose-600">{errors.checkbox_items_response}</span>}
                             </div>
                         )}
 
@@ -497,8 +532,17 @@ export const TodoCompletionModal = ({ isOpen, todo, onClose, onCompleted }) => {
 
                         {todoType === 'checkbox' && (
                             <div className="rounded-xl bg-slate-50 p-3">
-                                <p className="text-xs font-bold text-slate-400">Checkbox Status</p>
-                                <p className="font-bold text-slate-900">{form.checkbox_status === 'true' ? 'Checked / Done' : 'Unchecked / Not Done'}</p>
+                                <p className="text-xs font-bold text-slate-400">Checklist Responses</p>
+                                <div className="mt-2 grid gap-2">
+                                    {form.checkbox_items_response.map((item) => (
+                                        <div key={item.key} className="flex items-center justify-between rounded-lg bg-white px-3 py-2 text-sm font-bold text-slate-700">
+                                            <span>{item.label}</span>
+                                            <span className={item.response ? 'text-emerald-600' : 'text-rose-600'}>
+                                                {item.response ? 'Yes' : 'No'}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
                         )}
 

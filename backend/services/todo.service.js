@@ -39,6 +39,66 @@ const normalizeOptionalNumber = (value) => {
   return Number(value);
 };
 
+const parseJsonValue = (value, fallback = null) => {
+  if (value === undefined || value === null || value === "") return fallback;
+  if (typeof value === "string") {
+    try {
+      return JSON.parse(value);
+    } catch {
+      return fallback;
+    }
+  }
+  return value;
+};
+
+const normalizeCheckboxItems = (value) => {
+  const parsedValue = parseJsonValue(value, []);
+  if (!Array.isArray(parsedValue)) return [];
+
+  return parsedValue
+    .map((item, index) => {
+      const label = typeof item === "string" ? item : item?.label;
+      const trimmedLabel = String(label || "").trim();
+      if (!trimmedLabel) return null;
+
+      return {
+        key: String(item?.key || `checkbox_${index + 1}`),
+        label: trimmedLabel,
+      };
+    })
+    .filter(Boolean);
+};
+
+const normalizeCheckboxItemsForDb = (value) => {
+  const items = normalizeCheckboxItems(value);
+  return items.length ? JSON.stringify(items) : null;
+};
+
+const normalizeCheckboxResponseForDb = (value, checkboxItems = []) => {
+  const parsedValue = parseJsonValue(value, []);
+  if (!Array.isArray(parsedValue)) return null;
+
+  const itemMap = new Map(
+    checkboxItems.map((item, index) => [String(item.key || `checkbox_${index + 1}`), item.label]),
+  );
+
+  const responses = parsedValue
+    .map((item, index) => {
+      const key = String(item?.key || `checkbox_${index + 1}`);
+      const label = String(item?.label || itemMap.get(key) || "").trim();
+      if (!label) return null;
+
+      return {
+        key,
+        label,
+        response: Boolean(item?.response),
+      };
+    })
+    .filter(Boolean);
+
+  return responses.length ? JSON.stringify(responses) : null;
+};
+
 const normalizeTodoPayload = (payload, createdBy) => {
   const schedule = payload.schedule;
   const locationIds = payload.location_ids || (payload.location_id ? [payload.location_id] : []);
@@ -48,6 +108,9 @@ const normalizeTodoPayload = (payload, createdBy) => {
     schedule,
     title: payload.title,
     description: normalizeOptionalText(payload.description),
+    checkbox_items: payload.type === "checkbox"
+      ? normalizeCheckboxItemsForDb(payload.checkbox_items)
+      : null,
     location_ids: [...new Set(locationIds.map((locationId) => Number(locationId)))],
     created_by: createdBy,
     due_time: normalizeOptionalText(payload.due_time),
@@ -70,6 +133,10 @@ const normalizeUpdateTodoPayload = (payload) => {
 
   if (hasOwnValue(payload, "description")) {
     normalized.description = normalizeOptionalText(payload.description);
+  }
+
+  if (hasOwnValue(payload, "checkbox_items")) {
+    normalized.checkbox_items = normalizeCheckboxItemsForDb(payload.checkbox_items);
   }
 
   if (hasOwnValue(payload, "schedule")) {
@@ -132,6 +199,7 @@ const formatTodo = (todo, locations = []) => {
     schedule: todo.schedule,
     title: todo.title,
     description: todo.description,
+    checkbox_items: parseJsonValue(todo.checkbox_items, []),
     location_id: primaryLocation?.location_id || null,
     location: primaryLocation,
     location_ids: locations.map((location) => location.location_id),
@@ -271,7 +339,7 @@ const formatTodoCompletion = (completion, files = []) => ({
   ppc: completion.ppc,
   wp: completion.wp,
   super: completion.super,
-  checkbox_status: completion.checkbox_status,
+  checkbox_items_response: parseJsonValue(completion.checkbox_items_response, []),
   remarks: completion.remarks,
   completed_at: completion.completed_at,
   updated_at: completion.updated_at,
@@ -340,18 +408,26 @@ const buildCompletionPayload = (todo, body = {}, files = {}) => {
   }
 
   if (todo.type === "checkbox") {
-    const checkboxStatus = normalizeBoolean(body.checkbox_status);
-
     if (uploadedFiles.length) {
       throw new ApiError(INVALID, "files for checkbox todo");
     }
 
-    if (checkboxStatus === null) {
-      throw new ApiError(REQUIRED, "checkbox_status");
+    const checkboxItems = normalizeCheckboxItems(todo.checkbox_items);
+    const checkboxItemsResponse = normalizeCheckboxResponseForDb(
+      body.checkbox_items_response,
+      checkboxItems,
+    );
+
+    if (!checkboxItems.length) {
+      throw new ApiError(REQUIRED, "checkbox_items");
+    }
+
+    if (!checkboxItemsResponse) {
+      throw new ApiError(REQUIRED, "checkbox_items_response");
     }
 
     return {
-      checkbox_status: checkboxStatus,
+      checkbox_items_response: checkboxItemsResponse,
       remarks,
       files: [],
     };
@@ -665,6 +741,7 @@ export const getAdminManagerTodayTodosService = async (query = {}, user) => {
         schedule: record.schedule,
         title: record.title,
         description: record.description,
+        checkbox_items: parseJsonValue(record.checkbox_items, []),
         location_id: record.location_id,
         location,
         location_ids: [record.location_id],
@@ -705,7 +782,7 @@ export const getAdminManagerTodayTodosService = async (query = {}, user) => {
             ppc: record.ppc,
             wp: record.wp,
             super: record.super,
-            checkbox_status: record.checkbox_status,
+            checkbox_items_response: parseJsonValue(record.checkbox_items_response, []),
             remarks: record.remarks,
             files: (filesByCompletionId.get(Number(record.completion_id)) || []).map(formatCompletionFile),
           }

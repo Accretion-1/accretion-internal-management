@@ -847,10 +847,17 @@ export const DashboardPage = () => {
                             )}
                             {task.type === 'checkbox' && (
                               <div className="col-span-3 bg-white p-2 rounded-xl border border-slate-200/60">
-                                <p className="text-[9px] font-bold text-slate-400 uppercase">Checkbox State</p>
-                                <p className="text-xs font-extrabold text-slate-800 mt-0.5">
-                                  {task.completion.checkbox_status ? 'Checked / Approved' : 'Unchecked'}
-                                </p>
+                                <p className="text-[9px] font-bold text-slate-400 uppercase">Checklist Responses</p>
+                                <div className="mt-2 grid gap-1.5">
+                                  {(task.completion.checkbox_items_response || []).map((item) => (
+                                    <div key={item.key} className="flex items-center justify-between rounded-lg bg-slate-50 px-2 py-1.5 text-[11px] font-bold text-slate-700">
+                                      <span>{item.label}</span>
+                                      <span className={item.response ? 'text-emerald-600' : 'text-rose-600'}>
+                                        {item.response ? 'Yes' : 'No'}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
                               </div>
                             )}
                           </div>

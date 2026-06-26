@@ -12,7 +12,9 @@ import {
     ImageIcon,
     MapPin,
     Pencil,
+    Plus,
     RefreshCw,
+    Trash2,
     UserRound,
 } from 'lucide-react';
 import { Modal } from '../components/Modal';
@@ -26,6 +28,7 @@ const EMPTY_FORM = {
     schedule: 'daily',
     title: '',
     description: '',
+    checkbox_items: [{ key: 'checkbox_1', label: '' }],
     location_ids: [],
     start_date: '',
     day_of_week: '',
@@ -174,6 +177,15 @@ const normalizeTodoUpdatePayload = (form) => {
         is_active: Boolean(form.is_active),
     };
 
+    if (form.type === 'checkbox') {
+        payload.checkbox_items = form.checkbox_items
+            .map((item, index) => ({
+                key: item.key || `checkbox_${index + 1}`,
+                label: item.label.trim(),
+            }))
+            .filter((item) => item.label);
+    }
+
     if (form.schedule === 'weekly') {
         payload.day_of_week = Number(form.day_of_week);
     }
@@ -266,9 +278,28 @@ const CompletionRecordCard = ({ completion, todoType, onPreviewAttachment }) => 
                 {todoType === 'stock' && <DetailItem label="WP" value={completion.wp} />}
                 {todoType === 'stock' && <DetailItem label="Super" value={completion.super} />}
                 {todoType === 'checkbox' && (
-                    <DetailItem label="Checkbox Status" value={completion.checkbox_status ? 'Checked' : 'Unchecked'} />
+                    <DetailItem
+                        label="Checklist"
+                        value={`${(completion.checkbox_items_response || []).filter((item) => item.response).length}/${(completion.checkbox_items_response || []).length} completed`}
+                    />
                 )}
             </div>
+
+            {todoType === 'checkbox' && Array.isArray(completion.checkbox_items_response) && completion.checkbox_items_response.length > 0 && (
+                <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                    <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Checklist Responses</p>
+                    <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                        {completion.checkbox_items_response.map((item) => (
+                            <div key={item.key} className="flex items-center justify-between rounded-xl bg-white px-3 py-2 text-xs font-bold text-slate-700">
+                                <span>{item.label}</span>
+                                <span className={item.response ? 'text-emerald-600' : 'text-rose-600'}>
+                                    {item.response ? 'Yes' : 'No'}
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
 
             {completion.remarks && (
                 <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
@@ -431,6 +462,13 @@ export const TodoDetailPage = () => {
             nextErrors.schedule = 'Schedule is required.';
         }
 
+        if (form.type === 'checkbox') {
+            const validCheckboxItems = form.checkbox_items.filter((item) => item.label.trim());
+            if (!validCheckboxItems.length) {
+                nextErrors.checkbox_items = 'Add at least one checkbox item.';
+            }
+        }
+
         if (!form.location_ids.length) {
             nextErrors.location_ids = 'At least one location is required.';
         }
@@ -474,6 +512,37 @@ export const TodoDetailPage = () => {
         setErrors((prev) => ({ ...prev, [field]: undefined }));
     };
 
+    const handleCheckboxItemChange = (index, value) => {
+        setForm((prev) => ({
+            ...prev,
+            checkbox_items: prev.checkbox_items.map((item, itemIndex) => (
+                itemIndex === index ? { ...item, label: value } : item
+            )),
+        }));
+        setErrors((prev) => ({ ...prev, checkbox_items: undefined }));
+    };
+
+    const handleAddCheckboxItem = () => {
+        setForm((prev) => ({
+            ...prev,
+            checkbox_items: [
+                ...prev.checkbox_items,
+                { key: `checkbox_${Date.now()}`, label: '' },
+            ],
+        }));
+        setErrors((prev) => ({ ...prev, checkbox_items: undefined }));
+    };
+
+    const handleRemoveCheckboxItem = (index) => {
+        setForm((prev) => ({
+            ...prev,
+            checkbox_items: prev.checkbox_items.length > 1
+                ? prev.checkbox_items.filter((_, itemIndex) => itemIndex !== index)
+                : [{ key: 'checkbox_1', label: '' }],
+        }));
+        setErrors((prev) => ({ ...prev, checkbox_items: undefined }));
+    };
+
     const handleLocationToggle = (locationId) => {
         setForm((prev) => {
             const locationIdValue = String(locationId);
@@ -499,6 +568,12 @@ export const TodoDetailPage = () => {
             schedule: todo.schedule || EMPTY_FORM.schedule,
             title: todo.title || '',
             description: todo.description || '',
+            checkbox_items: Array.isArray(todo.checkbox_items) && todo.checkbox_items.length
+                ? todo.checkbox_items.map((item, index) => ({
+                    key: item.key || `checkbox_${index + 1}`,
+                    label: item.label || '',
+                }))
+                : [{ key: 'checkbox_1', label: '' }],
             location_ids: todoLocations.map((location) => String(location.location_id)).filter(Boolean),
             start_date: getDateInputValue(todo.start_date),
             day_of_week: todo.day_of_week ? String(todo.day_of_week) : '',
@@ -873,6 +948,43 @@ export const TodoDetailPage = () => {
                         </select>
                         {errors.schedule && <span className="text-xs text-rose-600">{errors.schedule}</span>}
                     </div>
+
+                    {form.type === 'checkbox' && (
+                        <div className="flex flex-col gap-2 sm:col-span-2">
+                            <div className="flex items-center justify-between gap-3">
+                                <label className="text-xs font-bold text-slate-600">Checkbox Items</label>
+                                <button
+                                    type="button"
+                                    onClick={handleAddCheckboxItem}
+                                    className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-extrabold text-blue-700 transition-all hover:bg-blue-100"
+                                >
+                                    <Plus className="h-3.5 w-3.5" />
+                                    Add Item
+                                </button>
+                            </div>
+                            <div className={`grid gap-2 rounded-xl border bg-slate-50 p-2 ${errors.checkbox_items ? 'border-rose-300' : 'border-slate-200'}`}>
+                                {form.checkbox_items.map((item, index) => (
+                                    <div key={item.key || index} className="flex items-center gap-2">
+                                        <input
+                                            value={item.label}
+                                            onChange={(event) => handleCheckboxItemChange(index, event.target.value)}
+                                            placeholder={`Checkbox item ${index + 1}`}
+                                            className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => handleRemoveCheckboxItem(index)}
+                                            className="inline-flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-rose-500 transition-all hover:bg-rose-50"
+                                            title="Remove checkbox item"
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                            {errors.checkbox_items && <span className="text-xs text-rose-600">{errors.checkbox_items}</span>}
+                        </div>
+                    )}
 
                     <div className="flex flex-col gap-1.5 sm:col-span-2">
                         <label className="text-xs font-bold text-slate-600">Locations</label>

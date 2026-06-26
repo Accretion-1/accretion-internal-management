@@ -9,6 +9,7 @@ const TODO_SELECT = `
     t.schedule,
     t.title,
     t.description,
+    t.checkbox_items,
     t.created_by,
     u.full_name AS created_by_name,
     u.phone_number AS created_by_phone_number,
@@ -31,6 +32,7 @@ const USER_TODO_SELECT = `
     t.schedule,
     t.title,
     t.description,
+    t.checkbox_items,
     t.created_by,
     u.full_name AS created_by_name,
     u.phone_number AS created_by_phone_number,
@@ -110,6 +112,7 @@ export const createTodoModel = async ({
   schedule,
   title,
   description = null,
+  checkbox_items = null,
   location_ids = [],
   created_by,
   due_time = null,
@@ -124,13 +127,14 @@ export const createTodoModel = async ({
   try {
     const [todoResult] = await connection.query(
       `INSERT INTO todos
-        (type, schedule, title, description, created_by, due_time, start_date, end_date, day_of_week, day_of_month, is_active)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        (type, schedule, title, description, checkbox_items, created_by, due_time, start_date, end_date, day_of_week, day_of_month, is_active)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         type,
         schedule,
         title,
         description,
+        checkbox_items,
         created_by,
         due_time,
         start_date,
@@ -402,7 +406,7 @@ export const completeTodoModel = async ({
   ppc = null,
   wp = null,
   super: superValue = null,
-  checkbox_status = null,
+  checkbox_items_response = null,
   remarks = null,
   files = [],
 }) => {
@@ -411,7 +415,7 @@ export const completeTodoModel = async ({
   try {
     const [completionResult] = await connection.query(
       `INSERT INTO todo_completions
-        (todo_id, todo_location_id, completed_by, completion_date, ppc, wp, \`super\`, checkbox_status, remarks)
+        (todo_id, todo_location_id, completed_by, completion_date, ppc, wp, \`super\`, checkbox_items_response, remarks)
        VALUES (?, ?, ?, CURDATE(), ?, ?, ?, ?, ?)`,
       [
         todo_id,
@@ -420,7 +424,7 @@ export const completeTodoModel = async ({
         ppc,
         wp,
         superValue,
-        checkbox_status,
+        checkbox_items_response,
         remarks,
       ],
     );
@@ -451,7 +455,7 @@ export const completeTodoModel = async ({
       ppc,
       wp,
       super: superValue,
-      checkbox_status,
+      checkbox_items_response,
       remarks,
       files,
     };
@@ -486,7 +490,7 @@ export const getTodoCompletionsModel = async ({
         tc.ppc,
         tc.wp,
         tc.\`super\`,
-        tc.checkbox_status,
+        tc.checkbox_items_response,
         tc.remarks,
         tc.completed_at,
         tc.updated_at,
@@ -590,6 +594,7 @@ export const getAdminManagerTodayTodosModel = async ({
         t.schedule,
         t.title,
         t.description,
+        t.checkbox_items,
         t.created_by,
         u_creator.full_name AS created_by_name,
         u_creator.phone_number AS created_by_phone_number,
@@ -620,7 +625,7 @@ export const getAdminManagerTodayTodosModel = async ({
         tc.ppc,
         tc.wp,
         tc.super,
-        tc.checkbox_status,
+        tc.checkbox_items_response,
         tc.remarks
       FROM todos t
       INNER JOIN todo_locations tl ON tl.todo_id = t.todo_id
@@ -637,7 +642,7 @@ export const getAdminManagerTodayTodosModel = async ({
           tc_sub.ppc,
           tc_sub.wp,
           tc_sub.super,
-          tc_sub.checkbox_status,
+          tc_sub.checkbox_items_response,
           tc_sub.remarks
         FROM todo_completions tc_sub
         INNER JOIN (
