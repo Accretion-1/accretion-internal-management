@@ -9,12 +9,13 @@ const TODO_SELECT = `
     t.schedule,
     t.title,
     t.description,
+    t.checkbox_items,
     t.created_by,
     u.full_name AS created_by_name,
     u.phone_number AS created_by_phone_number,
     t.due_time,
-    t.start_date,
-    t.end_date,
+    DATE_FORMAT(t.start_date, '%Y-%m-%d') AS start_date,
+    DATE_FORMAT(t.end_date, '%Y-%m-%d') AS end_date,
     t.day_of_week,
     t.day_of_month,
     t.is_active,
@@ -31,12 +32,13 @@ const USER_TODO_SELECT = `
     t.schedule,
     t.title,
     t.description,
+    t.checkbox_items,
     t.created_by,
     u.full_name AS created_by_name,
     u.phone_number AS created_by_phone_number,
     t.due_time,
-    t.start_date,
-    t.end_date,
+    DATE_FORMAT(t.start_date, '%Y-%m-%d') AS start_date,
+    DATE_FORMAT(t.end_date, '%Y-%m-%d') AS end_date,
     t.day_of_week,
     t.day_of_month,
     t.is_active,
@@ -87,7 +89,7 @@ const USER_TODO_WHERE = `
       t.schedule = 'daily'
       OR (t.schedule = 'weekly' AND t.day_of_week = CASE WHEN DAYOFWEEK(CURDATE()) = 1 THEN 7 ELSE DAYOFWEEK(CURDATE()) - 1 END)
       OR (t.schedule = 'monthly' AND t.day_of_month = DAY(CURDATE()))
-      OR (t.schedule = 'single' AND CURDATE() BETWEEN t.start_date AND t.end_date)
+      OR (t.schedule = 'single' AND t.start_date <= CURDATE() AND (t.end_date IS NULL OR t.end_date >= CURDATE()))
     )
 `;
 
@@ -110,6 +112,7 @@ export const createTodoModel = async ({
   schedule,
   title,
   description = null,
+  checkbox_items = null,
   location_ids = [],
   created_by,
   due_time = null,
@@ -124,13 +127,14 @@ export const createTodoModel = async ({
   try {
     const [todoResult] = await connection.query(
       `INSERT INTO todos
-        (type, schedule, title, description, created_by, due_time, start_date, end_date, day_of_week, day_of_month, is_active)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        (type, schedule, title, description, checkbox_items, created_by, due_time, start_date, end_date, day_of_week, day_of_month, is_active)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         type,
         schedule,
         title,
         description,
+        checkbox_items,
         created_by,
         due_time,
         start_date,
@@ -392,5 +396,329 @@ export const getUserEligibleTodoByIdModel = async ({
     return todo;
   } catch (error) {
     throw new ApiError(DB_ERROR, "Fetching User Todo", error, false);
+  }
+};
+
+export const completeTodoModel = async ({
+  todo_id,
+  todo_location_id,
+  completed_by,
+  ppc = null,
+  wp = null,
+  super: superValue = null,
+  checkbox_items_response = null,
+  remarks = null,
+  files = [],
+}) => {
+  const connection = await db.begin();
+
+  try {
+    const [completionResult] = await connection.query(
+      `INSERT INTO todo_completions
+        (todo_id, todo_location_id, completed_by, completion_date, ppc, wp, \`super\`, checkbox_items_response, remarks)
+       VALUES (?, ?, ?, CURDATE(), ?, ?, ?, ?, ?)`,
+      [
+        todo_id,
+        todo_location_id,
+        completed_by,
+        ppc,
+        wp,
+        superValue,
+        checkbox_items_response,
+        remarks,
+      ],
+    );
+
+    const completionId = completionResult.insertId;
+
+    if (files.length) {
+      const fileValues = files.map((file) => [
+        completionId,
+        file.file_type,
+        file.file_url,
+      ]);
+
+      await connection.query(
+        `INSERT INTO todo_completion_files (completion_id, file_type, file_url)
+         VALUES ?`,
+        [fileValues],
+      );
+    }
+
+    await db.commit(connection);
+
+    return {
+      completion_id: completionId,
+      todo_id,
+      todo_location_id,
+      completed_by,
+      ppc,
+      wp,
+      super: superValue,
+      checkbox_items_response,
+      remarks,
+      files,
+    };
+  } catch (error) {
+    await db.rollback(connection);
+    throw new ApiError(DB_ERROR, "Completing Todo", error, false);
+  }
+};
+
+export const getTodoCompletionsModel = async ({
+  todo_id,
+  location_id = null,
+  page = 1,
+  limit = 10,
+}) => {
+  try {
+    const offset = (page - 1) * limit;
+    const values = [todo_id];
+    const locationFilter = location_id ? " AND tl.location_id = ? " : "";
+
+    if (location_id) values.push(location_id);
+
+    return await db.query(
+      `SELECT
+        tc.completion_id,
+        tc.todo_id,
+        tc.todo_location_id,
+        tc.completed_by,
+        u.full_name AS completed_by_name,
+        u.phone_number AS completed_by_phone_number,
+        DATE_FORMAT(tc.completion_date, '%Y-%m-%d') AS completion_date,
+        tc.ppc,
+        tc.wp,
+        tc.\`super\`,
+        tc.checkbox_items_response,
+        tc.remarks,
+        tc.completed_at,
+        tc.updated_at,
+        tl.location_id,
+        l.district,
+        l.godown,
+        l.sloc,
+        l.cap,
+        l.remark AS location_remark
+       FROM todo_completions tc
+       INNER JOIN todo_locations tl ON tl.todo_location_id = tc.todo_location_id
+       INNER JOIN locations l ON l.location_id = tl.location_id
+       LEFT JOIN users u ON u.user_id = tc.completed_by
+       WHERE tc.todo_id = ?
+       ${locationFilter}
+       ORDER BY tc.completion_date DESC, tc.completed_at DESC, tc.completion_id DESC
+       LIMIT ? OFFSET ?`,
+      [...values, limit, offset],
+    );
+  } catch (error) {
+    throw new ApiError(DB_ERROR, "Fetching Todo Completions", error, false);
+  }
+};
+
+export const countTodoCompletionsModel = async ({ todo_id, location_id = null }) => {
+  try {
+    const values = [todo_id];
+    const locationFilter = location_id ? " AND tl.location_id = ? " : "";
+
+    if (location_id) values.push(location_id);
+
+    const [result] = await db.query(
+      `SELECT COUNT(*) AS total_records
+       FROM todo_completions tc
+       INNER JOIN todo_locations tl ON tl.todo_location_id = tc.todo_location_id
+       WHERE tc.todo_id = ?
+       ${locationFilter}`,
+      values,
+    );
+
+    return Number(result?.total_records || 0);
+  } catch (error) {
+    throw new ApiError(DB_ERROR, "Counting Todo Completions", error, false);
+  }
+};
+
+export const getCompletionFilesByCompletionIdsModel = async (completionIds = []) => {
+  try {
+    if (!completionIds.length) return [];
+
+    return await db.query(
+      `SELECT file_id, completion_id, file_type, file_url, created_at
+       FROM todo_completion_files
+       WHERE completion_id IN (?)
+       ORDER BY file_id ASC`,
+      [completionIds],
+    );
+  } catch (error) {
+    throw new ApiError(DB_ERROR, "Fetching Todo Completion Files", error, false);
+  }
+};
+
+export const getAdminManagerTodayTodosModel = async ({
+  location_id = null,
+  status = null,
+  page = 1,
+  limit = 10,
+}) => {
+  try {
+    const offset = (page - 1) * limit;
+    const values = [];
+
+    let whereSql = `
+      WHERE tl.is_deleted = FALSE
+        AND t.is_active = TRUE
+        AND t.start_date <= CURDATE()
+        AND (t.end_date IS NULL OR t.end_date >= CURDATE())
+        AND (
+          t.schedule = 'daily'
+          OR (t.schedule = 'weekly' AND t.day_of_week = CASE WHEN DAYOFWEEK(CURDATE()) = 1 THEN 7 ELSE DAYOFWEEK(CURDATE()) - 1 END)
+          OR (t.schedule = 'monthly' AND t.day_of_month = DAY(CURDATE()))
+          OR (t.schedule = 'single' AND t.start_date <= CURDATE() AND (t.end_date IS NULL OR t.end_date >= CURDATE()))
+        )
+    `;
+
+    if (location_id) {
+      whereSql += ` AND tl.location_id = ? `;
+      values.push(location_id);
+    }
+
+    if (status === "active") {
+      whereSql += ` AND tc.completion_id IS NULL `;
+    } else if (status === "completed") {
+      whereSql += ` AND tc.completion_id IS NOT NULL `;
+    }
+
+    const querySql = `
+      SELECT
+        t.todo_id,
+        t.type,
+        t.schedule,
+        t.title,
+        t.description,
+        t.checkbox_items,
+        t.created_by,
+        u_creator.full_name AS created_by_name,
+        u_creator.phone_number AS created_by_phone_number,
+        t.due_time,
+        DATE_FORMAT(t.start_date, '%Y-%m-%d') AS start_date,
+        DATE_FORMAT(t.end_date, '%Y-%m-%d') AS end_date,
+        t.day_of_week,
+        t.day_of_month,
+        t.is_active,
+        t.created_at,
+        t.updated_at,
+        tl.todo_location_id,
+        tl.location_id,
+        l.district,
+        l.godown,
+        l.sloc,
+        l.cap,
+        l.remark AS location_remark,
+        tl.created_at AS todo_location_created_at,
+        tl.updated_at AS todo_location_updated_at,
+        CASE WHEN tc.completion_id IS NOT NULL THEN TRUE ELSE FALSE END AS is_completed,
+        tc.completion_id,
+        tc.completed_by,
+        u_completer.full_name AS completed_by_name,
+        u_completer.phone_number AS completed_by_phone_number,
+        DATE_FORMAT(tc.completion_date, '%Y-%m-%d') AS completion_date,
+        tc.completed_at,
+        tc.ppc,
+        tc.wp,
+        tc.super,
+        tc.checkbox_items_response,
+        tc.remarks
+      FROM todos t
+      INNER JOIN todo_locations tl ON tl.todo_id = t.todo_id
+      INNER JOIN locations l ON l.location_id = tl.location_id
+      LEFT JOIN users u_creator ON u_creator.user_id = t.created_by
+      LEFT JOIN (
+        SELECT
+          tc_sub.completion_id,
+          tc_sub.todo_id,
+          tc_sub.todo_location_id,
+          tc_sub.completed_by,
+          DATE_FORMAT(tc_sub.completion_date, '%Y-%m-%d') AS completion_date,
+          tc_sub.completed_at,
+          tc_sub.ppc,
+          tc_sub.wp,
+          tc_sub.super,
+          tc_sub.checkbox_items_response,
+          tc_sub.remarks
+        FROM todo_completions tc_sub
+        INNER JOIN (
+          SELECT 
+            todo_id,
+            todo_location_id,
+            MAX(completion_id) AS max_completion_id
+          FROM todo_completions
+          WHERE completion_date = CURDATE()
+             OR todo_id IN (SELECT todo_id FROM todos WHERE schedule = 'single')
+          GROUP BY todo_id, todo_location_id
+        ) latest ON tc_sub.completion_id = latest.max_completion_id
+      ) tc ON tc.todo_id = t.todo_id AND tc.todo_location_id = tl.todo_location_id
+      LEFT JOIN users u_completer ON u_completer.user_id = tc.completed_by
+      ${whereSql}
+      ORDER BY t.todo_id DESC, tl.location_id ASC
+      LIMIT ? OFFSET ?
+    `;
+
+    return await db.query(querySql, [...values, limit, offset]);
+  } catch (error) {
+    throw new ApiError(DB_ERROR, "Fetching Admin/Manager Today Todos", error, false);
+  }
+};
+
+export const countAdminManagerTodayTodosModel = async ({
+  location_id = null,
+  status = null,
+}) => {
+  try {
+    const values = [];
+
+    let whereSql = `
+      WHERE tl.is_deleted = FALSE
+        AND t.is_active = TRUE
+        AND t.start_date <= CURDATE()
+        AND (t.end_date IS NULL OR t.end_date >= CURDATE())
+        AND (
+          t.schedule = 'daily'
+          OR (t.schedule = 'weekly' AND t.day_of_week = CASE WHEN DAYOFWEEK(CURDATE()) = 1 THEN 7 ELSE DAYOFWEEK(CURDATE()) - 1 END)
+          OR (t.schedule = 'monthly' AND t.day_of_month = DAY(CURDATE()))
+          OR (t.schedule = 'single' AND t.start_date <= CURDATE() AND (t.end_date IS NULL OR t.end_date >= CURDATE()))
+        )
+    `;
+
+    if (location_id) {
+      whereSql += ` AND tl.location_id = ? `;
+      values.push(location_id);
+    }
+
+    if (status === "active") {
+      whereSql += ` AND tc.completion_id IS NULL `;
+    } else if (status === "completed") {
+      whereSql += ` AND tc.completion_id IS NOT NULL `;
+    }
+
+    const countSql = `
+      SELECT COUNT(*) AS total_records
+      FROM todos t
+      INNER JOIN todo_locations tl ON tl.todo_id = t.todo_id
+      LEFT JOIN (
+        SELECT
+          todo_id,
+          todo_location_id,
+          MAX(completion_id) AS completion_id
+        FROM todo_completions
+        WHERE completion_date = CURDATE()
+           OR todo_id IN (SELECT todo_id FROM todos WHERE schedule = 'single')
+        GROUP BY todo_id, todo_location_id
+      ) tc ON tc.todo_id = t.todo_id AND tc.todo_location_id = tl.todo_location_id
+      ${whereSql}
+    `;
+
+    const [result] = await db.query(countSql, values);
+    return Number(result?.total_records || 0);
+  } catch (error) {
+    throw new ApiError(DB_ERROR, "Counting Admin/Manager Today Todos", error, false);
   }
 };

@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
-import { CORS_ORIGIN, PORT } from "./constants.js";
+import path from "path";
+import { CORS_ORIGIN, PORT, __dirname } from "./constants.js";
 import routes from "./routes/index.js";
 
 const app = express();
@@ -15,6 +16,7 @@ app.use(
   })
 );
 app.use(express.urlencoded({ extended: true }));
+app.use("/public", express.static(path.join(__dirname, "public")));
 
 app.use("/", routes);
 

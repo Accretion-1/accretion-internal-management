@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { useLocation, useNavigate, Outlet } from 'react-router-dom';
+import { useLocation, useNavigate, Outlet, Navigate } from 'react-router-dom';
 import { useAppState } from '../contexts/StateContext';
 import { LayoutDashboard, Users, Package, BarChart4, ClipboardList, Settings, LogOut, ChevronLeft, ChevronRight, Menu, X, ShieldAlert, CheckSquare, BellRing, MapPin } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { useAppDispatch } from '../store/hooks/reduxHooks';
+import { useAppDispatch, useAppSelector } from '../store/hooks/reduxHooks';
+import { selectAuthUser, selectIsAuthenticated } from '../store/selectors/authSelectors';
 import { logout as logoutAuth } from '../store/slices/authSlice';
 import { Modal } from '../components/Modal';
 const SIDEBAR_ITEMS = [
@@ -65,9 +66,16 @@ const MOBILE_SIDEBAR_VARIANTS = {
 export const AppLayout = () => {
     const { currentUser, logout } = useAppState();
     const dispatch = useAppDispatch();
+    const authUser = useAppSelector(selectAuthUser);
+    const isAuthenticated = useAppSelector(selectIsAuthenticated);
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
     const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
+    
+    if (isAuthenticated && authUser && (!currentUser || currentUser.id !== String(authUser.user_id) || (currentUser.panels?.length || 0) !== (authUser.panels?.length || 0))) {
+        return null;
+    }
+    
     if (!currentUser)
         return null;
     const location = useLocation();
@@ -292,7 +300,9 @@ export const AppLayout = () => {
           <AnimatePresence mode="wait">
             {isTabAllowed ? (<motion.div key={activeTab} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.2 }} className="w-full max-w-7xl mx-auto">
                 <Outlet />
-              </motion.div>) : (
+              </motion.div>) : !isPrivilegedRole ? (
+              <Navigate to={visibleSidebarItems[0]?.id ? `/${visibleSidebarItems[0].id}` : '/settings'} replace />
+            ) : (
         /* HIGH-FIDELITY 403 ACCESS DENIED CARD VIEW */
         <motion.div key="403-error-forbidden" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="w-full max-w-md mx-auto py-16 text-center select-none">
                 <div className="bg-white border border-rose-200/80 shadow-2xl rounded-3xl p-8 flex flex-col items-center gap-5 relative overflow-hidden text-left">
@@ -313,8 +323,8 @@ export const AppLayout = () => {
                     WorkSphere enforces strict role authorization logic. Administrators map these criteria to coordinate safe boundaries.
                   </p>
 
-                  <button id="return-dashboard-403" onClick={() => navigate('/dashboard')} className="w-full bg-slate-900 hover:bg-slate-800 text-white font-semibold rounded-xl text-xs py-3 text-center cursor-pointer transition-colors">
-                    Return to Safe Dashboard
+                  <button id="return-dashboard-403" onClick={() => navigate(visibleSidebarItems[0]?.id ? `/${visibleSidebarItems[0].id}` : '/settings')} className="w-full bg-slate-900 hover:bg-slate-800 text-white font-semibold rounded-xl text-xs py-3 text-center cursor-pointer transition-colors">
+                    Return to Safe Area
                   </button>
                 </div>
               </motion.div>)}

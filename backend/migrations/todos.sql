@@ -80,3 +80,13 @@ CREATE TABLE todo_locations (
 );
 
 ALTER TABLE `todo_completions` ADD `todo_location_id` BIGINT NOT NULL COMMENT 'Which location this completion was done at' AFTER `todo_id`;
+
+
+ALTER TABLE todos
+ADD COLUMN checkbox_items JSON NULL AFTER description;
+
+
+ALTER TABLE todo_completions
+ADD COLUMN checkbox_items_response JSON NULL AFTER `super`;
+
+ALTER TABLE todo_completions DROP checkbox_status;

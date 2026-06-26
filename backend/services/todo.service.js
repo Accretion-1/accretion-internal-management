@@ -1,16 +1,18 @@
 import * as locationModel from "../model/location.model.js";
 import * as todoModel from "../model/todo.model.js";
+import fs from "fs";
 import { ApiError } from "../utils/api.util.js";
 import {
   ADD_ERROR,
   CUSTOM_ERROR,
   FETCH_ERROR,
   FORBIDDEN,
+  INVALID,
   NOT_FOUND,
   REQUIRED,
   UPDATE_ERROR,
 } from "../utils/message.util.js";
-import { isEmpty } from "../utils/misc.util.js";
+import { CustomImagePath, isEmpty } from "../utils/misc.util.js";
 
 const normalizeOptionalText = (value) => {
   if (value === undefined || value === null || value === "") return null;
@@ -34,9 +36,71 @@ const normalizeOptionalDate = (value) => {
   return `${year}-${month}-${day}`;
 };
 
+const formatDateOnly = (value) => normalizeOptionalDate(value);
+
 const normalizeOptionalNumber = (value) => {
   if (value === undefined || value === null || value === "") return null;
   return Number(value);
+};
+
+const parseJsonValue = (value, fallback = null) => {
+  if (value === undefined || value === null || value === "") return fallback;
+  if (typeof value === "string") {
+    try {
+      return JSON.parse(value);
+    } catch {
+      return fallback;
+    }
+  }
+  return value;
+};
+
+const normalizeCheckboxItems = (value) => {
+  const parsedValue = parseJsonValue(value, []);
+  if (!Array.isArray(parsedValue)) return [];
+
+  return parsedValue
+    .map((item, index) => {
+      const label = typeof item === "string" ? item : item?.label;
+      const trimmedLabel = String(label || "").trim();
+      if (!trimmedLabel) return null;
+
+      return {
+        key: String(item?.key || `checkbox_${index + 1}`),
+        label: trimmedLabel,
+      };
+    })
+    .filter(Boolean);
+};
+
+const normalizeCheckboxItemsForDb = (value) => {
+  const items = normalizeCheckboxItems(value);
+  return items.length ? JSON.stringify(items) : null;
+};
+
+const normalizeCheckboxResponseForDb = (value, checkboxItems = []) => {
+  const parsedValue = parseJsonValue(value, []);
+  if (!Array.isArray(parsedValue)) return null;
+
+  const itemMap = new Map(
+    checkboxItems.map((item, index) => [String(item.key || `checkbox_${index + 1}`), item.label]),
+  );
+
+  const responses = parsedValue
+    .map((item, index) => {
+      const key = String(item?.key || `checkbox_${index + 1}`);
+      const label = String(item?.label || itemMap.get(key) || "").trim();
+      if (!label) return null;
+
+      return {
+        key,
+        label,
+        response: Boolean(item?.response),
+      };
+    })
+    .filter(Boolean);
+
+  return responses.length ? JSON.stringify(responses) : null;
 };
 
 const normalizeTodoPayload = (payload, createdBy) => {
@@ -48,6 +112,9 @@ const normalizeTodoPayload = (payload, createdBy) => {
     schedule,
     title: payload.title,
     description: normalizeOptionalText(payload.description),
+    checkbox_items: payload.type === "checkbox"
+      ? normalizeCheckboxItemsForDb(payload.checkbox_items)
+      : null,
     location_ids: [...new Set(locationIds.map((locationId) => Number(locationId)))],
     created_by: createdBy,
     due_time: normalizeOptionalText(payload.due_time),
@@ -70,6 +137,10 @@ const normalizeUpdateTodoPayload = (payload) => {
 
   if (hasOwnValue(payload, "description")) {
     normalized.description = normalizeOptionalText(payload.description);
+  }
+
+  if (hasOwnValue(payload, "checkbox_items")) {
+    normalized.checkbox_items = normalizeCheckboxItemsForDb(payload.checkbox_items);
   }
 
   if (hasOwnValue(payload, "schedule")) {
@@ -132,6 +203,7 @@ const formatTodo = (todo, locations = []) => {
     schedule: todo.schedule,
     title: todo.title,
     description: todo.description,
+    checkbox_items: parseJsonValue(todo.checkbox_items, []),
     location_id: primaryLocation?.location_id || null,
     location: primaryLocation,
     location_ids: locations.map((location) => location.location_id),
@@ -145,8 +217,8 @@ const formatTodo = (todo, locations = []) => {
         }
       : null,
     due_time: todo.due_time,
-    start_date: todo.start_date,
-    end_date: todo.end_date,
+    start_date: formatDateOnly(todo.start_date),
+    end_date: formatDateOnly(todo.end_date),
     day_of_week: todo.day_of_week,
     day_of_month: todo.day_of_month,
     is_active: Boolean(todo.is_active),
@@ -209,6 +281,12 @@ const ensureUserTodoAccess = (user) => {
   }
 };
 
+const ensureAdminOrManagerAccess = (user) => {
+  if (!["ADMIN", "MANAGER"].includes(user?.role)) {
+    throw new ApiError(FORBIDDEN, "Todo completions");
+  }
+};
+
 const normalizeUserTodoQuery = (query = {}) => {
   const page = Number(query.page || 1);
   const limit = Number(query.limit || 10);
@@ -218,6 +296,182 @@ const normalizeUserTodoQuery = (query = {}) => {
     page,
     limit,
   };
+};
+
+const normalizePaginationQuery = (query = {}) => {
+  const page = Number(query.page || 1);
+  const limit = Number(query.limit || 10);
+
+  return {
+    page,
+    limit,
+  };
+};
+
+const groupFilesByCompletionId = (files = []) => files.reduce((acc, file) => {
+  const completionId = Number(file.completion_id);
+  if (!acc.has(completionId)) acc.set(completionId, []);
+  acc.get(completionId).push(file);
+  return acc;
+}, new Map());
+
+const getStoredFileName = (fileUrl) => {
+  if (!fileUrl) return null;
+  if (/^https?:\/\//i.test(fileUrl)) return fileUrl;
+  return String(fileUrl).split("/").filter(Boolean).pop();
+};
+
+const formatCompletionFile = (file) => ({
+  ...file,
+  file_name: getStoredFileName(file.file_url),
+  file_url: CustomImagePath(getStoredFileName(file.file_url)),
+});
+
+const formatTodoCompletion = (completion, files = []) => ({
+  completion_id: completion.completion_id,
+  todo_id: completion.todo_id,
+  todo_location_id: completion.todo_location_id,
+  completed_by: completion.completed_by,
+  completed_by_user: completion.completed_by
+    ? {
+        user_id: completion.completed_by,
+        full_name: completion.completed_by_name,
+        phone_number: completion.completed_by_phone_number,
+      }
+    : null,
+  completion_date: formatDateOnly(completion.completion_date),
+  ppc: completion.ppc,
+  wp: completion.wp,
+  super: completion.super,
+  checkbox_items_response: parseJsonValue(completion.checkbox_items_response, []),
+  remarks: completion.remarks,
+  completed_at: completion.completed_at,
+  updated_at: completion.updated_at,
+  location: {
+    location_id: completion.location_id,
+    district: completion.district,
+    godown: completion.godown,
+    sloc: completion.sloc,
+    cap: completion.cap,
+    remark: completion.location_remark,
+  },
+  files: files.map(formatCompletionFile),
+});
+
+const normalizeBoolean = (value) => {
+  if (value === true || value === 1 || value === "1" || value === "true") return true;
+  if (value === false || value === 0 || value === "0" || value === "false") return false;
+  return null;
+};
+
+const normalizeCompletionFiles = (files = {}) => {
+  const allFiles = [
+    ...(files.photos || []),
+    ...(files.videos || []),
+    ...(files.files || []),
+  ];
+
+  return allFiles.map((file) => ({
+    originalname: file.originalname,
+    mimetype: file.mimetype,
+    path: file.path,
+    file_type: file.mimetype?.startsWith("video/") ? "video" : "photo",
+    file_url: file.filename,
+  }));
+};
+
+const cleanupUploadedFiles = (files = []) => {
+  files.forEach((file) => {
+    if (!file.path) return;
+    fs.unlink(file.path, () => {});
+  });
+};
+
+const buildCompletionPayload = (todo, body = {}, files = {}) => {
+  const uploadedFiles = normalizeCompletionFiles(files);
+  const remarks = normalizeOptionalText(body.remarks);
+
+  if (todo.type === "stock") {
+    const superValue = body.super ?? body.super_stocks;
+
+    if (uploadedFiles.length) {
+      throw new ApiError(INVALID, "files for stock todo");
+    }
+
+    if (body.ppc === undefined || body.wp === undefined || superValue === undefined) {
+      throw new ApiError(REQUIRED, "ppc, wp and super");
+    }
+
+    return {
+      ppc: Number(body.ppc),
+      wp: Number(body.wp),
+      super: Number(superValue),
+      remarks,
+      files: [],
+    };
+  }
+
+  if (todo.type === "checkbox") {
+    if (uploadedFiles.length) {
+      throw new ApiError(INVALID, "files for checkbox todo");
+    }
+
+    const checkboxItems = normalizeCheckboxItems(todo.checkbox_items);
+    const checkboxItemsResponse = normalizeCheckboxResponseForDb(
+      body.checkbox_items_response,
+      checkboxItems,
+    );
+
+    if (!checkboxItems.length) {
+      throw new ApiError(REQUIRED, "checkbox_items");
+    }
+
+    if (!checkboxItemsResponse) {
+      throw new ApiError(REQUIRED, "checkbox_items_response");
+    }
+
+    return {
+      checkbox_items_response: checkboxItemsResponse,
+      remarks,
+      files: [],
+    };
+  }
+
+  if (todo.type === "photo") {
+    const photoFiles = uploadedFiles.filter((file) => file.mimetype?.startsWith("image/"));
+
+    if (!photoFiles.length) {
+      throw new ApiError(REQUIRED, "Photo files");
+    }
+
+    if (photoFiles.length !== uploadedFiles.length) {
+      throw new ApiError(INVALID, "Photo files");
+    }
+
+    return {
+      remarks,
+      files: photoFiles.map(({ file_type, file_url }) => ({ file_type, file_url })),
+    };
+  }
+
+  if (todo.type === "video") {
+    const videoFiles = uploadedFiles.filter((file) => file.mimetype?.startsWith("video/"));
+
+    if (!videoFiles.length) {
+      throw new ApiError(REQUIRED, "Video files");
+    }
+
+    if (videoFiles.length !== uploadedFiles.length) {
+      throw new ApiError(INVALID, "Video files");
+    }
+
+    return {
+      remarks,
+      files: videoFiles.map(({ file_type, file_url }) => ({ file_type, file_url })),
+    };
+  }
+
+  throw new ApiError(INVALID, "Todo type");
 };
 
 export const createTodoService = async (payload, user) => {
@@ -342,5 +596,224 @@ export const getLoggedInUserTodoByIdService = async (todoId, query = {}, user) =
   } catch (error) {
     if (error instanceof ApiError) throw error;
     throw new ApiError(FETCH_ERROR, "User Todo", error, false);
+  }
+};
+
+export const completeLoggedInUserTodoService = async (todoId, body = {}, files = {}, user) => {
+  const uploadedFiles = normalizeCompletionFiles(files);
+
+  try {
+    ensureUserTodoAccess(user);
+
+    const todo = await todoModel.getUserEligibleTodoByIdModel({
+      todo_id: Number(todoId),
+      user_id: Number(user.user_id),
+      location_id: Number(user.location_id),
+    });
+
+    if (isEmpty(todo)) {
+      throw new ApiError(NOT_FOUND, "Todo");
+    }
+
+    if (Boolean(todo.is_completed)) {
+      throw new ApiError(CUSTOM_ERROR, "Todo is already completed");
+    }
+
+    const completionPayload = buildCompletionPayload(todo, body, files);
+
+    const completion = await todoModel.completeTodoModel({
+      todo_id: Number(todo.todo_id),
+      todo_location_id: Number(todo.todo_location_id),
+      completed_by: Number(user.user_id),
+      ...completionPayload,
+    });
+
+    return {
+      ...completion,
+      todo: {
+        ...formatUserTodo(todo),
+        is_completed: true,
+      },
+    };
+  } catch (error) {
+    cleanupUploadedFiles(uploadedFiles);
+    if (error instanceof ApiError) throw error;
+    throw new ApiError(UPDATE_ERROR, "Todo completion", error, false);
+  }
+};
+
+export const getTodoCompletionsService = async (todoId, query = {}, user) => {
+  try {
+    ensureAdminOrManagerAccess(user);
+    await ensureTodoExists(todoId);
+
+    const { page, limit } = normalizePaginationQuery(query);
+    const basePayload = {
+      todo_id: Number(todoId),
+      location_id: query.location_id ? Number(query.location_id) : null,
+    };
+
+    const [completions, totalRecords] = await Promise.all([
+      todoModel.getTodoCompletionsModel({
+        ...basePayload,
+        page,
+        limit,
+      }),
+      todoModel.countTodoCompletionsModel(basePayload),
+    ]);
+
+    const completionIds = completions.map((completion) => completion.completion_id);
+    const files = await todoModel.getCompletionFilesByCompletionIdsModel(completionIds);
+    const filesByCompletionId = groupFilesByCompletionId(files);
+
+    return {
+      records: completions.map((completion) =>
+        formatTodoCompletion(
+          completion,
+          filesByCompletionId.get(Number(completion.completion_id)) || [],
+        ),
+      ),
+      total_records: totalRecords,
+      total_pages: Math.ceil(totalRecords / limit),
+      current_page: page,
+      limit,
+    };
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    throw new ApiError(FETCH_ERROR, "Todo Completions", error, false);
+  }
+};
+
+export const getAdminManagerTodayTodosService = async (query = {}, user) => {
+  try {
+    ensureAdminOrManagerAccess(user);
+
+    const page = Number(query.page || 1);
+    const limit = Number(query.limit || 10);
+    const locationId = query.location_id ? Number(query.location_id) : null;
+    const status = query.status || null;
+
+    const [records, totalRecords, totalCount, completedCount, activeCount] = await Promise.all([
+      todoModel.getAdminManagerTodayTodosModel({
+        location_id: locationId,
+        status,
+        page,
+        limit,
+      }),
+      todoModel.countAdminManagerTodayTodosModel({
+        location_id: locationId,
+        status,
+      }),
+      todoModel.countAdminManagerTodayTodosModel({
+        location_id: locationId,
+        status: null,
+      }),
+      todoModel.countAdminManagerTodayTodosModel({
+        location_id: locationId,
+        status: 'completed',
+      }),
+      todoModel.countAdminManagerTodayTodosModel({
+        location_id: locationId,
+        status: 'active',
+      }),
+    ]);
+
+    const completionIds = records
+      .map((r) => r.completion_id)
+      .filter(Boolean);
+
+    let filesByCompletionId = new Map();
+    if (completionIds.length) {
+      const files = await todoModel.getCompletionFilesByCompletionIdsModel(completionIds);
+      filesByCompletionId = groupFilesByCompletionId(files);
+    }
+
+    const formattedRecords = records.map((record) => {
+      const location = {
+        todo_location_id: record.todo_location_id,
+        location_id: record.location_id,
+        district: record.district,
+        godown: record.godown,
+        sloc: record.sloc,
+        cap: record.cap,
+        remark: record.location_remark,
+      };
+
+      const baseTodo = {
+        todo_id: record.todo_id,
+        type: record.type,
+        schedule: record.schedule,
+        title: record.title,
+        description: record.description,
+        checkbox_items: parseJsonValue(record.checkbox_items, []),
+        location_id: record.location_id,
+        location,
+        location_ids: [record.location_id],
+        locations: [location],
+        created_by: record.created_by,
+        created_by_user: record.created_by
+          ? {
+              user_id: record.created_by,
+              full_name: record.created_by_name,
+              phone_number: record.created_by_phone_number,
+            }
+          : null,
+        due_time: record.due_time,
+        start_date: formatDateOnly(record.start_date),
+        end_date: formatDateOnly(record.end_date),
+        day_of_week: record.day_of_week,
+        day_of_month: record.day_of_month,
+        is_active: Boolean(record.is_active),
+        created_at: record.created_at,
+        updated_at: record.updated_at,
+      };
+
+      const completion = record.completion_id
+        ? {
+            completion_id: record.completion_id,
+            todo_id: record.todo_id,
+            todo_location_id: record.todo_location_id,
+            completed_by: record.completed_by,
+            completed_by_user: record.completed_by
+              ? {
+                  user_id: record.completed_by,
+                  full_name: record.completed_by_name,
+                  phone_number: record.completed_by_phone_number,
+                }
+              : null,
+            completion_date: formatDateOnly(record.completion_date),
+            completed_at: record.completed_at,
+            ppc: record.ppc,
+            wp: record.wp,
+            super: record.super,
+            checkbox_items_response: parseJsonValue(record.checkbox_items_response, []),
+            remarks: record.remarks,
+            files: (filesByCompletionId.get(Number(record.completion_id)) || []).map(formatCompletionFile),
+          }
+        : null;
+
+      return {
+        ...baseTodo,
+        todo_location_id: record.todo_location_id,
+        is_completed: Boolean(record.is_completed),
+        completion,
+      };
+    });
+
+    return {
+      records: formattedRecords,
+      total_records: totalRecords,
+      total_pages: Math.ceil(totalRecords / limit),
+      current_page: page,
+      limit,
+      stats: {
+        total: totalCount,
+        completed: completedCount,
+        pending: activeCount,
+      },
+    };
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    throw new ApiError(FETCH_ERROR, "Today's Todos", error, false);
   }
 };
