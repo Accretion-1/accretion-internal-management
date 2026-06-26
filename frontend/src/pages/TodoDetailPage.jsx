@@ -6,6 +6,8 @@ import {
     CheckCircle,
     Clock,
     ClipboardList,
+    Download,
+    Eye,
     FileVideo,
     ImageIcon,
     MapPin,
@@ -128,6 +130,18 @@ const getBackendFileUrl = (fileUrl) => {
 
 const getCompletionDateKey = (completion) => getDateInputValue(completion?.completion_date || completion?.completed_at) || 'unknown';
 
+const downloadAttachment = (url, fileName = 'attachment') => {
+    if (!url) return;
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+};
+
 const getTodayDateValue = () => {
     const today = new Date();
     const year = today.getFullYear();
@@ -178,26 +192,50 @@ const DetailItem = ({ label, value }) => (
     </div>
 );
 
-const CompletionMediaPreview = ({ file }) => {
+const CompletionMediaPreview = ({ file, onPreview }) => {
     const fileUrl = getBackendFileUrl(file?.file_url);
     const isPhoto = file?.file_type === 'photo';
+    const fileName = file?.file_name || (isPhoto ? 'photo-attachment' : 'video-attachment');
+    const previewPayload = { url: fileUrl, type: isPhoto ? 'photo' : 'video', name: fileName };
 
     return (
         <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-            <div className="flex items-center gap-2 border-b border-slate-100 px-3 py-2 text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
-                {isPhoto ? <ImageIcon className="h-4 w-4 text-blue-600" /> : <FileVideo className="h-4 w-4 text-violet-600" />}
-                {isPhoto ? 'Photo' : 'Video'}
+            <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-3 py-2">
+                <div className="flex items-center gap-2 text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
+                    {isPhoto ? <ImageIcon className="h-4 w-4 text-blue-600" /> : <FileVideo className="h-4 w-4 text-violet-600" />}
+                    {isPhoto ? 'Photo' : 'Video'}
+                </div>
+                <div className="flex items-center gap-1">
+                    <button
+                        type="button"
+                        onClick={() => onPreview(previewPayload)}
+                        className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-500 transition-all hover:bg-blue-50 hover:text-blue-600"
+                        title="Preview attachment"
+                    >
+                        <Eye className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => downloadAttachment(fileUrl, fileName)}
+                        className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-500 transition-all hover:bg-emerald-50 hover:text-emerald-600"
+                        title="Download attachment"
+                    >
+                        <Download className="h-3.5 w-3.5" />
+                    </button>
+                </div>
             </div>
-            {isPhoto ? (
-                <img src={fileUrl} alt="Completion attachment" className="h-36 w-full object-cover" />
+            <button type="button" onClick={() => onPreview(previewPayload)} className="block w-full overflow-hidden">
+                {isPhoto ? (
+                <img src={fileUrl} alt="Completion attachment" className="h-36 w-full object-cover transition-transform hover:scale-[1.02]" />
             ) : (
-                <video src={fileUrl} controls className="h-36 w-full bg-slate-950 object-cover" />
-            )}
+                <video src={fileUrl} muted playsInline className="h-36 w-full bg-slate-950 object-cover" />
+                )}
+            </button>
         </div>
     );
 };
 
-const CompletionRecordCard = ({ completion, todoType }) => {
+const CompletionRecordCard = ({ completion, todoType, onPreviewAttachment }) => {
     const files = Array.isArray(completion.files) ? completion.files : [];
 
     return (
@@ -242,7 +280,11 @@ const CompletionRecordCard = ({ completion, todoType }) => {
             {files.length > 0 && (
                 <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
                     {files.map((file) => (
-                        <CompletionMediaPreview key={file.file_id || file.file_url} file={file} />
+                        <CompletionMediaPreview
+                            key={file.file_id || file.file_url}
+                            file={file}
+                            onPreview={onPreviewAttachment}
+                        />
                     ))}
                 </div>
             )}
@@ -271,6 +313,7 @@ export const TodoDetailPage = () => {
         limit: 10,
     });
     const [isCompletionsLoading, setIsCompletionsLoading] = useState(false);
+    const [activeAttachment, setActiveAttachment] = useState(null);
 
     const isAdminOrManager = currentUser?.role === 'Admin' || currentUser?.role === 'Manager';
     const isUserRole = currentUser?.role === 'User';
@@ -721,6 +764,7 @@ export const TodoDetailPage = () => {
                                                             key={completion.completion_id}
                                                             completion={completion}
                                                             todoType={todo.type}
+                                                            onPreviewAttachment={setActiveAttachment}
                                                         />
                                                     ))}
                                                 </div>
@@ -924,6 +968,33 @@ export const TodoDetailPage = () => {
                 onClose={() => setIsCompleteOpen(false)}
                 onCompleted={handleCompletionDone}
             />
+
+            <Modal
+                isOpen={Boolean(activeAttachment)}
+                onClose={() => setActiveAttachment(null)}
+                title={`Verification ${activeAttachment?.type === 'video' ? 'Video' : 'Photo'} Attachment`}
+                maxWidthClass="max-w-3xl"
+                footerButtons={[
+                    { label: 'Close', onClick: () => setActiveAttachment(null) },
+                    {
+                        label: 'Download',
+                        onClick: () => downloadAttachment(activeAttachment?.url, activeAttachment?.name),
+                    },
+                    {
+                        label: 'Open in New Tab',
+                        onClick: () => window.open(activeAttachment?.url, '_blank'),
+                        variant: 'primary',
+                    },
+                ]}
+            >
+                <div className="flex justify-center overflow-hidden rounded-2xl bg-slate-950 p-2">
+                    {activeAttachment?.type === 'video' ? (
+                        <video src={activeAttachment.url} controls playsInline className="max-h-[60vh] w-full object-contain" />
+                    ) : (
+                        <img src={activeAttachment?.url} alt="Verification attachment preview" className="max-h-[60vh] object-contain" />
+                    )}
+                </div>
+            </Modal>
         </div>
     );
 };

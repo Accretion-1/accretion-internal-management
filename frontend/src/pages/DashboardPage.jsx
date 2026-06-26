@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAppState } from '../contexts/StateContext';
 import {
   Users, UserCheck, Shield, ClipboardList, Package, Bell, TrendingUp, Activity, CheckSquare, Layers, Clock, AlertTriangle, ArrowUpRight, Calendar,
-  MapPin, ChevronLeft, ChevronRight, Image as ImageIcon, Video as VideoIcon, FileText, CheckCircle2, HelpCircle, ExternalLink, RefreshCw
+  MapPin, ChevronLeft, ChevronRight, Image as ImageIcon, Video as VideoIcon, FileText, CheckCircle2, HelpCircle, ExternalLink, RefreshCw, Download
 } from 'lucide-react';
 import apiHandler from '../store/api/apiHandler';
 import { API_ENDPOINTS } from '../store/api/endpoints';
@@ -19,7 +19,7 @@ export const DashboardPage = () => {
   const [locationsLoading, setLocationsLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [activePhoto, setActivePhoto] = useState(null);
+  const [activeAttachment, setActiveAttachment] = useState(null);
   const [taskStats, setTaskStats] = useState({ total: 0, completed: 0, pending: 0 });
   const [currentTime, setCurrentTime] = useState(new Date());
 
@@ -121,6 +121,18 @@ export const DashboardPage = () => {
     } catch {
       return fileUrl;
     }
+  };
+
+  const downloadAttachment = (url, fileName = 'attachment') => {
+    if (!url) return;
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   if (!currentUser)
@@ -852,29 +864,40 @@ export const DashboardPage = () => {
                               {task.completion.files.map((file) => {
                                 const fileUrl = getBackendFileUrl(file.file_url);
                                 const isPhoto = file.file_type === 'photo';
-                                const fileName = file.file_name || 'attachment';
+                                const fileName = file.file_name || (isPhoto ? 'photo-attachment' : 'video-attachment');
 
                                 return (
                                   <div key={file.file_id || file.file_url} className="relative group overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs">
                                     {isPhoto ? (
-                                      <div className="relative h-20 w-20 cursor-pointer overflow-hidden" onClick={() => setActivePhoto(fileUrl)}>
+                                      <button
+                                        type="button"
+                                        className="relative block h-20 w-20 cursor-pointer overflow-hidden"
+                                        onClick={() => setActiveAttachment({ url: fileUrl, type: 'photo', name: fileName })}
+                                      >
                                         <img src={fileUrl} alt={fileName} className="h-full w-full object-cover transition-transform group-hover:scale-105" />
                                         <div className="absolute inset-0 bg-slate-900/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                                           <ImageIcon className="w-5 h-5 text-white filter drop-shadow-md" />
                                         </div>
-                                      </div>
+                                      </button>
                                     ) : (
-                                      <a
-                                        href={fileUrl}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
+                                      <button
+                                        type="button"
+                                        onClick={() => setActiveAttachment({ url: fileUrl, type: 'video', name: fileName })}
                                         className="flex h-20 w-20 flex-col items-center justify-center p-2 text-center hover:bg-slate-50 transition-colors"
                                       >
                                         <VideoIcon className="w-6 h-6 text-violet-500 mb-1" />
                                         <span className="text-[9px] font-bold text-slate-500 line-clamp-1 w-full px-1">{fileName}</span>
                                         <ExternalLink className="w-2.5 h-2.5 text-slate-400 mt-0.5" />
-                                      </a>
+                                      </button>
                                     )}
+                                    <button
+                                      type="button"
+                                      onClick={() => downloadAttachment(fileUrl, fileName)}
+                                      className="absolute bottom-1 right-1 flex h-7 w-7 items-center justify-center rounded-lg bg-white/95 text-slate-700 shadow-sm ring-1 ring-slate-200 transition-all hover:bg-blue-600 hover:text-white"
+                                      title="Download attachment"
+                                    >
+                                      <Download className="h-3.5 w-3.5" />
+                                    </button>
                                   </div>
                                 );
                               })}
@@ -917,19 +940,24 @@ export const DashboardPage = () => {
       </div>
     )}
 
-    {/* Image Modal for Previewing Attached Photos */}
+    {/* Modal for Previewing Attached Media */}
     <Modal
-      isOpen={Boolean(activePhoto)}
-      onClose={() => setActivePhoto(null)}
-      title="Verification Photo Attachment"
+      isOpen={Boolean(activeAttachment)}
+      onClose={() => setActiveAttachment(null)}
+      title={`Verification ${activeAttachment?.type === 'video' ? 'Video' : 'Photo'} Attachment`}
       maxWidthClass="max-w-3xl"
       footerButtons={[
-        { label: 'Close', onClick: () => setActivePhoto(null) },
-        { label: 'Open in New Tab', onClick: () => window.open(activePhoto, '_blank'), variant: 'primary' }
+        { label: 'Close', onClick: () => setActiveAttachment(null) },
+        { label: 'Download', onClick: () => downloadAttachment(activeAttachment?.url, activeAttachment?.name), variant: 'secondary' },
+        { label: 'Open in New Tab', onClick: () => window.open(activeAttachment?.url, '_blank'), variant: 'primary' }
       ]}
     >
       <div className="flex justify-center bg-slate-950 rounded-2xl overflow-hidden p-2">
-        <img src={activePhoto} alt="Verification attachment preview" className="max-h-[60vh] object-contain" />
+        {activeAttachment?.type === 'video' ? (
+          <video src={activeAttachment.url} controls playsInline className="max-h-[60vh] w-full object-contain" />
+        ) : (
+          <img src={activeAttachment?.url} alt="Verification attachment preview" className="max-h-[60vh] object-contain" />
+        )}
       </div>
     </Modal>
 
