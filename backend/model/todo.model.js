@@ -722,3 +722,95 @@ export const countAdminManagerTodayTodosModel = async ({
     throw new ApiError(DB_ERROR, "Counting Admin/Manager Today Todos", error, false);
   }
 };
+
+export const getPendingTodoReminderTargetsModel = async (reminderIntervalMinutes = 60) => {
+  try {
+    return await db.query(
+      `SELECT
+    t.todo_id,
+    t.type,
+    t.schedule,
+    t.title,
+    t.description,
+    t.due_time,
+    t.last_reminder_sent_at,
+    DATE_FORMAT(t.start_date, '%Y-%m-%d') AS start_date,
+    DATE_FORMAT(t.end_date, '%Y-%m-%d') AS end_date,
+    t.day_of_week,
+    t.day_of_month,
+    tl.todo_location_id,
+    tl.location_id,
+    l.district,
+    l.godown,
+    l.sloc,
+    l.cap,
+    l.remark AS location_remark,
+    u.user_id,
+    u.full_name,
+    u.phone_number,
+    u.fcm_token
+FROM todos t
+INNER JOIN todo_locations tl ON tl.todo_id = t.todo_id
+INNER JOIN locations l ON l.location_id = tl.location_id
+INNER JOIN users u ON u.location_id = tl.location_id
+    AND u.role = 'USER'
+    AND u.is_active = TRUE
+    AND u.fcm_token IS NOT NULL
+    AND u.fcm_token <> ''
+LEFT JOIN todo_completions tc ON tc.todo_id = t.todo_id
+    AND tc.todo_location_id = tl.todo_location_id
+    AND tc.completed_by = u.user_id
+    AND (
+        t.schedule = 'single'
+        OR tc.completion_date = DATE(CONVERT_TZ(NOW(), @@session.time_zone, 'Asia/Kolkata'))
+    )
+WHERE tl.is_deleted = FALSE
+    AND t.is_active = TRUE
+    AND t.due_time IS NOT NULL
+    -- Convert current server time to IST and add 1-minute buffer
+    AND t.due_time <= DATE_ADD(
+        TIME(CONVERT_TZ(NOW(), @@session.time_zone, 'Asia/Kolkata')),
+        INTERVAL 1 MINUTE
+    )
+    -- Convert dates to IST
+    AND t.start_date <= DATE(CONVERT_TZ(NOW(), @@session.time_zone, 'Asia/Kolkata'))
+    AND (t.end_date IS NULL OR t.end_date >= DATE(CONVERT_TZ(NOW(), @@session.time_zone, 'Asia/Kolkata')))
+    AND (
+        t.schedule = 'daily'
+        OR (t.schedule = 'weekly' AND t.day_of_week = 
+            CASE 
+                WHEN DAYOFWEEK(DATE(CONVERT_TZ(NOW(), @@session.time_zone, 'Asia/Kolkata'))) = 1 
+                THEN 7 
+                ELSE DAYOFWEEK(DATE(CONVERT_TZ(NOW(), @@session.time_zone, 'Asia/Kolkata'))) - 1 
+            END)
+        OR (t.schedule = 'monthly' AND t.day_of_month = 
+            DAY(DATE(CONVERT_TZ(NOW(), @@session.time_zone, 'Asia/Kolkata')))
+        )
+        OR (t.schedule = 'single' 
+            AND t.start_date <= DATE(CONVERT_TZ(NOW(), @@session.time_zone, 'Asia/Kolkata')) 
+            AND (t.end_date IS NULL OR t.end_date >= DATE(CONVERT_TZ(NOW(), @@session.time_zone, 'Asia/Kolkata')))
+        )
+    )
+    AND tc.completion_id IS NULL
+    AND (
+        t.last_reminder_sent_at IS NULL
+        OR UTC_TIMESTAMP() >= DATE_ADD(CONVERT_TZ(t.last_reminder_sent_at, @@session.time_zone, '+00:00'), INTERVAL ? MINUTE)
+    )
+ORDER BY t.due_time ASC, t.todo_id ASC, tl.location_id ASC, u.user_id ASC`,
+      [reminderIntervalMinutes],
+    );
+  } catch (error) {
+    throw new ApiError(DB_ERROR, "Fetching Todo Reminder Targets", error, false);
+  }
+};
+
+export const updateTodoLastReminderSentAtModel = async (todoId) => {
+  try {
+    return await db.query(
+      `UPDATE todos SET last_reminder_sent_at = CURRENT_TIMESTAMP WHERE todo_id = ?`,
+      [todoId],
+    );
+  } catch (error) {
+    throw new ApiError(DB_ERROR, "Updating Todo Last Reminder Sent At", error, false);
+  }
+};

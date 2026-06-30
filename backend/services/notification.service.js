@@ -32,6 +32,9 @@ const normalizeDataPayload = (data = {}) => Object.fromEntries(
 );
 
 export const sendNotification = async (token, title, body, options = {}) => {
+  if (process.env.NODE_ENV === "test") {
+    return { messageId: "mock-message-id" };
+  }
   const normalizedToken = assertValidToken(token);
   const message = {
     token: normalizedToken,

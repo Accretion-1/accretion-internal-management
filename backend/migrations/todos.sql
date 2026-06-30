@@ -90,3 +90,5 @@ ALTER TABLE todo_completions
 ADD COLUMN checkbox_items_response JSON NULL AFTER `super`;
 
 ALTER TABLE todo_completions DROP checkbox_status;
+
+ALTER TABLE todos ADD last_reminder_sent_at TIMESTAMP NULL;
