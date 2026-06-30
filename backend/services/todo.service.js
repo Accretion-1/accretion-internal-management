@@ -440,8 +440,8 @@ const buildCompletionPayload = (todo, body = {}, files = {}) => {
   if (todo.type === "photo") {
     const photoFiles = uploadedFiles.filter((file) => file.mimetype?.startsWith("image/"));
 
-    if (!photoFiles.length) {
-      throw new ApiError(REQUIRED, "Photo files");
+    if (!photoFiles.length && !remarks) {
+      throw new ApiError(REQUIRED, "Photo files or remarks");
     }
 
     if (photoFiles.length !== uploadedFiles.length) {

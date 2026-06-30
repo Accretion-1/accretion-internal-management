@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, Camera, CheckCircle, FileVideo, ImageIcon, Square, Trash2 } from 'lucide-react';
+import { AlertTriangle, Camera, CheckCircle, FileVideo, ImageIcon, Loader2, ShieldCheck, ShieldX, Square, Trash2 } from 'lucide-react';
 import { Modal } from './Modal';
 import apiHandler from '../store/api/apiHandler';
 import { API_ENDPOINTS } from '../store/api/endpoints';
@@ -23,16 +23,52 @@ const getCheckboxItems = (todo) => (
     label: item.label || '',
 })).filter((item) => item.label);
 
-const FileList = ({ files, onRemove }) => {
+const getFileKey = (file) => `${file.name}-${file.lastModified}-${file.size}`;
+
+const OcrStatusBadge = ({ result, compact = false }) => {
+    if (!result) return null;
+
+    const baseClass = compact
+        ? 'mt-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-extrabold'
+        : 'inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-extrabold';
+
+    if (result.status === 'checking') {
+        return (
+            <span className={`${baseClass} bg-blue-50 text-blue-700`}>
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                OCR checking...
+            </span>
+        );
+    }
+
+    if (result.status === 'matched') {
+        return (
+            <span className={`${baseClass} bg-emerald-50 text-emerald-700`}>
+                <ShieldCheck className="h-3.5 w-3.5" />
+                OCR matched {result.score ?? 0}%
+            </span>
+        );
+    }
+
+    return (
+        <span className={`${baseClass} bg-rose-50 text-rose-700`}>
+            <ShieldX className="h-3.5 w-3.5" />
+            OCR failed {result.score !== undefined ? `${result.score}%` : ''}
+        </span>
+    );
+};
+
+const FileList = ({ files, onRemove, ocrResults = {} }) => {
     if (!files.length) return null;
 
     return (
         <div className="mt-3 grid grid-cols-1 gap-2">
             {files.map((file, index) => (
                 <div key={`${file.name}-${file.lastModified}-${index}`} className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2">
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                         <p className="truncate text-xs font-bold text-slate-700">{file.name}</p>
                         <p className="text-[10px] font-semibold text-slate-400">{Math.max(file.size / 1024 / 1024, 0.01).toFixed(2)} MB</p>
+                        <OcrStatusBadge result={ocrResults[getFileKey(file)]} compact />
                     </div>
                     <button
                         type="button"
@@ -61,6 +97,7 @@ export const TodoCompletionModal = ({ isOpen, todo, onClose, onCompleted }) => {
     const [isRecording, setIsRecording] = useState(false);
     const [photoPreviews, setPhotoPreviews] = useState([]);
     const [videoPreviews, setVideoPreviews] = useState([]);
+    const [ocrResults, setOcrResults] = useState({});
 
     const todoType = todo?.type;
     const isMediaTodo = todoType === 'photo' || todoType === 'video';
@@ -137,6 +174,7 @@ export const TodoCompletionModal = ({ isOpen, todo, onClose, onCompleted }) => {
         });
         setErrors({});
         setStep('form');
+        setOcrResults({});
 
         if (todo?.type === 'photo' || todo?.type === 'video') {
             startCamera();
@@ -196,6 +234,60 @@ export const TodoCompletionModal = ({ isOpen, todo, onClose, onCompleted }) => {
             ...prev,
             [field]: prev[field].filter((_, fileIndex) => fileIndex !== index),
         }));
+        if (field === 'photos') {
+            const file = form.photos[index];
+            if (file) {
+                const fileKey = getFileKey(file);
+                setOcrResults((prev) => {
+                    const nextResults = { ...prev };
+                    delete nextResults[fileKey];
+                    return nextResults;
+                });
+            }
+        }
+    };
+
+    const verifyPhotoWithOcr = async (file) => {
+        const fileKey = getFileKey(file);
+        setOcrResults((prev) => ({
+            ...prev,
+            [fileKey]: { status: 'checking' },
+        }));
+
+        const formData = new FormData();
+        formData.append('image', file);
+
+        try {
+            const response = await apiHandler({
+                method: 'POST',
+                url: API_ENDPOINTS.OCR.VERIFY,
+                data: formData,
+                showNotification: false,
+            });
+            const data = response?.data || {};
+            const score = data.best_match?.score ?? 0;
+            const status = data.is_matched ? 'matched' : 'failed';
+
+            setOcrResults((prev) => ({
+                ...prev,
+                [fileKey]: {
+                    status,
+                    score,
+                    bestMatch: data.best_match || null,
+                    message: data.is_matched
+                        ? 'Image verified successfully.'
+                        : `Image did not match required OCR score (${data.min_match_score || 70}%).`,
+                },
+            }));
+        } catch (error) {
+            setOcrResults((prev) => ({
+                ...prev,
+                [fileKey]: {
+                    status: 'failed',
+                    message: error?.message || 'Unable to verify image with OCR.',
+                },
+            }));
+        }
     };
 
     const handleCapturePhoto = () => {
@@ -212,6 +304,7 @@ export const TodoCompletionModal = ({ isOpen, todo, onClose, onCompleted }) => {
             if (!blob) return;
             const file = new File([blob], `photo-${Date.now()}.jpg`, { type: 'image/jpeg' });
             addCapturedFile('photos', file);
+            verifyPhotoWithOcr(file);
         }, 'image/jpeg', 0.92);
     };
 
@@ -254,6 +347,11 @@ export const TodoCompletionModal = ({ isOpen, todo, onClose, onCompleted }) => {
 
     const validate = () => {
         const nextErrors = {};
+        const hasRemarks = Boolean(form.remarks.trim());
+        const photoOcrStates = form.photos.map((file) => ocrResults[getFileKey(file)]?.status);
+        const hasPendingPhotoOcr = photoOcrStates.includes('checking');
+        const hasFailedPhotoOcr = photoOcrStates.includes('failed');
+        const hasVerifiedPhoto = photoOcrStates.includes('matched');
 
         if (todoType === 'stock') {
             if (form.ppc === '') nextErrors.ppc = 'PPC is required.';
@@ -265,8 +363,17 @@ export const TodoCompletionModal = ({ isOpen, todo, onClose, onCompleted }) => {
             nextErrors.checkbox_items_response = 'No checkbox items are configured for this task.';
         }
 
-        if (todoType === 'photo' && !form.photos.length) {
-            nextErrors.photos = 'Capture at least one photo.';
+        if (todoType === 'photo') {
+            if (!form.photos.length && !hasRemarks) {
+                nextErrors.photos = 'Capture a photo or add remarks.';
+                nextErrors.remarks = 'Remarks are required when no photo is captured.';
+            } else if (hasPendingPhotoOcr) {
+                nextErrors.photos = 'Please wait until OCR verification is complete.';
+            } else if (hasFailedPhotoOcr) {
+                nextErrors.photos = 'Captured photo did not pass OCR. Remove it, capture another photo, or submit with remarks only.';
+            } else if (form.photos.length && !hasVerifiedPhoto) {
+                nextErrors.photos = 'Captured photo must pass OCR verification.';
+            }
         }
 
         if (todoType === 'video' && !form.videos.length) {
@@ -453,12 +560,18 @@ export const TodoCompletionModal = ({ isOpen, todo, onClose, onCompleted }) => {
                                                 </button>
                                                 <div className="p-2">
                                                     <p className="truncate text-[11px] font-bold text-slate-700">{preview.file.name}</p>
+                                                    <OcrStatusBadge result={ocrResults[getFileKey(preview.file)]} compact />
+                                                    {ocrResults[getFileKey(preview.file)]?.message && (
+                                                        <p className="mt-1 text-[10px] font-semibold text-slate-500">
+                                                            {ocrResults[getFileKey(preview.file)].message}
+                                                        </p>
+                                                    )}
                                                 </div>
                                             </div>
                                         ))}
                                     </div>
                                 )}
-                                <FileList files={form.photos} onRemove={(index) => handleRemoveFile('photos', index)} />
+                                <FileList files={form.photos} onRemove={(index) => handleRemoveFile('photos', index)} ocrResults={ocrResults} />
                             </div>
                         )}
 
@@ -511,8 +624,9 @@ export const TodoCompletionModal = ({ isOpen, todo, onClose, onCompleted }) => {
                                 onChange={(event) => handleChange('remarks', event.target.value)}
                                 rows={3}
                                 placeholder="Add optional remarks"
-                                className="resize-none rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
+                                className={`resize-none rounded-xl border bg-slate-50 px-3.5 py-2.5 text-sm font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-2 ${errors.remarks ? 'border-rose-300 focus:ring-rose-100' : 'border-slate-200 focus:ring-blue-100'}`}
                             />
+                            {errors.remarks && <span className="text-xs text-rose-600">{errors.remarks}</span>}
                         </div>
                     </>
                 ) : (

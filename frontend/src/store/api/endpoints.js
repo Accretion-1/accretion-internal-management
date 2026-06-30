@@ -14,6 +14,9 @@ export const API_ENDPOINTS = Object.freeze({
   NOTIFICATIONS: Object.freeze({
     SEND: "/notifications/send",
   }),
+  OCR: Object.freeze({
+    VERIFY: "/api/v1/ocr/verify",
+  }),
   PANELS: Object.freeze({
     BASE: "/panels",
   }),
