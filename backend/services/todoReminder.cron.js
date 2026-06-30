@@ -121,7 +121,6 @@ export const runTodoReminderCron = async () => {
 
   isRunning = true;
 
-  console.log("⏰ Running todo reminder cron...");
 
   try {
     const nowMs = Date.now();
