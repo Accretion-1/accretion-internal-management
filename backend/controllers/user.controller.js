@@ -41,3 +41,8 @@ export const updateUserController = apiHandler(async (req, res) => {
   const user = await userService.updateUserService(req.params.user_id, req.body, req.user);
   return apiResponse(UPDATE_SUCCESS, "User", user, res, "object");
 });
+
+export const updateUserFcmTokenController = apiHandler(async (req, res) => {
+  await userService.updateUserFcmTokenService(req.user.user_id, req.body.fcm_token);
+  return apiResponse(UPDATE_SUCCESS, "FCM token", null, res, "object");
+});

@@ -1,6 +1,7 @@
 import jwt from "jsonwebtoken";
 import { JWT_SECRET, NODE_ENV, TEST_OTP } from "../constants.js";
 import * as locationModel from "../model/location.model.js";
+import * as notificationService from "./notification.service.js";
 import * as panelModel from "../model/panel.model.js";
 import * as userModel from "../model/user.model.js";
 import { ApiError } from "../utils/api.util.js";
@@ -20,6 +21,29 @@ const canManageRole = (actorRole, targetRole) => (
   (ROLE_RANK[String(actorRole || "").toUpperCase()] || 0) >
   (ROLE_RANK[String(targetRole || "").toUpperCase()] || 0)
 );
+
+const sendLoginSuccessNotification = async (userId, fcmToken) => {
+  if (!fcmToken) return;
+
+  try {
+    await notificationService.sendNotification(
+      fcmToken,
+      "Login successful",
+      "You have successfully logged in.",
+      {
+        data: {
+          type: "LOGIN_SUCCESS",
+        },
+      },
+    );
+  } catch (error) {
+    if (notificationService.isUnregisteredTokenError(error)) {
+      await userModel.clearUserFcmTokenModel(userId);
+    }
+
+    console.warn("Unable to send login success notification:", error?.message || error);
+  }
+};
 
 const getActiveUser = async (phoneNumber) => {
   const [user] = await userModel.getUserByPhoneNumberModel(phoneNumber);
@@ -123,13 +147,9 @@ const normalizeUpdateUserPayload = (payload, existingUser) => {
   return normalizedPayload;
 };
 
-export const loginUserService = async ({ phone_number, fcm_token = null }) => {
+export const loginUserService = async ({ phone_number }) => {
   try {
     const user = await getActiveUser(phone_number);
-
-    if (fcm_token) {
-      await userModel.updateUserFcmTokenModel(user.user_id, fcm_token);
-    }
 
     await issueOTP(user);
   } catch (error) {
@@ -148,7 +168,7 @@ export const resendUserOTPService = async (phoneNumber) => {
   }
 };
 
-export const verifyUserOTPService = async ({ phone_number, otp }) => {
+export const verifyUserOTPService = async ({ phone_number, otp, fcm_token = null }) => {
   try {
     const user = await getActiveUser(phone_number);
     const expectedOTP = isDevelopment ? TEST_OTP : user.otp;
@@ -171,6 +191,11 @@ export const verifyUserOTPService = async ({ phone_number, otp }) => {
     }
 
     await userModel.markUserVerifiedModel(user.user_id);
+
+    if (fcm_token) {
+      await userModel.updateUserFcmTokenModel(user.user_id, fcm_token);
+      await sendLoginSuccessNotification(user.user_id, fcm_token);
+    }
 
     const authenticatedUser = await userModel.getUserDetailByIdModel(user.user_id);
     const panels = authenticatedUser.role === "USER"
@@ -326,5 +351,14 @@ export const updateUserService = async (userId, payload, actorUser) => {
   } catch (error) {
     if (error instanceof ApiError) throw error;
     throw new ApiError(UPDATE_ERROR, "User", error, false);
+  }
+};
+
+export const updateUserFcmTokenService = async (userId, fcmToken) => {
+  try {
+    await userModel.updateUserFcmTokenModel(userId, fcmToken || null);
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    throw new ApiError(UPDATE_ERROR, "FCM token", error, false);
   }
 };

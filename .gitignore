@@ -60,6 +60,8 @@ backend/backend/public/
 
 # Firebase service-account key (never commit credentials)
 backend/backend/keys/
+backend/*service-account*.json
+backend/firebase-service-account.json
 
 # Compiled / cached files
 backend/.cache/

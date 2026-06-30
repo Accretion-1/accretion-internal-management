@@ -7,6 +7,7 @@ import {
   loginUserController,
   resendUserOTPController,
   updateUserController,
+  updateUserFcmTokenController,
   verifyUserOTPController,
 } from "../controllers/user.controller.js";
 import { authGuard } from "../middlewares/guard.middleware.js";
@@ -16,6 +17,7 @@ import {
   loginUserSchema,
   resendOTPSchema,
   updateUserSchema,
+  updateFcmTokenSchema,
   userIdParamSchema,
   verifyOTPSchema,
 } from "../validations/user.validation.js";
@@ -25,6 +27,7 @@ const router = express.Router();
 router.post("/login", validate(loginUserSchema, "body"), loginUserController);
 router.post("/verify-otp", validate(verifyOTPSchema, "body"), verifyUserOTPController);
 router.post("/resend-otp", validate(resendOTPSchema, "body"), resendUserOTPController);
+router.put("/fcm-token", authGuard, validate(updateFcmTokenSchema, "body"), updateUserFcmTokenController);
 router.get("/profile", authGuard, getUserProfileController);
 router.get("/", authGuard, getUsersController);
 router.get("/:user_id", authGuard, validate(userIdParamSchema, "params"), getUserByIdController);
