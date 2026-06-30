@@ -7,3 +7,8 @@ npm-debug.log
 yarn-error.log
 .env
 .env.*
+
+
+firebase-service-account.json
+keys/
+*service-account*.json
