@@ -84,3 +84,11 @@ djfja
 frontend/.env
 backend/public/
 backend/firebase-service-account.json
+
+
+####
+# Firebase service-account key (never commit credentials)
+backend/firebase-service-account.json
+backend/keys/
+**/firebase-service-account.json
+**/*service-account*.json
