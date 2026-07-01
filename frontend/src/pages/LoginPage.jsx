@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { loginUser, resendOtp, verifyOtp } from '../store/slices/authSlice';
 import { useAppDispatch, useAppSelector } from '../store/hooks/reduxHooks';
 import { selectAuthLoading, selectResendLoading } from '../store/selectors/authSelectors';
+import { getFcmTokenSafely, showBrowserNotification } from '../services/notification.service';
 
 export const LoginPage = () => {
     const dispatch = useAppDispatch();
@@ -15,6 +16,7 @@ export const LoginPage = () => {
     const [phoneError, setPhoneError] = useState('');
     const [otpError, setOtpError] = useState('');
     const [smsIncomingAlert, setSmsIncomingAlert] = useState(null);
+    const [fcmToken, setFcmToken] = useState(null);
 
     const handlePhoneSubmit = async (e) => {
         e.preventDefault();
@@ -25,6 +27,8 @@ export const LoginPage = () => {
         }
         setPhoneError('');
         try {
+            const generatedFcmToken = await getFcmTokenSafely();
+            setFcmToken(generatedFcmToken);
             await dispatch(loginUser({ phone_number: cleanPhone })).unwrap();
             setPhoneNumber(cleanPhone);
             setStep('otp');
@@ -48,7 +52,7 @@ export const LoginPage = () => {
         }
         setOtpError('');
         try {
-            await dispatch(verifyOtp({ phone_number: phoneNumber, otp: otpValue })).unwrap();
+            await dispatch(verifyOtp({ phone_number: phoneNumber, otp: otpValue, fcm_token: fcmToken })).unwrap();
             setSmsIncomingAlert(null);
         }
         catch (error) {

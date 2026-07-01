@@ -343,6 +343,10 @@ const formatTodoCompletion = (completion, files = []) => ({
   ppc: completion.ppc,
   wp: completion.wp,
   super: completion.super,
+  cnt_ppc: completion.cnt_ppc,
+  cnt_wp: completion.cnt_wp,
+  cnt_super: completion.cnt_super,
+  week: completion.week,
   checkbox_items_response: parseJsonValue(completion.checkbox_items_response, []),
   remarks: completion.remarks,
   completed_at: completion.completed_at,
@@ -393,6 +397,10 @@ const buildCompletionPayload = (todo, body = {}, files = {}) => {
 
   if (todo.type === "stock") {
     const superValue = body.super ?? body.super_stocks;
+    const cntPpc = body.cnt_ppc ?? 0;
+    const cntWp = body.cnt_wp ?? 0;
+    const cntSuper = body.cnt_super ?? 0;
+    const week = normalizeOptionalText(body.week);
 
     if (uploadedFiles.length) {
       throw new ApiError(INVALID, "files for stock todo");
@@ -406,6 +414,10 @@ const buildCompletionPayload = (todo, body = {}, files = {}) => {
       ppc: Number(body.ppc),
       wp: Number(body.wp),
       super: Number(superValue),
+      cnt_ppc: Number(cntPpc),
+      cnt_wp: Number(cntWp),
+      cnt_super: Number(cntSuper),
+      week,
       remarks,
       files: [],
     };
@@ -440,8 +452,8 @@ const buildCompletionPayload = (todo, body = {}, files = {}) => {
   if (todo.type === "photo") {
     const photoFiles = uploadedFiles.filter((file) => file.mimetype?.startsWith("image/"));
 
-    if (!photoFiles.length) {
-      throw new ApiError(REQUIRED, "Photo files");
+    if (!photoFiles.length && !remarks) {
+      throw new ApiError(REQUIRED, "Photo files or remarks");
     }
 
     if (photoFiles.length !== uploadedFiles.length) {
@@ -786,6 +798,10 @@ export const getAdminManagerTodayTodosService = async (query = {}, user) => {
             ppc: record.ppc,
             wp: record.wp,
             super: record.super,
+            cnt_ppc: record.cnt_ppc,
+            cnt_wp: record.cnt_wp,
+            cnt_super: record.cnt_super,
+            week: record.week,
             checkbox_items_response: parseJsonValue(record.checkbox_items_response, []),
             remarks: record.remarks,
             files: (filesByCompletionId.get(Number(record.completion_id)) || []).map(formatCompletionFile),

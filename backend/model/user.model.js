@@ -197,6 +197,14 @@ export const updateUserFcmTokenModel = async (userId, fcmToken) => {
   }
 };
 
+export const clearUserFcmTokenModel = async (userId) => {
+  try {
+    return await db.query("UPDATE users SET fcm_token = NULL WHERE user_id = ?", [userId]);
+  } catch (error) {
+    throw new ApiError(DB_ERROR, "Clearing FCM Token", error, false);
+  }
+};
+
 export const markUserVerifiedModel = async (userId) => {
   try {
     return await db.query(

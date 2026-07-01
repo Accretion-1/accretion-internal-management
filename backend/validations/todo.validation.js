@@ -157,10 +157,14 @@ export const updateTodoSchema = Joi.object({
   .messages(messages);
 
 export const completeTodoSchema = Joi.object({
-  ppc: Joi.number().integer().min(0).optional(),
-  wp: Joi.number().integer().min(0).optional(),
-  super: Joi.number().integer().min(0).optional(),
-  super_stocks: Joi.number().integer().min(0).optional(),
+  ppc: Joi.number().precision(2).min(0).optional(),
+  wp: Joi.number().precision(2).min(0).optional(),
+  super: Joi.number().precision(2).min(0).optional(),
+  super_stocks: Joi.number().precision(2).min(0).optional(),
+  cnt_ppc: Joi.number().precision(2).min(0).optional(),
+  cnt_wp: Joi.number().precision(2).min(0).optional(),
+  cnt_super: Joi.number().precision(2).min(0).optional(),
+  week: Joi.string().trim().allow("", null).optional(),
   checkbox_items_response: checkboxItemsResponseValidation.optional(),
   remarks: nullableTextValidation.optional(),
 }).messages(messages);

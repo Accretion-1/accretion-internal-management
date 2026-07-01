@@ -9,6 +9,13 @@ export const API_ENDPOINTS = Object.freeze({
     ADD: "/user/add",
     BY_ID: (userId) => `/user/${userId}`,
     UPDATE: (userId) => `/user/update/${userId}`,
+    UPDATE_FCM_TOKEN: "/user/fcm-token",
+  }),
+  NOTIFICATIONS: Object.freeze({
+    SEND: "/notifications/send",
+  }),
+  OCR: Object.freeze({
+    VERIFY: "/api/v1/ocr/verify",
   }),
   PANELS: Object.freeze({
     BASE: "/panels",

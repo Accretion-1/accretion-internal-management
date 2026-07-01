@@ -277,6 +277,10 @@ const CompletionRecordCard = ({ completion, todoType, onPreviewAttachment }) => 
                 {todoType === 'stock' && <DetailItem label="PPC" value={completion.ppc} />}
                 {todoType === 'stock' && <DetailItem label="WP" value={completion.wp} />}
                 {todoType === 'stock' && <DetailItem label="Super" value={completion.super} />}
+                {todoType === 'stock' && <DetailItem label="CNT PPC" value={completion.cnt_ppc} />}
+                {todoType === 'stock' && <DetailItem label="CNT WP" value={completion.cnt_wp} />}
+                {todoType === 'stock' && <DetailItem label="CNT Super" value={completion.cnt_super} />}
+                {todoType === 'stock' && <DetailItem label="Week" value={completion.week} />}
                 {todoType === 'checkbox' && (
                     <DetailItem
                         label="Checklist"

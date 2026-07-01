@@ -90,3 +90,13 @@ ALTER TABLE todo_completions
 ADD COLUMN checkbox_items_response JSON NULL AFTER `super`;
 
 ALTER TABLE todo_completions DROP checkbox_status;
+
+ALTER TABLE todos ADD last_reminder_sent_at TIMESTAMP NULL;
+
+
+ALTER TABLE `todo_completions` ADD `cnt_ppc` DECIMAL(10,2) NOT NULL DEFAULT '0.00' AFTER `super`, ADD `cnt_wp` DECIMAL(10,2) NOT NULL DEFAULT '0.00' AFTER `cnt_ppc`, ADD `cnt_super` DECIMAL(10,2) NOT NULL DEFAULT '0.00' AFTER `cnt_wp`, ADD `week` DECIMAL(10,2) NOT NULL DEFAULT '0.00' AFTER `cnt_super`;
+
+
+ALTER TABLE `todo_completions` CHANGE `ppc` `ppc` DECIMAL(10,2) NULL DEFAULT NULL COMMENT 'Pieces Per Cycle (stock type)', CHANGE `wp` `wp` DECIMAL(10,2) NULL DEFAULT NULL COMMENT 'Work Progress (stock type)', CHANGE `super` `super` DECIMAL(10,2) NULL DEFAULT NULL COMMENT 'Supervisor count or score (stock type)';
+
+ALTER TABLE `todo_completions` CHANGE `week` `week` TEXT NULL;

@@ -828,7 +828,7 @@ export const DashboardPage = () => {
 
                         {/* Metrics data for Stock or Checkbox type */}
                         {(task.type === 'stock' || task.type === 'checkbox') && (
-                          <div className="grid grid-cols-3 gap-2 text-center">
+                          <div className="grid grid-cols-2 gap-2 text-center sm:grid-cols-3">
                             {task.type === 'stock' && (
                               <>
                                 <div className="bg-white p-2 rounded-xl border border-slate-200/60">
@@ -842,6 +842,22 @@ export const DashboardPage = () => {
                                 <div className="bg-white p-2 rounded-xl border border-slate-200/60">
                                   <p className="text-[9px] font-bold text-slate-400 uppercase">Super</p>
                                   <p className="text-xs font-extrabold text-slate-800 mt-0.5">{task.completion.super ?? '-'}</p>
+                                </div>
+                                <div className="bg-white p-2 rounded-xl border border-slate-200/60">
+                                  <p className="text-[9px] font-bold text-slate-400 uppercase">CNT PPC</p>
+                                  <p className="text-xs font-extrabold text-slate-800 mt-0.5">{task.completion.cnt_ppc ?? '-'}</p>
+                                </div>
+                                <div className="bg-white p-2 rounded-xl border border-slate-200/60">
+                                  <p className="text-[9px] font-bold text-slate-400 uppercase">CNT WP</p>
+                                  <p className="text-xs font-extrabold text-slate-800 mt-0.5">{task.completion.cnt_wp ?? '-'}</p>
+                                </div>
+                                <div className="bg-white p-2 rounded-xl border border-slate-200/60">
+                                  <p className="text-[9px] font-bold text-slate-400 uppercase">CNT Super</p>
+                                  <p className="text-xs font-extrabold text-slate-800 mt-0.5">{task.completion.cnt_super ?? '-'}</p>
+                                </div>
+                                <div className="bg-white p-2 rounded-xl border border-slate-200/60 sm:col-span-3">
+                                  <p className="text-[9px] font-bold text-slate-400 uppercase">Week</p>
+                                  <p className="text-xs font-extrabold text-slate-800 mt-0.5">{task.completion.week ?? '-'}</p>
                                 </div>
                               </>
                             )}
