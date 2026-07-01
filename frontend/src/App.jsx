@@ -10,6 +10,7 @@ import { GlobalLoadingOverlay } from './components/loading/GlobalLoadingOverlay'
 import { InstallBanner } from './components/InstallBanner';
 import { useAppSelector } from './store/hooks/reduxHooks';
 import { selectAuthUser, selectIsAuthenticated } from './store/selectors/authSelectors';
+import { listenForForegroundNotifications, refreshAndSyncFcmToken } from './services/notification.service';
 // Individual application modules pages
 import { DashboardPage } from './pages/DashboardPage';
 import { UserManagementPage } from './pages/UserManagementPage';
@@ -17,6 +18,7 @@ import { StockPage } from './pages/StockPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { ReminderPage } from './pages/ReminderPage';
 import { TodoPage } from './pages/TodoPage';
+import { TodoDetailPage } from './pages/TodoDetailPage';
 import { ActivityLogsPage } from './pages/ActivityLogsPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { LocationsPage } from './pages/LocationsPage';
@@ -103,6 +105,41 @@ const AuthStateBridge = () => {
     return null;
 };
 function AppContent() {
+    const isAuthenticated = useAppSelector(selectIsAuthenticated);
+    useEffect(() => {
+        let unsubscribe = () => {};
+        let isMounted = true;
+
+        listenForForegroundNotifications()
+            .then((cleanup) => {
+                if (isMounted) {
+                    unsubscribe = cleanup;
+                } else {
+                    cleanup?.();
+                }
+            })
+            .catch((error) => {
+                console.warn('Unable to listen for foreground notifications:', error);
+            });
+
+        return () => {
+            isMounted = false;
+            unsubscribe?.();
+        };
+    }, []);
+
+    useEffect(() => {
+        if (!isAuthenticated) return undefined;
+
+        refreshAndSyncFcmToken().catch((error) => {
+            if (Number(error?.status) !== 401 && Number(error?.code) !== 401) {
+                console.warn('Unable to sync FCM token:', error);
+            }
+        });
+
+        return undefined;
+    }, [isAuthenticated]);
+
     return (<>
       <AuthStateBridge />
       <Toaster position="top-right" toastOptions={{ duration: 4000 }}/>
@@ -124,6 +161,7 @@ function AppContent() {
           <Route path="/stock" element={<StockPage />}/>
           <Route path="/reports" element={<ReportsPage />}/>
           <Route path="/todos" element={<TodoPage />}/>
+          <Route path="/todos/:todoId" element={<TodoDetailPage />}/>
           <Route path="/reminders" element={<ReminderPage />}/>
           <Route path="/reminder-schedule" element={<ReminderPage />}/>
           <Route path="/locations" element={<LocationsPage />}/>

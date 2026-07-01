@@ -4,7 +4,13 @@ import path from 'path';
 import jwt from 'jsonwebtoken';
 
 export const CustomImagePath = (fileName) => {
-  return fileName ? `${FILE_PATH}${fileName}` : null;
+  if (!fileName) return null;
+  if (/^https?:\/\//i.test(fileName)) return fileName;
+
+  const basePath = FILE_PATH || "";
+  if (!basePath) return fileName;
+
+  return `${basePath.replace(/\/?$/, "/")}${String(fileName).replace(/^\/+/, "")}`;
 }
 
 export const isEmpty = (value) =>

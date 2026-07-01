@@ -9,6 +9,13 @@ export const API_ENDPOINTS = Object.freeze({
     ADD: "/user/add",
     BY_ID: (userId) => `/user/${userId}`,
     UPDATE: (userId) => `/user/update/${userId}`,
+    UPDATE_FCM_TOKEN: "/user/fcm-token",
+  }),
+  NOTIFICATIONS: Object.freeze({
+    SEND: "/notifications/send",
+  }),
+  OCR: Object.freeze({
+    VERIFY: "/v1/ocr/verify",
   }),
   PANELS: Object.freeze({
     BASE: "/panels",
@@ -16,6 +23,17 @@ export const API_ENDPOINTS = Object.freeze({
   LOCATIONS: Object.freeze({
     BASE: "/locations",
     BY_ID: (locationId) => `/locations/${locationId}`,
+  }),
+  TODOS: Object.freeze({
+    BASE: "/todos",
+    ADD: "/todos/add-todos",
+    BY_ID: (todoId) => `/todos/${todoId}`,
+    UPDATE: (todoId) => `/todos/${todoId}`,
+    COMPLETIONS: (todoId) => `/todos/${todoId}/completions`,
+    MY: "/todos/my",
+    MY_BY_ID: (todoId) => `/todos/my/${todoId}`,
+    COMPLETE: (todoId) => `/todos/my/${todoId}/complete`,
+    TODAY_TASKS: "/todos/today-tasks",
   }),
   HOSTING: Object.freeze({}),
   SUPPORT: Object.freeze({}),

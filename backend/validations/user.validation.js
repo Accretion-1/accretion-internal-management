@@ -17,11 +17,11 @@ const optionalPhoneNumber = Joi.string()
 
 export const loginUserSchema = Joi.object({
   phone_number: phoneNumber,
-  fcm_token: Joi.string().trim().allow("").optional(),
 });
 
 export const verifyOTPSchema = Joi.object({
   phone_number: phoneNumber,
+  fcm_token: Joi.string().trim().allow("", null).optional(),
   otp: Joi.alternatives()
     .try(
       Joi.string().trim().pattern(/^(?:\d{4}|\d{6})$/),
@@ -68,3 +68,7 @@ export const updateUserSchema = Joi.object({
 })
   .or("phone_number", "panel_ids", "full_name", "is_active")
   .unknown(false);
+
+export const updateFcmTokenSchema = Joi.object({
+  fcm_token: Joi.string().trim().allow("", null).required(),
+});
