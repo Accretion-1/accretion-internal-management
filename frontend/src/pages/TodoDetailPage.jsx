@@ -26,6 +26,7 @@ import { API_ENDPOINTS } from '../store/api/endpoints';
 const EMPTY_FORM = {
     type: 'checkbox',
     schedule: 'daily',
+    is_ocr: null,
     title: '',
     description: '',
     checkbox_items: [{ key: 'checkbox_1', label: '' }],
@@ -57,6 +58,15 @@ const WEEK_DAY_OPTIONS = Object.entries(WEEK_DAYS).map(([value, label]) => ({
     value,
     label,
 }));
+
+const STOCK_FIELDS = [
+    ['ppc', 'PPC'],
+    ['wp', 'WP'],
+    ['super', 'Super'],
+    ['cnt_ppc', 'CNT PPC'],
+    ['cnt_wp', 'CNT WP'],
+    ['cnt_super', 'CNT Super'],
+];
 
 const formatDateTime = (value) => {
     if (!value) return '-';
@@ -171,6 +181,7 @@ const normalizeTodoUpdatePayload = (form) => {
     const payload = {
         title: form.title.trim(),
         description: form.description.trim() || null,
+        is_ocr: form.type === 'photo' ? Boolean(form.is_ocr) : null,
         schedule: form.schedule,
         location_ids: form.location_ids.map((locationId) => Number(locationId)),
         start_date: localDateToUtcISOString(form.start_date),
@@ -249,6 +260,7 @@ const CompletionMediaPreview = ({ file, onPreview }) => {
 
 const CompletionRecordCard = ({ completion, todoType, onPreviewAttachment }) => {
     const files = Array.isArray(completion.files) ? completion.files : [];
+    const stockSections = Array.isArray(completion.stock_item_sections) ? completion.stock_item_sections : [];
 
     return (
         <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-xs">
@@ -274,13 +286,6 @@ const CompletionRecordCard = ({ completion, todoType, onPreviewAttachment }) => 
 
             <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 <DetailItem label="Completion Date" value={formatDate(completion.completion_date)} />
-                {todoType === 'stock' && <DetailItem label="PPC" value={completion.ppc} />}
-                {todoType === 'stock' && <DetailItem label="WP" value={completion.wp} />}
-                {todoType === 'stock' && <DetailItem label="Super" value={completion.super} />}
-                {todoType === 'stock' && <DetailItem label="CNT PPC" value={completion.cnt_ppc} />}
-                {todoType === 'stock' && <DetailItem label="CNT WP" value={completion.cnt_wp} />}
-                {todoType === 'stock' && <DetailItem label="CNT Super" value={completion.cnt_super} />}
-                {todoType === 'stock' && <DetailItem label="Week" value={completion.week} />}
                 {todoType === 'checkbox' && (
                     <DetailItem
                         label="Checklist"
@@ -288,6 +293,33 @@ const CompletionRecordCard = ({ completion, todoType, onPreviewAttachment }) => 
                     />
                 )}
             </div>
+
+            {todoType === 'stock' && stockSections.length > 0 && (
+                <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                    <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Stock Entries</p>
+                    <div className="mt-3 grid gap-3 md:grid-cols-2">
+                        {stockSections.map((section) => {
+                            const stockLabel = STOCK_FIELDS.find(([field]) => field === section.stock_name)?.[1] || section.stock_name;
+
+                            return (
+                            <div key={`stock-section-${completion.completion_id}-${section.stock_name}`} className="rounded-2xl border border-slate-200 bg-white p-3">
+                                <div className="mb-3 inline-flex rounded-xl bg-blue-50 px-3 py-1.5 text-xs font-extrabold text-blue-700">
+                                    {stockLabel}
+                                </div>
+                                <div className="grid gap-2">
+                                    {section.items.map((item, index) => (
+                                        <div key={item.todo_completion_item_id || `${section.stock_name}-${index}`} className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2">
+                                            <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Week {Number(item.stock_value || 0) > 0 ? item.week : '-'}</p>
+                                            <p className="text-sm font-extrabold text-slate-900">{Number(item.stock_value || 0).toFixed(2)}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
 
             {todoType === 'checkbox' && Array.isArray(completion.checkbox_items_response) && completion.checkbox_items_response.length > 0 && (
                 <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
@@ -570,6 +602,7 @@ export const TodoDetailPage = () => {
             ...EMPTY_FORM,
             type: todo.type || EMPTY_FORM.type,
             schedule: todo.schedule || EMPTY_FORM.schedule,
+            is_ocr: todo.type === 'photo' ? Boolean(todo.is_ocr) : null,
             title: todo.title || '',
             description: todo.description || '',
             checkbox_items: Array.isArray(todo.checkbox_items) && todo.checkbox_items.length
@@ -696,6 +729,11 @@ export const TodoDetailPage = () => {
                                         <span className="rounded-full bg-blue-600 px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider text-white">
                                             {todo.type}
                                         </span>
+                                        {todo.type === 'photo' && (
+                                            <span className={`rounded-full px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider ${todo.is_ocr ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+                                                OCR {todo.is_ocr ? 'Enabled' : 'Disabled'}
+                                            </span>
+                                        )}
                                         <span className={`rounded-full px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider ${todo.is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
                                             {isUserRole ? (todo.is_completed ? 'Completed' : 'Pending') : (todo.is_active ? 'Active' : 'Inactive')}
                                         </span>
@@ -988,6 +1026,23 @@ export const TodoDetailPage = () => {
                             </div>
                             {errors.checkbox_items && <span className="text-xs text-rose-600">{errors.checkbox_items}</span>}
                         </div>
+                    )}
+
+                    {form.type === 'photo' && (
+                        <label className="flex cursor-pointer items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:col-span-2">
+                            <span>
+                                <span className="block text-xs font-extrabold uppercase tracking-wider text-slate-500">OCR Verification</span>
+                                <span className="mt-1 block text-xs font-semibold text-slate-500">
+                                    If enabled, users must capture a photo that passes OCR before completing this task.
+                                </span>
+                            </span>
+                            <input
+                                type="checkbox"
+                                checked={Boolean(form.is_ocr)}
+                                onChange={(event) => handleChange('is_ocr', event.target.checked)}
+                                className="h-5 w-5 rounded border-slate-300 text-blue-600"
+                            />
+                        </label>
                     )}
 
                     <div className="flex flex-col gap-1.5 sm:col-span-2">

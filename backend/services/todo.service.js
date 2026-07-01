@@ -1,4 +1,5 @@
 import * as locationModel from "../model/location.model.js";
+import * as ocrService from "./ocr.service.js";
 import * as todoModel from "../model/todo.model.js";
 import fs from "fs";
 import { ApiError } from "../utils/api.util.js";
@@ -13,6 +14,8 @@ import {
   UPDATE_ERROR,
 } from "../utils/message.util.js";
 import { CustomImagePath, isEmpty } from "../utils/misc.util.js";
+
+const STOCK_ITEM_NAMES = ["ppc", "wp", "super", "cnt_ppc", "cnt_wp", "cnt_super"];
 
 const normalizeOptionalText = (value) => {
   if (value === undefined || value === null || value === "") return null;
@@ -43,6 +46,11 @@ const normalizeOptionalNumber = (value) => {
   return Number(value);
 };
 
+const normalizeOptionalBooleanNumber = (value) => {
+  if (value === undefined || value === null || value === "") return null;
+  return value === true || value === 1 || value === "1" || value === "true" ? 1 : 0;
+};
+
 const parseJsonValue = (value, fallback = null) => {
   if (value === undefined || value === null || value === "") return fallback;
   if (typeof value === "string") {
@@ -53,6 +61,46 @@ const parseJsonValue = (value, fallback = null) => {
     }
   }
   return value;
+};
+
+const normalizeStockItems = (value) => {
+  const parsedValue = parseJsonValue(value, []);
+  const rows = Array.isArray(parsedValue) ? parsedValue : [];
+
+  return rows.flatMap((row, groupIndex) => {
+    const week = normalizeOptionalNumber(row?.week ?? groupIndex + 1);
+
+    if (row?.stock_name !== undefined) {
+      const stockValue = Number(row.stock_value ?? 0);
+      return [{
+        stock_name: row.stock_name,
+        stock_value: stockValue,
+        week: stockValue > 0 ? week : null,
+      }];
+    }
+
+    return STOCK_ITEM_NAMES.map((stockName) => ({
+      stock_name: stockName,
+      stock_value: Number(row?.[stockName] ?? 0),
+      week: Number(row?.[stockName] ?? 0) > 0 ? week : null,
+    }));
+  });
+};
+
+const normalizeLegacyStockItems = (body = {}) => {
+  if (body.stock_items !== undefined) {
+    return normalizeStockItems(body.stock_items);
+  }
+
+  return STOCK_ITEM_NAMES.map((stockName) => {
+    const sourceKey = stockName === "super" ? "super_stocks" : stockName;
+    const stockValue = Number(body[sourceKey] ?? body[stockName] ?? 0);
+    return {
+      stock_name: stockName,
+      stock_value: stockValue,
+      week: stockValue > 0 ? normalizeOptionalNumber(body.week ?? 1) : null,
+    };
+  });
 };
 
 const normalizeCheckboxItems = (value) => {
@@ -110,6 +158,7 @@ const normalizeTodoPayload = (payload, createdBy) => {
   return {
     type: payload.type,
     schedule,
+    is_ocr: payload.type === "photo" ? normalizeOptionalBooleanNumber(payload.is_ocr) : null,
     title: payload.title,
     description: normalizeOptionalText(payload.description),
     checkbox_items: payload.type === "checkbox"
@@ -141,6 +190,10 @@ const normalizeUpdateTodoPayload = (payload) => {
 
   if (hasOwnValue(payload, "checkbox_items")) {
     normalized.checkbox_items = normalizeCheckboxItemsForDb(payload.checkbox_items);
+  }
+
+  if (hasOwnValue(payload, "is_ocr")) {
+    normalized.is_ocr = normalizeOptionalBooleanNumber(payload.is_ocr);
   }
 
   if (hasOwnValue(payload, "schedule")) {
@@ -201,6 +254,7 @@ const formatTodo = (todo, locations = []) => {
     todo_id: todo.todo_id,
     type: todo.type,
     schedule: todo.schedule,
+    is_ocr: todo.is_ocr === null || todo.is_ocr === undefined ? null : Boolean(todo.is_ocr),
     title: todo.title,
     description: todo.description,
     checkbox_items: parseJsonValue(todo.checkbox_items, []),
@@ -315,6 +369,54 @@ const groupFilesByCompletionId = (files = []) => files.reduce((acc, file) => {
   return acc;
 }, new Map());
 
+const groupCompletionItemsByCompletionId = (items = []) => items.reduce((acc, item) => {
+  const completionId = Number(item.completion_id);
+  if (!acc.has(completionId)) acc.set(completionId, []);
+  acc.get(completionId).push({
+    todo_completion_item_id: item.todo_completion_item_id,
+    stock_name: item.stock_name,
+    stock_value: Number(item.stock_value || 0),
+    week: item.week === null || item.week === undefined ? null : Number(item.week),
+    created_at: item.created_at,
+  });
+  return acc;
+}, new Map());
+
+const buildStockItemGroups = (items = []) => {
+  const groups = new Map();
+
+  items.forEach((item) => {
+    const weekKey = item.week === null || item.week === undefined ? "default" : String(item.week);
+    if (!groups.has(weekKey)) {
+      groups.set(weekKey, {
+        week: item.week,
+        ppc: 0,
+        wp: 0,
+        super: 0,
+        cnt_ppc: 0,
+        cnt_wp: 0,
+        cnt_super: 0,
+      });
+    }
+
+    groups.get(weekKey)[item.stock_name] = Number(item.stock_value || 0);
+  });
+
+  return [...groups.values()];
+};
+
+const buildStockItemSections = (items = []) => STOCK_ITEM_NAMES.map((stockName) => ({
+  stock_name: stockName,
+  items: items
+    .filter((item) => item.stock_name === stockName)
+    .map((item) => ({
+      todo_completion_item_id: item.todo_completion_item_id,
+      week: item.week,
+      stock_value: Number(item.stock_value || 0),
+      created_at: item.created_at,
+    })),
+})).filter((section) => section.items.length);
+
 const getStoredFileName = (fileUrl) => {
   if (!fileUrl) return null;
   if (/^https?:\/\//i.test(fileUrl)) return fileUrl;
@@ -327,40 +429,49 @@ const formatCompletionFile = (file) => ({
   file_url: CustomImagePath(getStoredFileName(file.file_url)),
 });
 
-const formatTodoCompletion = (completion, files = []) => ({
-  completion_id: completion.completion_id,
-  todo_id: completion.todo_id,
-  todo_location_id: completion.todo_location_id,
-  completed_by: completion.completed_by,
-  completed_by_user: completion.completed_by
-    ? {
-        user_id: completion.completed_by,
-        full_name: completion.completed_by_name,
-        phone_number: completion.completed_by_phone_number,
-      }
-    : null,
-  completion_date: formatDateOnly(completion.completion_date),
-  ppc: completion.ppc,
-  wp: completion.wp,
-  super: completion.super,
-  cnt_ppc: completion.cnt_ppc,
-  cnt_wp: completion.cnt_wp,
-  cnt_super: completion.cnt_super,
-  week: completion.week,
-  checkbox_items_response: parseJsonValue(completion.checkbox_items_response, []),
-  remarks: completion.remarks,
-  completed_at: completion.completed_at,
-  updated_at: completion.updated_at,
-  location: {
-    location_id: completion.location_id,
-    district: completion.district,
-    godown: completion.godown,
-    sloc: completion.sloc,
-    cap: completion.cap,
-    remark: completion.location_remark,
-  },
-  files: files.map(formatCompletionFile),
-});
+const formatTodoCompletion = (completion, files = [], stockItems = []) => {
+  const stockItemGroups = buildStockItemGroups(stockItems);
+  const stockItemSections = buildStockItemSections(stockItems);
+  const [firstStockGroup = {}] = stockItemGroups;
+
+  return {
+    completion_id: completion.completion_id,
+    todo_id: completion.todo_id,
+    todo_location_id: completion.todo_location_id,
+    completed_by: completion.completed_by,
+    completed_by_user: completion.completed_by
+      ? {
+          user_id: completion.completed_by,
+          full_name: completion.completed_by_name,
+          phone_number: completion.completed_by_phone_number,
+        }
+      : null,
+    completion_date: formatDateOnly(completion.completion_date),
+    ppc: firstStockGroup.ppc,
+    wp: firstStockGroup.wp,
+    super: firstStockGroup.super,
+    cnt_ppc: firstStockGroup.cnt_ppc,
+    cnt_wp: firstStockGroup.cnt_wp,
+    cnt_super: firstStockGroup.cnt_super,
+    week: firstStockGroup.week,
+    stock_items: stockItems,
+    stock_item_groups: stockItemGroups,
+    stock_item_sections: stockItemSections,
+    checkbox_items_response: parseJsonValue(completion.checkbox_items_response, []),
+    remarks: completion.remarks,
+    completed_at: completion.completed_at,
+    updated_at: completion.updated_at,
+    location: {
+      location_id: completion.location_id,
+      district: completion.district,
+      godown: completion.godown,
+      sloc: completion.sloc,
+      cap: completion.cap,
+      remark: completion.location_remark,
+    },
+    files: files.map(formatCompletionFile),
+  };
+};
 
 const normalizeBoolean = (value) => {
   if (value === true || value === 1 || value === "1" || value === "true") return true;
@@ -391,33 +502,39 @@ const cleanupUploadedFiles = (files = []) => {
   });
 };
 
-const buildCompletionPayload = (todo, body = {}, files = {}) => {
+const verifyPhotoFilesWithOcr = async (photoFiles = []) => {
+  for (const file of photoFiles) {
+    const buffer = await fs.promises.readFile(file.path);
+    const result = await ocrService.verifyOcrImageService({
+      buffer,
+      originalname: file.originalname,
+      mimetype: file.mimetype,
+      size: file.size,
+    });
+
+    if (!result?.is_matched) {
+      throw new ApiError(CUSTOM_ERROR, `OCR verification failed for ${file.originalname}`);
+    }
+  }
+};
+
+const buildCompletionPayload = async (todo, body = {}, files = {}) => {
   const uploadedFiles = normalizeCompletionFiles(files);
   const remarks = normalizeOptionalText(body.remarks);
 
   if (todo.type === "stock") {
-    const superValue = body.super ?? body.super_stocks;
-    const cntPpc = body.cnt_ppc ?? 0;
-    const cntWp = body.cnt_wp ?? 0;
-    const cntSuper = body.cnt_super ?? 0;
-    const week = normalizeOptionalText(body.week);
+    const stockItems = normalizeLegacyStockItems(body);
 
     if (uploadedFiles.length) {
       throw new ApiError(INVALID, "files for stock todo");
     }
 
-    if (body.ppc === undefined || body.wp === undefined || superValue === undefined) {
-      throw new ApiError(REQUIRED, "ppc, wp and super");
+    if (!stockItems.length) {
+      throw new ApiError(REQUIRED, "stock_items");
     }
 
     return {
-      ppc: Number(body.ppc),
-      wp: Number(body.wp),
-      super: Number(superValue),
-      cnt_ppc: Number(cntPpc),
-      cnt_wp: Number(cntWp),
-      cnt_super: Number(cntSuper),
-      week,
+      stock_items: stockItems,
       remarks,
       files: [],
     };
@@ -458,6 +575,10 @@ const buildCompletionPayload = (todo, body = {}, files = {}) => {
 
     if (photoFiles.length !== uploadedFiles.length) {
       throw new ApiError(INVALID, "Photo files");
+    }
+
+    if (Boolean(todo.is_ocr) && photoFiles.length) {
+      await verifyPhotoFilesWithOcr(photoFiles);
     }
 
     return {
@@ -536,9 +657,17 @@ export const getTodoByIdService = async (todoId) => {
 
 export const updateTodoService = async (todoId, payload) => {
   try {
-    await ensureTodoExists(todoId);
+    const existingTodo = await ensureTodoExists(todoId);
 
     const todoPayload = normalizeUpdateTodoPayload(payload);
+
+    if (existingTodo.type === "photo" && hasOwnValue(todoPayload, "is_ocr") && todoPayload.is_ocr === null) {
+      throw new ApiError(REQUIRED, "is_ocr");
+    }
+
+    if (existingTodo.type !== "photo" && hasOwnValue(todoPayload, "is_ocr")) {
+      todoPayload.is_ocr = null;
+    }
 
     if (Array.isArray(todoPayload.location_ids)) {
       await ensureLocationsExist(todoPayload.location_ids);
@@ -631,7 +760,7 @@ export const completeLoggedInUserTodoService = async (todoId, body = {}, files =
       throw new ApiError(CUSTOM_ERROR, "Todo is already completed");
     }
 
-    const completionPayload = buildCompletionPayload(todo, body, files);
+    const completionPayload = await buildCompletionPayload(todo, body, files);
 
     const completion = await todoModel.completeTodoModel({
       todo_id: Number(todo.todo_id),
@@ -675,14 +804,19 @@ export const getTodoCompletionsService = async (todoId, query = {}, user) => {
     ]);
 
     const completionIds = completions.map((completion) => completion.completion_id);
-    const files = await todoModel.getCompletionFilesByCompletionIdsModel(completionIds);
+    const [files, stockItems] = await Promise.all([
+      todoModel.getCompletionFilesByCompletionIdsModel(completionIds),
+      todoModel.getCompletionItemsByCompletionIdsModel(completionIds),
+    ]);
     const filesByCompletionId = groupFilesByCompletionId(files);
+    const stockItemsByCompletionId = groupCompletionItemsByCompletionId(stockItems);
 
     return {
       records: completions.map((completion) =>
         formatTodoCompletion(
           completion,
           filesByCompletionId.get(Number(completion.completion_id)) || [],
+          stockItemsByCompletionId.get(Number(completion.completion_id)) || [],
         ),
       ),
       total_records: totalRecords,
@@ -735,9 +869,14 @@ export const getAdminManagerTodayTodosService = async (query = {}, user) => {
       .filter(Boolean);
 
     let filesByCompletionId = new Map();
+    let stockItemsByCompletionId = new Map();
     if (completionIds.length) {
-      const files = await todoModel.getCompletionFilesByCompletionIdsModel(completionIds);
+      const [files, stockItems] = await Promise.all([
+        todoModel.getCompletionFilesByCompletionIdsModel(completionIds),
+        todoModel.getCompletionItemsByCompletionIdsModel(completionIds),
+      ]);
       filesByCompletionId = groupFilesByCompletionId(files);
+      stockItemsByCompletionId = groupCompletionItemsByCompletionId(stockItems);
     }
 
     const formattedRecords = records.map((record) => {
@@ -755,6 +894,7 @@ export const getAdminManagerTodayTodosService = async (query = {}, user) => {
         todo_id: record.todo_id,
         type: record.type,
         schedule: record.schedule,
+        is_ocr: record.is_ocr === null || record.is_ocr === undefined ? null : Boolean(record.is_ocr),
         title: record.title,
         description: record.description,
         checkbox_items: parseJsonValue(record.checkbox_items, []),
@@ -795,13 +935,24 @@ export const getAdminManagerTodayTodosService = async (query = {}, user) => {
               : null,
             completion_date: formatDateOnly(record.completion_date),
             completed_at: record.completed_at,
-            ppc: record.ppc,
-            wp: record.wp,
-            super: record.super,
-            cnt_ppc: record.cnt_ppc,
-            cnt_wp: record.cnt_wp,
-            cnt_super: record.cnt_super,
-            week: record.week,
+            ...(() => {
+              const stockItems = stockItemsByCompletionId.get(Number(record.completion_id)) || [];
+              const stockItemGroups = buildStockItemGroups(stockItems);
+              const stockItemSections = buildStockItemSections(stockItems);
+              const [firstStockGroup = {}] = stockItemGroups;
+              return {
+                ppc: firstStockGroup.ppc,
+                wp: firstStockGroup.wp,
+                super: firstStockGroup.super,
+                cnt_ppc: firstStockGroup.cnt_ppc,
+                cnt_wp: firstStockGroup.cnt_wp,
+                cnt_super: firstStockGroup.cnt_super,
+                week: firstStockGroup.week,
+                stock_items: stockItems,
+                stock_item_groups: stockItemGroups,
+                stock_item_sections: stockItemSections,
+              };
+            })(),
             checkbox_items_response: parseJsonValue(record.checkbox_items_response, []),
             remarks: record.remarks,
             files: (filesByCompletionId.get(Number(record.completion_id)) || []).map(formatCompletionFile),

@@ -57,6 +57,76 @@ const checkboxItemsResponseValidation = Joi.alternatives().try(
   }),
 );
 
+const stockItemNames = ["ppc", "wp", "super", "cnt_ppc", "cnt_wp", "cnt_super"];
+
+const stockItemsValidation = Joi.alternatives().try(
+  Joi.array()
+    .items(
+      Joi.alternatives().try(
+        Joi.object({
+          stock_name: Joi.string().valid(...stockItemNames).required(),
+          stock_value: Joi.number().precision(2).min(0).required(),
+          week: Joi.when("stock_value", {
+            is: 0,
+            then: Joi.number().integer().min(0).allow(null).optional(),
+            otherwise: Joi.number().integer().positive().required(),
+          }),
+        }),
+        Joi.object({
+          week: Joi.number().integer().positive().required(),
+          ppc: Joi.number().precision(2).min(0).required(),
+          wp: Joi.number().precision(2).min(0).required(),
+          super: Joi.number().precision(2).min(0).required(),
+          cnt_ppc: Joi.number().precision(2).min(0).required(),
+          cnt_wp: Joi.number().precision(2).min(0).required(),
+          cnt_super: Joi.number().precision(2).min(0).required(),
+        }),
+      ),
+    )
+    .min(1),
+  Joi.string().custom((value, helpers) => {
+    try {
+      const parsedValue = JSON.parse(value);
+      if (!Array.isArray(parsedValue) || parsedValue.length === 0) {
+        return helpers.message("stock_items must contain at least one item");
+      }
+
+      const hasInvalidItem = parsedValue.some((item) => {
+        if (!item) {
+          return true;
+        }
+
+        if (item.stock_name !== undefined) {
+          const stockValue = Number(item.stock_value);
+          const weekValue = item.week === null || item.week === undefined || item.week === "" ? null : Number(item.week);
+
+          return !stockItemNames.includes(item.stock_name)
+            || Number.isNaN(stockValue)
+            || stockValue < 0
+            || (stockValue > 0 && (!Number.isInteger(weekValue) || weekValue <= 0))
+            || (stockValue === 0 && weekValue !== null && (!Number.isInteger(weekValue) || weekValue < 0));
+        }
+
+        if (!Number.isInteger(Number(item.week)) || Number(item.week) <= 0) {
+          return true;
+        }
+
+        return stockItemNames.some((stockName) =>
+          Number.isNaN(Number(item[stockName])) || Number(item[stockName]) < 0,
+        );
+      });
+
+      if (hasInvalidItem) {
+        return helpers.message("stock_items contains invalid values");
+      }
+
+      return value;
+    } catch {
+      return helpers.message("stock_items must be valid JSON");
+    }
+  }),
+);
+
 export const todoIdParamSchema = Joi.object({
   todo_id: Joi.number().integer().positive().required(),
 }).messages(messages);
@@ -88,6 +158,11 @@ export const getAdminManagerTodayTodosQuerySchema = Joi.object({
 export const createTodoSchema = Joi.object({
   type: Joi.string().valid(...todoTypes).required(),
   schedule: Joi.string().valid(...todoSchedules).required(),
+  is_ocr: Joi.when("type", {
+    is: "photo",
+    then: Joi.boolean().required(),
+    otherwise: Joi.valid(null).optional(),
+  }),
   title: Joi.string().trim().min(2).max(255).required(),
   description: nullableTextValidation.optional(),
   checkbox_items: Joi.when("type", {
@@ -122,6 +197,7 @@ export const updateTodoSchema = Joi.object({
   title: Joi.string().trim().min(2).max(255).optional(),
   description: nullableTextValidation.optional(),
   checkbox_items: checkboxItemsValidation.optional(),
+  is_ocr: Joi.boolean().allow(null).optional(),
   schedule: Joi.string().valid(...todoSchedules).optional(),
   location_id: Joi.number().integer().positive().optional(),
   location_ids: Joi.array()
@@ -146,6 +222,7 @@ export const updateTodoSchema = Joi.object({
     "title",
     "description",
     "checkbox_items",
+    "is_ocr",
     "schedule",
     "location_id",
     "location_ids",
@@ -157,6 +234,7 @@ export const updateTodoSchema = Joi.object({
   .messages(messages);
 
 export const completeTodoSchema = Joi.object({
+  stock_items: stockItemsValidation.optional(),
   ppc: Joi.number().precision(2).min(0).optional(),
   wp: Joi.number().precision(2).min(0).optional(),
   super: Joi.number().precision(2).min(0).optional(),

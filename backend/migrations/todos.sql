@@ -100,3 +100,42 @@ ALTER TABLE `todo_completions` ADD `cnt_ppc` DECIMAL(10,2) NOT NULL DEFAULT '0.0
 ALTER TABLE `todo_completions` CHANGE `ppc` `ppc` DECIMAL(10,2) NULL DEFAULT NULL COMMENT 'Pieces Per Cycle (stock type)', CHANGE `wp` `wp` DECIMAL(10,2) NULL DEFAULT NULL COMMENT 'Work Progress (stock type)', CHANGE `super` `super` DECIMAL(10,2) NULL DEFAULT NULL COMMENT 'Supervisor count or score (stock type)';
 
 ALTER TABLE `todo_completions` CHANGE `week` `week` TEXT NULL;
+
+ALTER TABLE `todos` ADD `is_ocr` BOOLEAN NULL AFTER `schedule`;
+
+ALTER TABLE `todo_completions`
+  DROP `ppc`,
+  DROP `wp`,
+  DROP `super`,
+  DROP `cnt_ppc`,
+  DROP `cnt_wp`,
+  DROP `cnt_super`,
+  DROP `week`;
+
+
+  CREATE TABLE todo_completion_items (
+    todo_completion_item_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+
+    completion_id BIGINT NOT NULL,
+
+    stock_name ENUM(
+        'ppc',
+        'wp',
+        'super',
+        'cnt_ppc',
+        'cnt_wp',
+        'cnt_super'
+    ) NOT NULL,
+
+    stock_value DECIMAL(10,2) NOT NULL,
+
+    week INT NULL,
+
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_todo_completion_items_completion
+        FOREIGN KEY (completion_id)
+        REFERENCES todo_completions(completion_id)
+        ON DELETE CASCADE
+        ON UPDATE CASCADE
+);

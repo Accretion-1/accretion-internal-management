@@ -7,6 +7,7 @@ const TODO_SELECT = `
     t.todo_id,
     t.type,
     t.schedule,
+    t.is_ocr,
     t.title,
     t.description,
     t.checkbox_items,
@@ -30,6 +31,7 @@ const USER_TODO_SELECT = `
     t.todo_id,
     t.type,
     t.schedule,
+    t.is_ocr,
     t.title,
     t.description,
     t.checkbox_items,
@@ -110,6 +112,7 @@ const buildUserTodoStatusFilter = (status, values) => {
 export const createTodoModel = async ({
   type,
   schedule,
+  is_ocr = null,
   title,
   description = null,
   checkbox_items = null,
@@ -127,11 +130,12 @@ export const createTodoModel = async ({
   try {
     const [todoResult] = await connection.query(
       `INSERT INTO todos
-        (type, schedule, title, description, checkbox_items, created_by, due_time, start_date, end_date, day_of_week, day_of_month, is_active)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        (type, schedule, is_ocr, title, description, checkbox_items, created_by, due_time, start_date, end_date, day_of_week, day_of_month, is_active)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         type,
         schedule,
+        is_ocr,
         title,
         description,
         checkbox_items,
@@ -403,13 +407,7 @@ export const completeTodoModel = async ({
   todo_id,
   todo_location_id,
   completed_by,
-  ppc = null,
-  wp = null,
-  super: superValue = null,
-  cnt_ppc = 0,
-  cnt_wp = 0,
-  cnt_super = 0,
-  week = null,
+  stock_items = [],
   checkbox_items_response = null,
   remarks = null,
   files = [],
@@ -419,25 +417,33 @@ export const completeTodoModel = async ({
   try {
     const [completionResult] = await connection.query(
       `INSERT INTO todo_completions
-        (todo_id, todo_location_id, completed_by, completion_date, ppc, wp, \`super\`, cnt_ppc, cnt_wp, cnt_super, \`week\`, checkbox_items_response, remarks)
-       VALUES (?, ?, ?, CURDATE(), ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        (todo_id, todo_location_id, completed_by, completion_date, checkbox_items_response, remarks)
+       VALUES (?, ?, ?, CURDATE(), ?, ?)`,
       [
         todo_id,
         todo_location_id,
         completed_by,
-        ppc,
-        wp,
-        superValue,
-        cnt_ppc,
-        cnt_wp,
-        cnt_super,
-        week,
         checkbox_items_response,
         remarks,
       ],
     );
 
     const completionId = completionResult.insertId;
+
+    if (stock_items.length) {
+      const stockValues = stock_items.map((item) => [
+        completionId,
+        item.stock_name,
+        item.stock_value,
+        item.week,
+      ]);
+
+      await connection.query(
+        `INSERT INTO todo_completion_items (completion_id, stock_name, stock_value, week)
+         VALUES ?`,
+        [stockValues],
+      );
+    }
 
     if (files.length) {
       const fileValues = files.map((file) => [
@@ -460,13 +466,7 @@ export const completeTodoModel = async ({
       todo_id,
       todo_location_id,
       completed_by,
-      ppc,
-      wp,
-      super: superValue,
-      cnt_ppc,
-      cnt_wp,
-      cnt_super,
-      week,
+      stock_items,
       checkbox_items_response,
       remarks,
       files,
@@ -499,13 +499,6 @@ export const getTodoCompletionsModel = async ({
         u.full_name AS completed_by_name,
         u.phone_number AS completed_by_phone_number,
         DATE_FORMAT(tc.completion_date, '%Y-%m-%d') AS completion_date,
-        tc.ppc,
-        tc.wp,
-        tc.\`super\`,
-        tc.cnt_ppc,
-        tc.cnt_wp,
-        tc.cnt_super,
-        tc.\`week\`,
         tc.checkbox_items_response,
         tc.remarks,
         tc.completed_at,
@@ -528,6 +521,28 @@ export const getTodoCompletionsModel = async ({
     );
   } catch (error) {
     throw new ApiError(DB_ERROR, "Fetching Todo Completions", error, false);
+  }
+};
+
+export const getCompletionItemsByCompletionIdsModel = async (completionIds = []) => {
+  try {
+    if (!completionIds.length) return [];
+
+    return await db.query(
+      `SELECT
+        todo_completion_item_id,
+        completion_id,
+        stock_name,
+        stock_value,
+        week,
+        created_at
+       FROM todo_completion_items
+       WHERE completion_id IN (?)
+       ORDER BY completion_id ASC, week ASC, todo_completion_item_id ASC`,
+      [completionIds],
+    );
+  } catch (error) {
+    throw new ApiError(DB_ERROR, "Fetching Todo Completion Items", error, false);
   }
 };
 
@@ -608,6 +623,7 @@ export const getAdminManagerTodayTodosModel = async ({
         t.todo_id,
         t.type,
         t.schedule,
+        t.is_ocr,
         t.title,
         t.description,
         t.checkbox_items,
@@ -638,13 +654,6 @@ export const getAdminManagerTodayTodosModel = async ({
         u_completer.phone_number AS completed_by_phone_number,
         DATE_FORMAT(tc.completion_date, '%Y-%m-%d') AS completion_date,
         tc.completed_at,
-        tc.ppc,
-        tc.wp,
-        tc.\`super\`,
-        tc.cnt_ppc,
-        tc.cnt_wp,
-        tc.cnt_super,
-        tc.\`week\`,
         tc.checkbox_items_response,
         tc.remarks
       FROM todos t
@@ -659,13 +668,6 @@ export const getAdminManagerTodayTodosModel = async ({
           tc_sub.completed_by,
           DATE_FORMAT(tc_sub.completion_date, '%Y-%m-%d') AS completion_date,
           tc_sub.completed_at,
-          tc_sub.ppc,
-          tc_sub.wp,
-          tc_sub.\`super\`,
-          tc_sub.cnt_ppc,
-          tc_sub.cnt_wp,
-          tc_sub.cnt_super,
-          tc_sub.\`week\`,
           tc_sub.checkbox_items_response,
           tc_sub.remarks
         FROM todo_completions tc_sub
@@ -754,6 +756,7 @@ export const getPendingTodoReminderTargetsModel = async (reminderIntervalMinutes
     t.todo_id,
     t.type,
     t.schedule,
+    t.is_ocr,
     t.title,
     t.description,
     t.due_time,

@@ -7,6 +7,16 @@ import {
 import apiHandler from '../store/api/apiHandler';
 import { API_ENDPOINTS } from '../store/api/endpoints';
 import { Modal } from '../components/Modal';
+
+const STOCK_FIELDS = [
+  ['ppc', 'PPC'],
+  ['wp', 'WP'],
+  ['super', 'Super'],
+  ['cnt_ppc', 'CNT PPC'],
+  ['cnt_wp', 'CNT WP'],
+  ['cnt_super', 'CNT Super'],
+];
+
 export const DashboardPage = () => {
   const { currentUser, users, stocks, reminders, activities, notifications } = useAppState();
   const [hoveredMetric, setHoveredMetric] = useState(null);
@@ -828,38 +838,27 @@ export const DashboardPage = () => {
 
                         {/* Metrics data for Stock or Checkbox type */}
                         {(task.type === 'stock' || task.type === 'checkbox') && (
-                          <div className="grid grid-cols-2 gap-2 text-center sm:grid-cols-3">
+                          <div className="grid gap-2 text-center">
                             {task.type === 'stock' && (
-                              <>
-                                <div className="bg-white p-2 rounded-xl border border-slate-200/60">
-                                  <p className="text-[9px] font-bold text-slate-400 uppercase">PPC</p>
-                                  <p className="text-xs font-extrabold text-slate-800 mt-0.5">{task.completion.ppc ?? '-'}</p>
+                              (task.completion.stock_item_sections || []).map((section) => {
+                                const stockLabel = STOCK_FIELDS.find(([field]) => field === section.stock_name)?.[1] || section.stock_name;
+
+                                return (
+                                <div key={`stock-section-${task.completion.completion_id}-${section.stock_name}`} className="rounded-xl border border-slate-200/60 bg-white p-2 text-left">
+                                  <p className="mb-2 inline-flex rounded-lg bg-blue-50 px-2 py-1 text-[9px] font-extrabold uppercase tracking-wider text-blue-700">
+                                    {stockLabel}
+                                  </p>
+                                  <div className="grid gap-1.5">
+                                    {section.items.map((item, itemIndex) => (
+                                      <div key={item.todo_completion_item_id || `${section.stock_name}-${itemIndex}`} className="flex items-center justify-between rounded-lg bg-slate-50 px-2 py-1.5">
+                                        <p className="text-[8px] font-bold uppercase text-slate-400">Week {Number(item.stock_value || 0) > 0 ? item.week : '-'}</p>
+                                        <p className="text-[11px] font-extrabold text-slate-800">{Number(item.stock_value || 0).toFixed(2)}</p>
+                                      </div>
+                                    ))}
+                                  </div>
                                 </div>
-                                <div className="bg-white p-2 rounded-xl border border-slate-200/60">
-                                  <p className="text-[9px] font-bold text-slate-400 uppercase">WP</p>
-                                  <p className="text-xs font-extrabold text-slate-800 mt-0.5">{task.completion.wp ?? '-'}</p>
-                                </div>
-                                <div className="bg-white p-2 rounded-xl border border-slate-200/60">
-                                  <p className="text-[9px] font-bold text-slate-400 uppercase">Super</p>
-                                  <p className="text-xs font-extrabold text-slate-800 mt-0.5">{task.completion.super ?? '-'}</p>
-                                </div>
-                                <div className="bg-white p-2 rounded-xl border border-slate-200/60">
-                                  <p className="text-[9px] font-bold text-slate-400 uppercase">CNT PPC</p>
-                                  <p className="text-xs font-extrabold text-slate-800 mt-0.5">{task.completion.cnt_ppc ?? '-'}</p>
-                                </div>
-                                <div className="bg-white p-2 rounded-xl border border-slate-200/60">
-                                  <p className="text-[9px] font-bold text-slate-400 uppercase">CNT WP</p>
-                                  <p className="text-xs font-extrabold text-slate-800 mt-0.5">{task.completion.cnt_wp ?? '-'}</p>
-                                </div>
-                                <div className="bg-white p-2 rounded-xl border border-slate-200/60">
-                                  <p className="text-[9px] font-bold text-slate-400 uppercase">CNT Super</p>
-                                  <p className="text-xs font-extrabold text-slate-800 mt-0.5">{task.completion.cnt_super ?? '-'}</p>
-                                </div>
-                                <div className="bg-white p-2 rounded-xl border border-slate-200/60 sm:col-span-3">
-                                  <p className="text-[9px] font-bold text-slate-400 uppercase">Week</p>
-                                  <p className="text-xs font-extrabold text-slate-800 mt-0.5">{task.completion.week ?? '-'}</p>
-                                </div>
-                              </>
+                                );
+                              })
                             )}
                             {task.type === 'checkbox' && (
                               <div className="col-span-3 bg-white p-2 rounded-xl border border-slate-200/60">
