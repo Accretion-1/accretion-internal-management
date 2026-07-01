@@ -59,6 +59,15 @@ const WEEK_DAY_OPTIONS = Object.entries(WEEK_DAYS).map(([value, label]) => ({
     label,
 }));
 
+const STOCK_FIELDS = [
+    ['ppc', 'PPC'],
+    ['wp', 'WP'],
+    ['super', 'Super'],
+    ['cnt_ppc', 'CNT PPC'],
+    ['cnt_wp', 'CNT WP'],
+    ['cnt_super', 'CNT Super'],
+];
+
 const formatDateTime = (value) => {
     if (!value) return '-';
     return new Date(value).toLocaleString('en-IN', {
@@ -251,6 +260,7 @@ const CompletionMediaPreview = ({ file, onPreview }) => {
 
 const CompletionRecordCard = ({ completion, todoType, onPreviewAttachment }) => {
     const files = Array.isArray(completion.files) ? completion.files : [];
+    const stockSections = Array.isArray(completion.stock_item_sections) ? completion.stock_item_sections : [];
 
     return (
         <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-xs">
@@ -276,13 +286,6 @@ const CompletionRecordCard = ({ completion, todoType, onPreviewAttachment }) => 
 
             <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 <DetailItem label="Completion Date" value={formatDate(completion.completion_date)} />
-                {todoType === 'stock' && <DetailItem label="PPC" value={completion.ppc} />}
-                {todoType === 'stock' && <DetailItem label="WP" value={completion.wp} />}
-                {todoType === 'stock' && <DetailItem label="Super" value={completion.super} />}
-                {todoType === 'stock' && <DetailItem label="CNT PPC" value={completion.cnt_ppc} />}
-                {todoType === 'stock' && <DetailItem label="CNT WP" value={completion.cnt_wp} />}
-                {todoType === 'stock' && <DetailItem label="CNT Super" value={completion.cnt_super} />}
-                {todoType === 'stock' && <DetailItem label="Week" value={completion.week} />}
                 {todoType === 'checkbox' && (
                     <DetailItem
                         label="Checklist"
@@ -290,6 +293,33 @@ const CompletionRecordCard = ({ completion, todoType, onPreviewAttachment }) => 
                     />
                 )}
             </div>
+
+            {todoType === 'stock' && stockSections.length > 0 && (
+                <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                    <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Stock Entries</p>
+                    <div className="mt-3 grid gap-3 md:grid-cols-2">
+                        {stockSections.map((section) => {
+                            const stockLabel = STOCK_FIELDS.find(([field]) => field === section.stock_name)?.[1] || section.stock_name;
+
+                            return (
+                            <div key={`stock-section-${completion.completion_id}-${section.stock_name}`} className="rounded-2xl border border-slate-200 bg-white p-3">
+                                <div className="mb-3 inline-flex rounded-xl bg-blue-50 px-3 py-1.5 text-xs font-extrabold text-blue-700">
+                                    {stockLabel}
+                                </div>
+                                <div className="grid gap-2">
+                                    {section.items.map((item, index) => (
+                                        <div key={item.todo_completion_item_id || `${section.stock_name}-${index}`} className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2">
+                                            <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Week {Number(item.stock_value || 0) > 0 ? item.week : '-'}</p>
+                                            <p className="text-sm font-extrabold text-slate-900">{Number(item.stock_value || 0).toFixed(2)}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
 
             {todoType === 'checkbox' && Array.isArray(completion.checkbox_items_response) && completion.checkbox_items_response.length > 0 && (
                 <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-4">

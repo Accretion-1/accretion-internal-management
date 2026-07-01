@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, Camera, CheckCircle, FileVideo, ImageIcon, Loader2, ShieldCheck, ShieldX, Square, Trash2, X } from 'lucide-react';
+import { AlertTriangle, Camera, CheckCircle, FileVideo, ImageIcon, Loader2, Plus, ShieldCheck, ShieldX, Square, Trash2, X } from 'lucide-react';
 import { Modal } from './Modal';
 import apiHandler from '../store/api/apiHandler';
 import { API_ENDPOINTS } from '../store/api/endpoints';
@@ -7,18 +7,29 @@ import { useAppState } from '../contexts/StateContext';
 
 
 const INITIAL_FORM = {
-    ppc: '',
-    wp: '',
-    super_stocks: '',
-    cnt_ppc: '',
-    cnt_wp: '',
-    cnt_super: '',
-    week: '',
+    stock_items: [],
     checkbox_items_response: [],
     remarks: '',
     photos: [],
     videos: [],
 };
+
+const STOCK_FIELDS = [
+    ['ppc', 'PPC'],
+    ['wp', 'WP'],
+    ['super', 'Super'],
+    ['cnt_ppc', 'CNT PPC'],
+    ['cnt_wp', 'CNT WP'],
+    ['cnt_super', 'CNT Super'],
+];
+
+const createDefaultStockItem = (stockName, week = 1) => ({
+    stock_name: stockName,
+    week: String(week),
+    stock_value: '0.00',
+});
+
+const createDefaultStockItems = () => STOCK_FIELDS.map(([stockName]) => createDefaultStockItem(stockName, 1));
 
 const PHOTO_CAPTURE_CONSTRAINTS = {
     facingMode: { ideal: 'environment' },
@@ -210,6 +221,7 @@ export const TodoCompletionModal = ({ isOpen, todo, onClose, onCompleted }) => {
         const checkboxItems = getCheckboxItems(todo);
         setForm({
             ...INITIAL_FORM,
+            stock_items: todo?.type === 'stock' ? createDefaultStockItems() : [],
             checkbox_items_response: checkboxItems.map((item) => ({
                 ...item,
                 response: true,
@@ -286,6 +298,43 @@ export const TodoCompletionModal = ({ isOpen, todo, onClose, onCompleted }) => {
     const handleChange = (field, value) => {
         setForm((prev) => ({ ...prev, [field]: value }));
         setErrors((prev) => ({ ...prev, [field]: undefined }));
+    };
+
+    const handleStockItemChange = (index, field, value) => {
+        setForm((prev) => ({
+            ...prev,
+            stock_items: prev.stock_items.map((item, itemIndex) => (
+                itemIndex === index ? { ...item, [field]: value } : item
+            )),
+        }));
+        setErrors((prev) => ({ ...prev, stock_items: undefined }));
+    };
+
+    const handleAddStockItem = (stockName) => {
+        setForm((prev) => ({
+            ...prev,
+            stock_items: [
+                ...prev.stock_items,
+                createDefaultStockItem(
+                    stockName,
+                    prev.stock_items.filter((item) => item.stock_name === stockName).length + 1,
+                ),
+            ],
+        }));
+        setErrors((prev) => ({ ...prev, stock_items: undefined }));
+    };
+
+    const handleRemoveStockItem = (index) => {
+        const targetItem = form.stock_items[index];
+        const stockTypeCount = form.stock_items.filter((item) => item.stock_name === targetItem?.stock_name).length;
+
+        setForm((prev) => ({
+            ...prev,
+            stock_items: stockTypeCount > 1
+                ? prev.stock_items.filter((_, itemIndex) => itemIndex !== index)
+                : prev.stock_items,
+        }));
+        setErrors((prev) => ({ ...prev, stock_items: undefined }));
     };
 
     const handleCheckboxResponseToggle = (key) => {
@@ -498,13 +547,21 @@ export const TodoCompletionModal = ({ isOpen, todo, onClose, onCompleted }) => {
         const hasVerifiedPhoto = photoOcrStates.includes('matched');
 
         if (todoType === 'stock') {
-            if (form.ppc === '') nextErrors.ppc = 'PPC is required.';
-            if (form.wp === '') nextErrors.wp = 'WP is required.';
-            if (form.super_stocks === '') nextErrors.super_stocks = 'Super stock value is required.';
-            if (form.cnt_ppc === '') nextErrors.cnt_ppc = 'CNT PPC is required.';
-            if (form.cnt_wp === '') nextErrors.cnt_wp = 'CNT WP is required.';
-            if (form.cnt_super === '') nextErrors.cnt_super = 'CNT Super is required.';
-            if (!form.week.trim()) nextErrors.week = 'Week is required.';
+            if (!form.stock_items.length) {
+                nextErrors.stock_items = 'At least one stock entry is required.';
+            } else {
+                const hasInvalidStockItem = form.stock_items.some((item) => (
+                    !item.stock_name
+                    || item.stock_value === ''
+                    || Number(item.stock_value) < 0
+                    || Number.isNaN(Number(item.stock_value))
+                    || (Number(item.stock_value) > 0 && (!item.week || Number(item.week) <= 0 || Number.isNaN(Number(item.week))))
+                ));
+
+                if (hasInvalidStockItem) {
+                    nextErrors.stock_items = 'Stock value is required for every row. Week is required only when value is greater than 0.00.';
+                }
+            }
         }
 
         if (todoType === 'checkbox' && !form.checkbox_items_response.length) {
@@ -545,13 +602,11 @@ export const TodoCompletionModal = ({ isOpen, todo, onClose, onCompleted }) => {
         }
 
         if (todoType === 'stock') {
-            formData.append('ppc', form.ppc);
-            formData.append('wp', form.wp);
-            formData.append('super_stocks', form.super_stocks);
-            formData.append('cnt_ppc', form.cnt_ppc);
-            formData.append('cnt_wp', form.cnt_wp);
-            formData.append('cnt_super', form.cnt_super);
-            formData.append('week', form.week.trim());
+            formData.append('stock_items', JSON.stringify(form.stock_items.map((item) => ({
+                stock_name: item.stock_name,
+                stock_value: Number(item.stock_value || 0),
+                week: Number(item.stock_value || 0) > 0 ? Number(item.week) : null,
+            }))));
         }
 
         if (todoType === 'checkbox') {
@@ -632,30 +687,85 @@ export const TodoCompletionModal = ({ isOpen, todo, onClose, onCompleted }) => {
                     {step === 'form' ? (
                         <>
                             {todoType === 'stock' && (
-                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                                    {[
-                                        ['ppc', 'PPC'],
-                                        ['wp', 'WP'],
-                                        ['super_stocks', 'Super Stocks'],
-                                        ['cnt_ppc', 'CNT PPC'],
-                                        ['cnt_wp', 'CNT WP'],
-                                        ['cnt_super', 'CNT Super'],
-                                        ['week', 'Week'],
-                                    ].map(([field, label]) => (
-                                        <div key={field} className="flex flex-col gap-1.5">
-                                            <label className="text-xs font-bold text-slate-600">{label}</label>
-                                            <input
-                                                type={field === 'week' ? 'text' : 'number'}
-                                                min={field === 'week' ? undefined : '0'}
-                                                step={field === 'week' ? undefined : '0.01'}
-                                                value={form[field]}
-                                                onChange={(event) => handleChange(field, event.target.value)}
-                                                placeholder={field === 'week' ? 'Enter week' : undefined}
-                                                className={`rounded-xl border bg-slate-50 px-3.5 py-2.5 text-sm font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-2 ${errors[field] ? 'border-rose-300 focus:ring-rose-100' : 'border-slate-200 focus:ring-blue-100'}`}
-                                            />
-                                            {errors[field] && <span className="text-xs text-rose-600">{errors[field]}</span>}
+                                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                                    <div>
+                                        <div>
+                                            <label className="text-xs font-extrabold uppercase tracking-wider text-slate-500">Stock Values</label>
+                                            <p className="mt-1 text-[11px] font-semibold text-slate-400">Each stock type has its own week/value rows. All values default to 0.00.</p>
                                         </div>
-                                    ))}
+                                    </div>
+
+                                    <div className="mt-4 grid gap-4">
+                                        {STOCK_FIELDS.map(([stockName, stockLabel]) => {
+                                            const stockRows = form.stock_items
+                                                .map((item, index) => ({ ...item, index }))
+                                                .filter((item) => item.stock_name === stockName);
+
+                                            return (
+                                                <div key={stockName} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
+                                                    <div className="mb-3">
+                                                        <div>
+                                                            <div className="inline-flex rounded-xl bg-blue-50 px-3 py-2 text-xs font-extrabold text-blue-700">
+                                                                {stockLabel}
+                                                            </div>
+                                                            <p className="mt-1 text-[11px] font-semibold text-slate-400">Add one or more week entries for {stockLabel}.</p>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="grid gap-3">
+                                                        {stockRows.map((item, rowIndex) => (
+                                                            <div key={`${stockName}-${item.index}`} className="grid grid-cols-1 gap-3 rounded-xl border border-slate-100 bg-slate-50 p-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+                                                                <div className="flex flex-col gap-1.5">
+                                                                    <label className="text-xs font-bold text-slate-600">Week</label>
+                                                                    <input
+                                                                        type="number"
+                                                                        min="1"
+                                                                        max="53"
+                                                                        step="1"
+                                                                        value={item.week}
+                                                                        onChange={(event) => handleStockItemChange(item.index, 'week', event.target.value)}
+                                                                        className="rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
+                                                                    />
+                                                                </div>
+                                                                <div className="flex flex-col gap-1.5">
+                                                                    <label className="text-xs font-bold text-slate-600">{stockLabel} Value</label>
+                                                                    <input
+                                                                        type="number"
+                                                                        min="0"
+                                                                        step="0.01"
+                                                                        value={item.stock_value}
+                                                                        onChange={(event) => handleStockItemChange(item.index, 'stock_value', event.target.value)}
+                                                                        className="rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
+                                                                    />
+                                                                </div>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleRemoveStockItem(item.index)}
+                                                                    disabled={stockRows.length === 1}
+                                                                    className="inline-flex h-11 w-11 cursor-pointer items-center justify-center rounded-xl text-rose-500 transition-all hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-40"
+                                                                    title={`Remove ${stockLabel} row ${rowIndex + 1}`}
+                                                                >
+                                                                    <Trash2 className="h-4 w-4" />
+                                                                </button>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                    <div className="mt-3 flex justify-end">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleAddStockItem(stockName)}
+                                                            className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-blue-600 px-3 py-2 text-xs font-extrabold text-white transition-all hover:bg-blue-700"
+                                                        >
+                                                            <Plus className="h-4 w-4" />
+                                                            Add {stockLabel}
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+
+                                    {errors.stock_items && <span className="mt-3 block text-xs text-rose-600">{errors.stock_items}</span>}
                                 </div>
                             )}
 
@@ -868,14 +978,26 @@ export const TodoCompletionModal = ({ isOpen, todo, onClose, onCompleted }) => {
                             </div>
 
                             {todoType === 'stock' && (
-                                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                                    <div className="rounded-xl bg-slate-50 p-3"><p className="text-xs font-bold text-slate-400">PPC</p><p className="font-bold text-slate-900">{form.ppc}</p></div>
-                                    <div className="rounded-xl bg-slate-50 p-3"><p className="text-xs font-bold text-slate-400">WP</p><p className="font-bold text-slate-900">{form.wp}</p></div>
-                                    <div className="rounded-xl bg-slate-50 p-3"><p className="text-xs font-bold text-slate-400">Super Stocks</p><p className="font-bold text-slate-900">{form.super_stocks}</p></div>
-                                    <div className="rounded-xl bg-slate-50 p-3"><p className="text-xs font-bold text-slate-400">CNT PPC</p><p className="font-bold text-slate-900">{form.cnt_ppc}</p></div>
-                                    <div className="rounded-xl bg-slate-50 p-3"><p className="text-xs font-bold text-slate-400">CNT WP</p><p className="font-bold text-slate-900">{form.cnt_wp}</p></div>
-                                    <div className="rounded-xl bg-slate-50 p-3"><p className="text-xs font-bold text-slate-400">CNT Super</p><p className="font-bold text-slate-900">{form.cnt_super}</p></div>
-                                    <div className="rounded-xl bg-slate-50 p-3 sm:col-span-3"><p className="text-xs font-bold text-slate-400">Week</p><p className="font-bold text-slate-900">{form.week}</p></div>
+                                <div className="grid gap-3">
+                                    {STOCK_FIELDS.map(([stockName, stockLabel]) => {
+                                        const stockRows = form.stock_items.filter((item) => item.stock_name === stockName);
+
+                                        return (
+                                            <div key={`review-${stockName}`} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                                                <div className="mb-3 inline-flex rounded-xl bg-blue-50 px-3 py-1.5 text-xs font-extrabold text-blue-700">
+                                                    {stockLabel}
+                                                </div>
+                                                <div className="grid gap-2 sm:grid-cols-2">
+                                                    {stockRows.map((item, index) => (
+                                                        <div key={`review-${stockName}-${index}`} className="rounded-xl bg-white p-3">
+                                                            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Week {Number(item.stock_value || 0) > 0 ? item.week : '-'}</p>
+                                                            <p className="mt-1 font-bold text-slate-900">{Number(item.stock_value || 0).toFixed(2)}</p>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             )}
 
