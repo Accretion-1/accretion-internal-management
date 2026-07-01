@@ -100,3 +100,5 @@ ALTER TABLE `todo_completions` ADD `cnt_ppc` DECIMAL(10,2) NOT NULL DEFAULT '0.0
 ALTER TABLE `todo_completions` CHANGE `ppc` `ppc` DECIMAL(10,2) NULL DEFAULT NULL COMMENT 'Pieces Per Cycle (stock type)', CHANGE `wp` `wp` DECIMAL(10,2) NULL DEFAULT NULL COMMENT 'Work Progress (stock type)', CHANGE `super` `super` DECIMAL(10,2) NULL DEFAULT NULL COMMENT 'Supervisor count or score (stock type)';
 
 ALTER TABLE `todo_completions` CHANGE `week` `week` TEXT NULL;
+
+ALTER TABLE `todos` ADD `is_ocr` BOOLEAN NULL AFTER `schedule`;

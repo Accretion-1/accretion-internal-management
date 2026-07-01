@@ -121,6 +121,7 @@ export const TodoCompletionModal = ({ isOpen, todo, onClose, onCompleted }) => {
 
     const todoType = todo?.type;
     const isMediaTodo = todoType === 'photo' || todoType === 'video';
+    const shouldVerifyPhotoOcr = todoType === 'photo' && Boolean(todo?.is_ocr);
 
     const selectedFiles = useMemo(() => {
         if (todoType === 'photo') return form.photos;
@@ -417,14 +418,16 @@ export const TodoCompletionModal = ({ isOpen, todo, onClose, onCompleted }) => {
         const file = await createPhotoFile();
         if (!file) return;
 
-            const newIndex = form.photos.length;
-            addCapturedFile('photos', file);
+        const newIndex = form.photos.length;
+        addCapturedFile('photos', file);
+        if (shouldVerifyPhotoOcr) {
             verifyPhotoWithOcr(file);
+        }
 
-            if (isUser) {
-                stopCamera();
-                setIsCapturing(false);
-                const previewUrl = URL.createObjectURL(file);
+        if (isUser) {
+            stopCamera();
+            setIsCapturing(false);
+            const previewUrl = URL.createObjectURL(file);
                 setPreviewFile({
                     file,
                     url: previewUrl,
@@ -512,11 +515,11 @@ export const TodoCompletionModal = ({ isOpen, todo, onClose, onCompleted }) => {
             if (!form.photos.length && !hasRemarks) {
                 nextErrors.photos = 'Capture a photo or add remarks.';
                 nextErrors.remarks = 'Remarks are required when no photo is captured.';
-            } else if (hasPendingPhotoOcr) {
+            } else if (shouldVerifyPhotoOcr && hasPendingPhotoOcr) {
                 nextErrors.photos = 'Please wait until OCR verification is complete.';
-            } else if (hasFailedPhotoOcr) {
+            } else if (shouldVerifyPhotoOcr && hasFailedPhotoOcr) {
                 nextErrors.photos = 'Captured photo did not pass OCR. Remove it, capture another photo, or submit with remarks only.';
-            } else if (form.photos.length && !hasVerifiedPhoto) {
+            } else if (shouldVerifyPhotoOcr && form.photos.length && !hasVerifiedPhoto) {
                 nextErrors.photos = 'Captured photo must pass OCR verification.';
             }
         }
@@ -753,8 +756,8 @@ export const TodoCompletionModal = ({ isOpen, todo, onClose, onCompleted }) => {
                                                     </button>
                                                     <div className="p-2">
                                                         <p className="truncate text-[11px] font-bold text-slate-700">{preview.file.name}</p>
-                                                        <OcrStatusBadge result={ocrResults[getFileKey(preview.file)]} compact />
-                                                        {ocrResults[getFileKey(preview.file)]?.message && (
+                                                        {shouldVerifyPhotoOcr && <OcrStatusBadge result={ocrResults[getFileKey(preview.file)]} compact />}
+                                                        {shouldVerifyPhotoOcr && ocrResults[getFileKey(preview.file)]?.message && (
                                                             <p className="mt-1 text-[10px] font-semibold text-slate-500">
                                                                 {ocrResults[getFileKey(preview.file)].message}
                                                             </p>
@@ -764,7 +767,7 @@ export const TodoCompletionModal = ({ isOpen, todo, onClose, onCompleted }) => {
                                             ))}
                                         </div>
                                     )}
-                                    <FileList files={form.photos} onRemove={(index) => handleRemoveFile('photos', index)} ocrResults={ocrResults} />
+                                    <FileList files={form.photos} onRemove={(index) => handleRemoveFile('photos', index)} ocrResults={shouldVerifyPhotoOcr ? ocrResults : {}} />
                                 </div>
                             )}
 

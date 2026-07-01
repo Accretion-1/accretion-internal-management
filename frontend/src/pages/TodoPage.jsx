@@ -23,6 +23,7 @@ import { API_ENDPOINTS } from '../store/api/endpoints';
 const EMPTY_FORM = {
     type: 'checkbox',
     schedule: 'daily',
+    is_ocr: null,
     title: '',
     description: '',
     checkbox_items: [{ key: 'checkbox_1', label: '' }],
@@ -133,6 +134,7 @@ const normalizeTodoPayload = (form) => {
     const payload = {
         type: form.type,
         schedule: form.schedule,
+        is_ocr: form.type === 'photo' ? Boolean(form.is_ocr) : null,
         title: form.title.trim(),
         description: form.description.trim() || null,
         location_ids: form.location_ids.map((locationId) => Number(locationId)),
@@ -165,6 +167,7 @@ const normalizeTodoUpdatePayload = (form) => {
     const payload = {
         title: form.title.trim(),
         description: form.description.trim() || null,
+        is_ocr: form.type === 'photo' ? Boolean(form.is_ocr) : null,
         schedule: form.schedule,
         location_ids: form.location_ids.map((locationId) => Number(locationId)),
         start_date: localDateToUtcISOString(form.start_date),
@@ -321,6 +324,10 @@ export const TodoPage = () => {
             }
         }
 
+        if (form.type === 'photo' && form.is_ocr === null) {
+            nextErrors.is_ocr = 'Choose whether OCR verification is required.';
+        }
+
         if (!form.location_ids.length) {
             nextErrors.location_ids = 'At least one location is required.';
         }
@@ -365,6 +372,10 @@ export const TodoPage = () => {
 
             if (field === 'type' && value === 'checkbox' && !next.checkbox_items.length) {
                 next.checkbox_items = [{ key: 'checkbox_1', label: '' }];
+            }
+
+            if (field === 'type') {
+                next.is_ocr = value === 'photo' ? false : null;
             }
 
             return next;
@@ -433,6 +444,7 @@ export const TodoPage = () => {
             ...EMPTY_FORM,
             type: todo.type || EMPTY_FORM.type,
             schedule: todo.schedule || EMPTY_FORM.schedule,
+            is_ocr: todo.type === 'photo' ? Boolean(todo.is_ocr) : null,
             title: todo.title || '',
             description: todo.description || '',
             checkbox_items: Array.isArray(todo.checkbox_items) && todo.checkbox_items.length
@@ -606,6 +618,11 @@ export const TodoPage = () => {
                                                 <ClipboardList className="h-3.5 w-3.5" />
                                                 {todo.type}
                                             </div>
+                                            {todo.type === 'photo' && (
+                                                <div className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[10px] font-bold ${todo.is_ocr ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+                                                    OCR {todo.is_ocr ? 'On' : 'Off'}
+                                                </div>
+                                            )}
                                             <div className="flex items-center gap-1.5 rounded-lg bg-slate-100 px-2.5 py-1 text-[10px] font-bold capitalize text-slate-600">
                                                 <RefreshCw className="h-3.5 w-3.5" />
                                                 {todo.schedule}
@@ -845,6 +862,24 @@ export const TodoPage = () => {
                             </div>
                             {errors.checkbox_items && <span className="text-xs text-rose-600">{errors.checkbox_items}</span>}
                         </div>
+                    )}
+
+                    {form.type === 'photo' && (
+                        <label className={`flex cursor-pointer items-center justify-between gap-4 rounded-2xl border bg-slate-50 p-4 sm:col-span-2 ${errors.is_ocr ? 'border-rose-300' : 'border-slate-200'}`}>
+                            <span>
+                                <span className="block text-xs font-extrabold uppercase tracking-wider text-slate-500">OCR Verification</span>
+                                <span className="mt-1 block text-xs font-semibold text-slate-500">
+                                    If enabled, users must capture a photo that passes OCR before completing this task.
+                                </span>
+                                {errors.is_ocr && <span className="mt-1 block text-xs text-rose-600">{errors.is_ocr}</span>}
+                            </span>
+                            <input
+                                type="checkbox"
+                                checked={Boolean(form.is_ocr)}
+                                onChange={(event) => handleChange('is_ocr', event.target.checked)}
+                                className="h-5 w-5 rounded border-slate-300 text-blue-600"
+                            />
+                        </label>
                     )}
 
                     <div className="flex flex-col gap-1.5 sm:col-span-2">

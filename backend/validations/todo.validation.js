@@ -88,6 +88,11 @@ export const getAdminManagerTodayTodosQuerySchema = Joi.object({
 export const createTodoSchema = Joi.object({
   type: Joi.string().valid(...todoTypes).required(),
   schedule: Joi.string().valid(...todoSchedules).required(),
+  is_ocr: Joi.when("type", {
+    is: "photo",
+    then: Joi.boolean().required(),
+    otherwise: Joi.valid(null).optional(),
+  }),
   title: Joi.string().trim().min(2).max(255).required(),
   description: nullableTextValidation.optional(),
   checkbox_items: Joi.when("type", {
@@ -122,6 +127,7 @@ export const updateTodoSchema = Joi.object({
   title: Joi.string().trim().min(2).max(255).optional(),
   description: nullableTextValidation.optional(),
   checkbox_items: checkboxItemsValidation.optional(),
+  is_ocr: Joi.boolean().allow(null).optional(),
   schedule: Joi.string().valid(...todoSchedules).optional(),
   location_id: Joi.number().integer().positive().optional(),
   location_ids: Joi.array()
@@ -146,6 +152,7 @@ export const updateTodoSchema = Joi.object({
     "title",
     "description",
     "checkbox_items",
+    "is_ocr",
     "schedule",
     "location_id",
     "location_ids",

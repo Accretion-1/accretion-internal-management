@@ -1,4 +1,5 @@
 import * as locationModel from "../model/location.model.js";
+import * as ocrService from "./ocr.service.js";
 import * as todoModel from "../model/todo.model.js";
 import fs from "fs";
 import { ApiError } from "../utils/api.util.js";
@@ -41,6 +42,11 @@ const formatDateOnly = (value) => normalizeOptionalDate(value);
 const normalizeOptionalNumber = (value) => {
   if (value === undefined || value === null || value === "") return null;
   return Number(value);
+};
+
+const normalizeOptionalBooleanNumber = (value) => {
+  if (value === undefined || value === null || value === "") return null;
+  return value === true || value === 1 || value === "1" || value === "true" ? 1 : 0;
 };
 
 const parseJsonValue = (value, fallback = null) => {
@@ -110,6 +116,7 @@ const normalizeTodoPayload = (payload, createdBy) => {
   return {
     type: payload.type,
     schedule,
+    is_ocr: payload.type === "photo" ? normalizeOptionalBooleanNumber(payload.is_ocr) : null,
     title: payload.title,
     description: normalizeOptionalText(payload.description),
     checkbox_items: payload.type === "checkbox"
@@ -141,6 +148,10 @@ const normalizeUpdateTodoPayload = (payload) => {
 
   if (hasOwnValue(payload, "checkbox_items")) {
     normalized.checkbox_items = normalizeCheckboxItemsForDb(payload.checkbox_items);
+  }
+
+  if (hasOwnValue(payload, "is_ocr")) {
+    normalized.is_ocr = normalizeOptionalBooleanNumber(payload.is_ocr);
   }
 
   if (hasOwnValue(payload, "schedule")) {
@@ -201,6 +212,7 @@ const formatTodo = (todo, locations = []) => {
     todo_id: todo.todo_id,
     type: todo.type,
     schedule: todo.schedule,
+    is_ocr: todo.is_ocr === null || todo.is_ocr === undefined ? null : Boolean(todo.is_ocr),
     title: todo.title,
     description: todo.description,
     checkbox_items: parseJsonValue(todo.checkbox_items, []),
@@ -391,7 +403,23 @@ const cleanupUploadedFiles = (files = []) => {
   });
 };
 
-const buildCompletionPayload = (todo, body = {}, files = {}) => {
+const verifyPhotoFilesWithOcr = async (photoFiles = []) => {
+  for (const file of photoFiles) {
+    const buffer = await fs.promises.readFile(file.path);
+    const result = await ocrService.verifyOcrImageService({
+      buffer,
+      originalname: file.originalname,
+      mimetype: file.mimetype,
+      size: file.size,
+    });
+
+    if (!result?.is_matched) {
+      throw new ApiError(CUSTOM_ERROR, `OCR verification failed for ${file.originalname}`);
+    }
+  }
+};
+
+const buildCompletionPayload = async (todo, body = {}, files = {}) => {
   const uploadedFiles = normalizeCompletionFiles(files);
   const remarks = normalizeOptionalText(body.remarks);
 
@@ -458,6 +486,10 @@ const buildCompletionPayload = (todo, body = {}, files = {}) => {
 
     if (photoFiles.length !== uploadedFiles.length) {
       throw new ApiError(INVALID, "Photo files");
+    }
+
+    if (Boolean(todo.is_ocr) && photoFiles.length) {
+      await verifyPhotoFilesWithOcr(photoFiles);
     }
 
     return {
@@ -536,9 +568,17 @@ export const getTodoByIdService = async (todoId) => {
 
 export const updateTodoService = async (todoId, payload) => {
   try {
-    await ensureTodoExists(todoId);
+    const existingTodo = await ensureTodoExists(todoId);
 
     const todoPayload = normalizeUpdateTodoPayload(payload);
+
+    if (existingTodo.type === "photo" && hasOwnValue(todoPayload, "is_ocr") && todoPayload.is_ocr === null) {
+      throw new ApiError(REQUIRED, "is_ocr");
+    }
+
+    if (existingTodo.type !== "photo" && hasOwnValue(todoPayload, "is_ocr")) {
+      todoPayload.is_ocr = null;
+    }
 
     if (Array.isArray(todoPayload.location_ids)) {
       await ensureLocationsExist(todoPayload.location_ids);
@@ -631,7 +671,7 @@ export const completeLoggedInUserTodoService = async (todoId, body = {}, files =
       throw new ApiError(CUSTOM_ERROR, "Todo is already completed");
     }
 
-    const completionPayload = buildCompletionPayload(todo, body, files);
+    const completionPayload = await buildCompletionPayload(todo, body, files);
 
     const completion = await todoModel.completeTodoModel({
       todo_id: Number(todo.todo_id),
@@ -755,6 +795,7 @@ export const getAdminManagerTodayTodosService = async (query = {}, user) => {
         todo_id: record.todo_id,
         type: record.type,
         schedule: record.schedule,
+        is_ocr: record.is_ocr === null || record.is_ocr === undefined ? null : Boolean(record.is_ocr),
         title: record.title,
         description: record.description,
         checkbox_items: parseJsonValue(record.checkbox_items, []),

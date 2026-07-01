@@ -7,6 +7,7 @@ const TODO_SELECT = `
     t.todo_id,
     t.type,
     t.schedule,
+    t.is_ocr,
     t.title,
     t.description,
     t.checkbox_items,
@@ -30,6 +31,7 @@ const USER_TODO_SELECT = `
     t.todo_id,
     t.type,
     t.schedule,
+    t.is_ocr,
     t.title,
     t.description,
     t.checkbox_items,
@@ -110,6 +112,7 @@ const buildUserTodoStatusFilter = (status, values) => {
 export const createTodoModel = async ({
   type,
   schedule,
+  is_ocr = null,
   title,
   description = null,
   checkbox_items = null,
@@ -127,11 +130,12 @@ export const createTodoModel = async ({
   try {
     const [todoResult] = await connection.query(
       `INSERT INTO todos
-        (type, schedule, title, description, checkbox_items, created_by, due_time, start_date, end_date, day_of_week, day_of_month, is_active)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        (type, schedule, is_ocr, title, description, checkbox_items, created_by, due_time, start_date, end_date, day_of_week, day_of_month, is_active)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         type,
         schedule,
+        is_ocr,
         title,
         description,
         checkbox_items,
@@ -608,6 +612,7 @@ export const getAdminManagerTodayTodosModel = async ({
         t.todo_id,
         t.type,
         t.schedule,
+        t.is_ocr,
         t.title,
         t.description,
         t.checkbox_items,
@@ -754,6 +759,7 @@ export const getPendingTodoReminderTargetsModel = async (reminderIntervalMinutes
     t.todo_id,
     t.type,
     t.schedule,
+    t.is_ocr,
     t.title,
     t.description,
     t.due_time,
