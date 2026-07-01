@@ -10,6 +10,10 @@ const INITIAL_FORM = {
     ppc: '',
     wp: '',
     super_stocks: '',
+    cnt_ppc: '',
+    cnt_wp: '',
+    cnt_super: '',
+    week: '',
     checkbox_items_response: [],
     remarks: '',
     photos: [],
@@ -430,6 +434,10 @@ export const TodoCompletionModal = ({ isOpen, todo, onClose, onCompleted }) => {
             if (form.ppc === '') nextErrors.ppc = 'PPC is required.';
             if (form.wp === '') nextErrors.wp = 'WP is required.';
             if (form.super_stocks === '') nextErrors.super_stocks = 'Super stock value is required.';
+            if (form.cnt_ppc === '') nextErrors.cnt_ppc = 'CNT PPC is required.';
+            if (form.cnt_wp === '') nextErrors.cnt_wp = 'CNT WP is required.';
+            if (form.cnt_super === '') nextErrors.cnt_super = 'CNT Super is required.';
+            if (!form.week.trim()) nextErrors.week = 'Week is required.';
         }
 
         if (todoType === 'checkbox' && !form.checkbox_items_response.length) {
@@ -473,6 +481,10 @@ export const TodoCompletionModal = ({ isOpen, todo, onClose, onCompleted }) => {
             formData.append('ppc', form.ppc);
             formData.append('wp', form.wp);
             formData.append('super_stocks', form.super_stocks);
+            formData.append('cnt_ppc', form.cnt_ppc);
+            formData.append('cnt_wp', form.cnt_wp);
+            formData.append('cnt_super', form.cnt_super);
+            formData.append('week', form.week.trim());
         }
 
         if (todoType === 'checkbox') {
@@ -558,14 +570,20 @@ export const TodoCompletionModal = ({ isOpen, todo, onClose, onCompleted }) => {
                                         ['ppc', 'PPC'],
                                         ['wp', 'WP'],
                                         ['super_stocks', 'Super Stocks'],
+                                        ['cnt_ppc', 'CNT PPC'],
+                                        ['cnt_wp', 'CNT WP'],
+                                        ['cnt_super', 'CNT Super'],
+                                        ['week', 'Week'],
                                     ].map(([field, label]) => (
                                         <div key={field} className="flex flex-col gap-1.5">
                                             <label className="text-xs font-bold text-slate-600">{label}</label>
                                             <input
-                                                type="number"
-                                                min="0"
+                                                type={field === 'week' ? 'text' : 'number'}
+                                                min={field === 'week' ? undefined : '0'}
+                                                step={field === 'week' ? undefined : '0.01'}
                                                 value={form[field]}
                                                 onChange={(event) => handleChange(field, event.target.value)}
+                                                placeholder={field === 'week' ? 'Enter week' : undefined}
                                                 className={`rounded-xl border bg-slate-50 px-3.5 py-2.5 text-sm font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-2 ${errors[field] ? 'border-rose-300 focus:ring-rose-100' : 'border-slate-200 focus:ring-blue-100'}`}
                                             />
                                             {errors[field] && <span className="text-xs text-rose-600">{errors[field]}</span>}
@@ -787,6 +805,10 @@ export const TodoCompletionModal = ({ isOpen, todo, onClose, onCompleted }) => {
                                     <div className="rounded-xl bg-slate-50 p-3"><p className="text-xs font-bold text-slate-400">PPC</p><p className="font-bold text-slate-900">{form.ppc}</p></div>
                                     <div className="rounded-xl bg-slate-50 p-3"><p className="text-xs font-bold text-slate-400">WP</p><p className="font-bold text-slate-900">{form.wp}</p></div>
                                     <div className="rounded-xl bg-slate-50 p-3"><p className="text-xs font-bold text-slate-400">Super Stocks</p><p className="font-bold text-slate-900">{form.super_stocks}</p></div>
+                                    <div className="rounded-xl bg-slate-50 p-3"><p className="text-xs font-bold text-slate-400">CNT PPC</p><p className="font-bold text-slate-900">{form.cnt_ppc}</p></div>
+                                    <div className="rounded-xl bg-slate-50 p-3"><p className="text-xs font-bold text-slate-400">CNT WP</p><p className="font-bold text-slate-900">{form.cnt_wp}</p></div>
+                                    <div className="rounded-xl bg-slate-50 p-3"><p className="text-xs font-bold text-slate-400">CNT Super</p><p className="font-bold text-slate-900">{form.cnt_super}</p></div>
+                                    <div className="rounded-xl bg-slate-50 p-3 sm:col-span-3"><p className="text-xs font-bold text-slate-400">Week</p><p className="font-bold text-slate-900">{form.week}</p></div>
                                 </div>
                             )}
 

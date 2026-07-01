@@ -406,6 +406,10 @@ export const completeTodoModel = async ({
   ppc = null,
   wp = null,
   super: superValue = null,
+  cnt_ppc = 0,
+  cnt_wp = 0,
+  cnt_super = 0,
+  week = null,
   checkbox_items_response = null,
   remarks = null,
   files = [],
@@ -415,8 +419,8 @@ export const completeTodoModel = async ({
   try {
     const [completionResult] = await connection.query(
       `INSERT INTO todo_completions
-        (todo_id, todo_location_id, completed_by, completion_date, ppc, wp, \`super\`, checkbox_items_response, remarks)
-       VALUES (?, ?, ?, CURDATE(), ?, ?, ?, ?, ?)`,
+        (todo_id, todo_location_id, completed_by, completion_date, ppc, wp, \`super\`, cnt_ppc, cnt_wp, cnt_super, \`week\`, checkbox_items_response, remarks)
+       VALUES (?, ?, ?, CURDATE(), ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         todo_id,
         todo_location_id,
@@ -424,6 +428,10 @@ export const completeTodoModel = async ({
         ppc,
         wp,
         superValue,
+        cnt_ppc,
+        cnt_wp,
+        cnt_super,
+        week,
         checkbox_items_response,
         remarks,
       ],
@@ -455,6 +463,10 @@ export const completeTodoModel = async ({
       ppc,
       wp,
       super: superValue,
+      cnt_ppc,
+      cnt_wp,
+      cnt_super,
+      week,
       checkbox_items_response,
       remarks,
       files,
@@ -490,6 +502,10 @@ export const getTodoCompletionsModel = async ({
         tc.ppc,
         tc.wp,
         tc.\`super\`,
+        tc.cnt_ppc,
+        tc.cnt_wp,
+        tc.cnt_super,
+        tc.\`week\`,
         tc.checkbox_items_response,
         tc.remarks,
         tc.completed_at,
@@ -624,7 +640,11 @@ export const getAdminManagerTodayTodosModel = async ({
         tc.completed_at,
         tc.ppc,
         tc.wp,
-        tc.super,
+        tc.\`super\`,
+        tc.cnt_ppc,
+        tc.cnt_wp,
+        tc.cnt_super,
+        tc.\`week\`,
         tc.checkbox_items_response,
         tc.remarks
       FROM todos t
@@ -641,7 +661,11 @@ export const getAdminManagerTodayTodosModel = async ({
           tc_sub.completed_at,
           tc_sub.ppc,
           tc_sub.wp,
-          tc_sub.super,
+          tc_sub.\`super\`,
+          tc_sub.cnt_ppc,
+          tc_sub.cnt_wp,
+          tc_sub.cnt_super,
+          tc_sub.\`week\`,
           tc_sub.checkbox_items_response,
           tc_sub.remarks
         FROM todo_completions tc_sub
