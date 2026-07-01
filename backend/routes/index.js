@@ -11,6 +11,7 @@ const router = express.Router();
 router.use("/locations", locationRoutes);
 router.use("/notifications", notificationRoutes);
 router.use("/api/v1/ocr", ocrRoutes);
+router.use("/v1/ocr", ocrRoutes);
 router.use("/panels", panelRoutes);
 router.use("/todos", todoRoutes);
 router.use("/user", userRoutes);

@@ -356,11 +356,14 @@ export const TodoCompletionModal = ({ isOpen, todo, onClose, onCompleted }) => {
                 },
             }));
         } catch (error) {
+            const isNetworkError = !error?.status || error?.message === 'Network Error';
             setOcrResults((prev) => ({
                 ...prev,
                 [fileKey]: {
                     status: 'failed',
-                    message: error?.message || 'Unable to verify image with OCR.',
+                    message: isNetworkError
+                        ? 'OCR request failed. Please check network, API URL, CORS, or upload size limit.'
+                        : error?.message || 'Unable to verify image with OCR.',
                 },
             }));
         }
