@@ -20,6 +20,13 @@ const INITIAL_FORM = {
     videos: [],
 };
 
+const PHOTO_CAPTURE_CONSTRAINTS = {
+    facingMode: { ideal: 'environment' },
+    width: { ideal: 4096 },
+    height: { ideal: 2160 },
+    aspectRatio: { ideal: 1.777777778 },
+};
+
 const getTaskTypeLabel = (type) => String(type || '').replace(/^\w/, (letter) => letter.toUpperCase());
 
 const getCheckboxItems = (todo) => (
@@ -146,14 +153,34 @@ export const TodoCompletionModal = ({ isOpen, todo, onClose, onCompleted }) => {
 
             try {
                 stream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: { ideal: 'environment' } },
+                    video: PHOTO_CAPTURE_CONSTRAINTS,
                     audio: todoType === 'video',
                 });
             } catch {
                 stream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: { ideal: 'environment' } },
+                    video: PHOTO_CAPTURE_CONSTRAINTS,
                     audio: false,
                 });
+            }
+
+            const [videoTrack] = stream.getVideoTracks();
+            const capabilities = videoTrack?.getCapabilities?.() || {};
+            const advancedConstraints = {};
+
+            if (capabilities.focusMode?.includes?.('continuous')) {
+                advancedConstraints.focusMode = 'continuous';
+            }
+
+            if (capabilities.exposureMode?.includes?.('continuous')) {
+                advancedConstraints.exposureMode = 'continuous';
+            }
+
+            if (capabilities.whiteBalanceMode?.includes?.('continuous')) {
+                advancedConstraints.whiteBalanceMode = 'continuous';
+            }
+
+            if (Object.keys(advancedConstraints).length) {
+                await videoTrack.applyConstraints({ advanced: [advancedConstraints] }).catch(() => {});
             }
 
             streamRef.current = stream;
@@ -339,19 +366,54 @@ export const TodoCompletionModal = ({ isOpen, todo, onClose, onCompleted }) => {
         }
     };
 
-    const handleCapturePhoto = () => {
+    const createPhotoFile = async () => {
         if (!videoRef.current || !isCameraReady) return;
+
+        const [videoTrack] = streamRef.current?.getVideoTracks?.() || [];
+
+        if (videoTrack && 'ImageCapture' in window) {
+            try {
+                const imageCapture = new window.ImageCapture(videoTrack);
+                const capabilities = await imageCapture.getPhotoCapabilities?.();
+                const photoSettings = {};
+
+                if (capabilities?.imageWidth?.max) {
+                    photoSettings.imageWidth = capabilities.imageWidth.max;
+                }
+
+                if (capabilities?.imageHeight?.max) {
+                    photoSettings.imageHeight = capabilities.imageHeight.max;
+                }
+
+                const blob = await imageCapture.takePhoto(photoSettings);
+                if (blob?.size) {
+                    return new File([blob], `photo-${Date.now()}.jpg`, { type: blob.type || 'image/jpeg' });
+                }
+            } catch {
+                // Fallback to canvas capture below.
+            }
+        }
 
         const video = videoRef.current;
         const canvas = document.createElement('canvas');
-        canvas.width = video.videoWidth || 1280;
-        canvas.height = video.videoHeight || 720;
+        const trackSettings = videoTrack?.getSettings?.() || {};
+        canvas.width = Math.max(video.videoWidth || 0, trackSettings.width || 0, 1920);
+        canvas.height = Math.max(video.videoHeight || 0, trackSettings.height || 0, 1080);
         const context = canvas.getContext('2d');
+        context.imageSmoothingEnabled = false;
         context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-        canvas.toBlob((blob) => {
-            if (!blob) return;
-            const file = new File([blob], `photo-${Date.now()}.jpg`, { type: 'image/jpeg' });
+        return new Promise((resolve) => {
+            canvas.toBlob((blob) => {
+                resolve(blob ? new File([blob], `photo-${Date.now()}.jpg`, { type: 'image/jpeg' }) : null);
+            }, 'image/jpeg', 0.98);
+        });
+    };
+
+    const handleCapturePhoto = async () => {
+        const file = await createPhotoFile();
+        if (!file) return;
+
             const newIndex = form.photos.length;
             addCapturedFile('photos', file);
             verifyPhotoWithOcr(file);
@@ -368,7 +430,6 @@ export const TodoCompletionModal = ({ isOpen, todo, onClose, onCompleted }) => {
                     isNew: true
                 });
             }
-        }, 'image/jpeg', 0.92);
     };
 
     const handleStartRecording = () => {
