@@ -1,309 +1,680 @@
-import React, { useState } from 'react';
-import { useAppState } from '../contexts/StateContext';
-import { FileSpreadsheet, FileText, FileDown, BarChart4, ArrowUpRight, Shield, Layers } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { BarChart4, ChevronDown, ClipboardList, Download, FileSpreadsheet, Filter, Loader2, RefreshCw, Search, UserRound } from 'lucide-react';
+import apiHandler from '../store/api/apiHandler';
+import { API_ENDPOINTS } from '../store/api/endpoints';
+
+const STOCK_FIELDS = [
+  ['ppc', 'PPC'],
+  ['wp', 'WP'],
+  ['super', 'Super'],
+  ['cnt_ppc', 'CNT PPC'],
+  ['cnt_wp', 'CNT WP'],
+  ['cnt_super', 'CNT Super'],
+];
+
+const formatLocalDateInput = (date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const getToday = () => formatLocalDateInput(new Date());
+
+const getMonthStart = () => {
+  const date = new Date();
+  date.setDate(1);
+  return formatLocalDateInput(date);
+};
+
+const getLocationLabel = (location) => {
+  if (!location) return '-';
+  return [location.district, location.godown, location.sloc].filter(Boolean).join(' • ') || '-';
+};
+
+const getTodoLocations = (todo) => (
+  Array.isArray(todo.locations) && todo.locations.length
+    ? todo.locations
+    : [todo.location].filter(Boolean)
+);
+
+const hasAllLocations = (locationIds = []) => locationIds.includes('all');
+
+const formatDate = (value) => {
+  if (!value) return '-';
+  return new Date(`${value}T00:00:00`).toLocaleDateString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
+};
+
+const formatDateTime = (value) => {
+  if (!value) return '-';
+  return new Date(value).toLocaleString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+};
+
+const getRecordStockTotal = (record) => (
+  record.stock_item_sections || []
+).reduce((sectionTotal, section) => (
+  sectionTotal + (section.items || []).reduce((itemTotal, item) => itemTotal + Number(item.stock_value || 0), 0)
+), 0);
+
+const sanitizeFileName = (value) => String(value || 'report')
+  .trim()
+  .replace(/[^\w\s-]/g, '')
+  .replace(/\s+/g, '-')
+  .replace(/-+/g, '-')
+  .toLowerCase();
+
+const escapeCsvValue = (value) => {
+  const normalizedValue = value === null || value === undefined ? '' : String(value);
+  return `"${normalizedValue.replace(/"/g, '""')}"`;
+};
+
+const escapeHtmlValue = (value) => String(value ?? '')
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#039;');
+
+const downloadBlob = (content, fileName, mimeType) => {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+};
+
+const formatStockSectionForExport = (record, stockName) => {
+  const section = (record.stock_item_sections || []).find((item) => item.stock_name === stockName);
+  if (!section?.items?.length) return '';
+
+  return section.items
+    .map((item) => `Week ${Number(item.stock_value || 0) > 0 ? item.week : '-'}: ${Number(item.stock_value || 0).toFixed(2)}`)
+    .join(' | ');
+};
+
+const buildExportRows = (recordsToExport = []) => recordsToExport.map((record) => {
+  const baseRow = {
+    'Completion Date': formatDate(record.completion_date),
+    'Completed At': formatDateTime(record.completed_at),
+    'Completed By': record.completed_by_user?.full_name || `User #${record.completed_by}`,
+    'Phone Number': record.completed_by_user?.phone_number || '-',
+    Location: getLocationLabel(record.location),
+    'Task Name': record.todo?.title || record.todo_title || '-',
+  };
+
+  STOCK_FIELDS.forEach(([stockName, stockLabel]) => {
+    baseRow[`${stockLabel} (In MT)`] = formatStockSectionForExport(record, stockName);
+  });
+
+  return {
+    ...baseRow,
+    'Total Stock Value (In MT)': getRecordStockTotal(record).toFixed(2),
+    Remarks: record.remarks || '-',
+  };
+});
+
+const exportRowsAsCsv = (rows, fileName) => {
+  const headers = Object.keys(rows[0] || {
+    'Completion Date': '',
+    'Completed At': '',
+    'Completed By': '',
+    'Phone Number': '',
+    Location: '',
+    'Task Name': '',
+    ...Object.fromEntries(STOCK_FIELDS.map(([, stockLabel]) => [`${stockLabel} (In MT)`, ''])),
+    'Total Stock Value (In MT)': '',
+    Remarks: '',
+  });
+  const csvContent = [
+    headers.map(escapeCsvValue).join(','),
+    ...rows.map((row) => headers.map((header) => escapeCsvValue(row[header])).join(',')),
+  ].join('\n');
+
+  downloadBlob(`\uFEFF${csvContent}`, `${fileName}.csv`, 'text/csv;charset=utf-8;');
+};
+
+const exportRowsAsXls = (rows, fileName) => {
+  const headers = Object.keys(rows[0] || {
+    'Completion Date': '',
+    'Completed At': '',
+    'Completed By': '',
+    'Phone Number': '',
+    Location: '',
+    'Task Name': '',
+    ...Object.fromEntries(STOCK_FIELDS.map(([, stockLabel]) => [`${stockLabel} (In MT)`, ''])),
+    'Total Stock Value (In MT)': '',
+    Remarks: '',
+  });
+  const tableHead = headers
+    .map((header) => `<th style="background:#eaf2ff;border:1px solid #cbd5e1;padding:8px;text-align:left;">${escapeHtmlValue(header)}</th>`)
+    .join('');
+  const tableBody = rows
+    .map((row) => `<tr>${headers.map((header) => `<td style="border:1px solid #cbd5e1;padding:8px;vertical-align:top;">${escapeHtmlValue(row[header])}</td>`).join('')}</tr>`)
+    .join('');
+  const htmlContent = `
+    <html>
+      <head>
+        <meta charset="UTF-8" />
+        <style>
+          table { border-collapse: collapse; font-family: Arial, sans-serif; font-size: 12px; }
+          th { font-weight: 700; }
+          td { mso-number-format: "\\@"; }
+        </style>
+      </head>
+      <body>
+        <table>
+          <thead><tr>${tableHead}</tr></thead>
+          <tbody>${tableBody}</tbody>
+        </table>
+      </body>
+    </html>
+  `;
+
+  downloadBlob(htmlContent, `${fileName}.xls`, 'application/vnd.ms-excel;charset=utf-8;');
+};
+
+const StockSection = ({ section }) => {
+  const stockLabel = STOCK_FIELDS.find(([field]) => field === section.stock_name)?.[1] || section.stock_name;
+
+  return (
+    <div className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1">
+      <span className="shrink-0 rounded-md bg-blue-50 px-1.5 py-0.5 text-[8px] font-extrabold uppercase tracking-wider text-blue-700">
+        {stockLabel}
+      </span>
+      <div className="flex flex-wrap gap-1">
+        {(section.items || []).map((item, index) => (
+          <span key={item.todo_completion_item_id || `${section.stock_name}-${index}`} className="inline-flex items-center gap-1 rounded-md bg-white px-1.5 py-0.5 text-[10px] font-extrabold shadow-xs">
+            <span className="text-[8px] uppercase tracking-wider text-slate-400">
+              W{Number(item.stock_value || 0) > 0 ? item.week : '-'}
+            </span>
+            <span className="text-slate-900">{Number(item.stock_value || 0).toFixed(2)}</span>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 export const ReportsPage = () => {
-    const { users, stocks, reminders, activities, showToast } = useAppState();
-    const [timeframe, setTimeframe] = useState('weekly');
-    const [downloadingFormat, setDownloadingFormat] = useState(null);
-    // Stats
-    const activeCount = users.filter(u => u.status === 'Active').length;
-    const stockCount = stocks.length;
-    const completedReminders = reminders.filter(r => r.status === 'Completed').length;
-    const activeReminders = reminders.filter(r => r.status === 'Active').length;
-    const completionRatio = reminders.length > 0
-        ? Math.round((completedReminders / reminders.length) * 100)
-        : 0;
-    // Export process latency simulation
-    const handleDownload = (reportName, format) => {
-        setDownloadingFormat(`${reportName}-${format}`);
-        showToast(`Compiling server assets into ${format}...`, 'info');
-        setTimeout(() => {
-            setDownloadingFormat(null);
-            showToast(`WorkSphere_${reportName}_Report.${format.toLowerCase()} saved successfully.`, 'success');
-        }, 1200);
-    };
-    return (<div className="flex flex-col gap-6 font-sans text-left pb-12">
-      
-      {/* Title block */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+  const [locations, setLocations] = useState([]);
+  const [stockTasks, setStockTasks] = useState([]);
+  const [records, setRecords] = useState([]);
+  const [filters, setFilters] = useState({
+    location_ids: ['all'],
+    todo_id: '',
+    start_date: getMonthStart(),
+    end_date: getToday(),
+  });
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalRecords, setTotalRecords] = useState(0);
+  const [loadingLocations, setLoadingLocations] = useState(false);
+  const [loadingTasks, setLoadingTasks] = useState(false);
+  const [loadingReport, setLoadingReport] = useState(false);
+  const [exportingType, setExportingType] = useState('');
+  const [locationDropdownOpen, setLocationDropdownOpen] = useState(false);
+
+  const canFetchReport = Boolean(filters.location_ids.length && filters.todo_id && filters.start_date && filters.end_date);
+  const selectedLocationLabel = (() => {
+    if (hasAllLocations(filters.location_ids)) return 'All locations';
+
+    const selectedLocations = locations.filter((location) => filters.location_ids.includes(String(location.location_id)));
+    if (selectedLocations.length === 0) return 'Select locations';
+    if (selectedLocations.length === 1) return getLocationLabel(selectedLocations[0]);
+
+    return `${selectedLocations.length} locations selected`;
+  })();
+
+  const fetchLocations = async () => {
+    setLoadingLocations(true);
+    try {
+      const response = await apiHandler({ method: 'GET', url: API_ENDPOINTS.LOCATIONS.BASE });
+      const nextLocations = Array.isArray(response?.data) ? response.data : [];
+      setLocations(nextLocations);
+    } finally {
+      setLoadingLocations(false);
+    }
+  };
+
+  const fetchStockTasks = async (locationIds = filters.location_ids) => {
+    setLoadingTasks(true);
+    try {
+      const response = await apiHandler({
+        method: 'GET',
+        url: API_ENDPOINTS.TODOS.BASE,
+      });
+      const selectedIds = locationIds.map(String);
+      const tasks = (Array.isArray(response?.data) ? response.data : [])
+        .filter((task) => task.type === 'stock')
+        .filter((task) => {
+          if (hasAllLocations(selectedIds)) return true;
+          return getTodoLocations(task).some((location) => selectedIds.includes(String(location.location_id)));
+        });
+      setStockTasks(tasks);
+      setFilters((prev) => ({
+        ...prev,
+        todo_id: tasks.some((task) => String(task.todo_id) === String(prev.todo_id))
+          ? prev.todo_id
+          : (tasks[0]?.todo_id ? String(tasks[0].todo_id) : ''),
+      }));
+    } finally {
+      setLoadingTasks(false);
+    }
+  };
+
+  const getReportLocationParam = () => (
+    hasAllLocations(filters.location_ids)
+      ? 'all'
+      : filters.location_ids.join(',')
+  );
+
+  const fetchReport = async (targetPage = page) => {
+    if (!canFetchReport) {
+      setRecords([]);
+      setTotalPages(1);
+      setTotalRecords(0);
+      return;
+    }
+
+    setLoadingReport(true);
+    try {
+      const response = await apiHandler({
+        method: 'GET',
+        url: API_ENDPOINTS.TODOS.STOCK_REPORT,
+        params: {
+          todo_id: filters.todo_id,
+          start_date: filters.start_date,
+          end_date: filters.end_date,
+          location_ids: getReportLocationParam(),
+          page: targetPage,
+          limit: 20,
+        },
+      });
+      const data = response?.data || {};
+      setRecords(Array.isArray(data.records) ? data.records : []);
+      setTotalPages(Number(data.total_pages || 1));
+      setTotalRecords(Number(data.total_records || 0));
+      setPage(Number(data.current_page || targetPage));
+    } finally {
+      setLoadingReport(false);
+    }
+  };
+
+  const getSelectedTaskTitle = () => stockTasks.find((task) => String(task.todo_id) === String(filters.todo_id))?.title || 'stock-report';
+
+  const getExportFileName = () => sanitizeFileName([
+    'stock-completion-report',
+    getSelectedTaskTitle(),
+    filters.start_date,
+    'to',
+    filters.end_date,
+  ].filter(Boolean).join('-'));
+
+  const fetchAllReportRecords = async () => {
+    const firstResponse = await apiHandler({
+      method: 'GET',
+      url: API_ENDPOINTS.TODOS.STOCK_REPORT,
+      params: {
+        todo_id: filters.todo_id,
+        start_date: filters.start_date,
+        end_date: filters.end_date,
+        location_ids: getReportLocationParam(),
+        page: 1,
+        limit: 100,
+      },
+    });
+    const firstData = firstResponse?.data || {};
+    const allRecords = Array.isArray(firstData.records) ? [...firstData.records] : [];
+    const exportTotalPages = Number(firstData.total_pages || 1);
+
+    if (exportTotalPages > 1) {
+      const remainingResponses = await Promise.all(
+        Array.from({ length: exportTotalPages - 1 }, (_, index) => apiHandler({
+          method: 'GET',
+          url: API_ENDPOINTS.TODOS.STOCK_REPORT,
+          params: {
+            todo_id: filters.todo_id,
+            start_date: filters.start_date,
+            end_date: filters.end_date,
+            location_ids: getReportLocationParam(),
+            page: index + 2,
+            limit: 100,
+          },
+        })),
+      );
+
+      remainingResponses.forEach((response) => {
+        const nextRecords = Array.isArray(response?.data?.records) ? response.data.records : [];
+        allRecords.push(...nextRecords);
+      });
+    }
+
+    return allRecords;
+  };
+
+  const handleExportReport = async (type) => {
+    if (!canFetchReport || exportingType) return;
+
+    setExportingType(type);
+    try {
+      const exportRecords = await fetchAllReportRecords();
+      const exportRows = buildExportRows(exportRecords);
+      const fileName = getExportFileName();
+
+      if (type === 'csv') {
+        exportRowsAsCsv(exportRows, fileName);
+      } else {
+        exportRowsAsXls(exportRows, fileName);
+      }
+    } finally {
+      setExportingType('');
+    }
+  };
+
+  useEffect(() => {
+    fetchLocations();
+  }, []);
+
+  useEffect(() => {
+    fetchStockTasks(filters.location_ids);
+  }, [filters.location_ids]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [filters.location_ids, filters.todo_id, filters.start_date, filters.end_date]);
+
+  useEffect(() => {
+    fetchReport(page);
+  }, [page, filters.location_ids, filters.todo_id, filters.start_date, filters.end_date]);
+
+  const handleFilterChange = (field, value) => {
+    setFilters((prev) => {
+      const next = { ...prev, [field]: value };
+      if (field === 'start_date' && next.end_date && value > next.end_date) {
+        next.end_date = value;
+      }
+      return next;
+    });
+  };
+
+  const handleToggleAllLocations = () => {
+    setFilters((prev) => ({ ...prev, location_ids: ['all'] }));
+  };
+
+  const handleToggleLocation = (locationId) => {
+    const locationIdValue = String(locationId);
+    setFilters((prev) => {
+      const withoutAll = prev.location_ids.filter((existingId) => existingId !== 'all');
+      const nextLocationIds = withoutAll.includes(locationIdValue)
+        ? withoutAll.filter((existingId) => existingId !== locationIdValue)
+        : [...withoutAll, locationIdValue];
+
+      return {
+        ...prev,
+        location_ids: nextLocationIds.length ? nextLocationIds : ['all'],
+      };
+    });
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h2 className="font-display text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
-            <BarChart4 className="w-6 h-6 text-blue-600"/>
-            Executive Reports & Analytics
-          </h2>
-          <p className="text-xs text-slate-500 mt-1">Cross-examine operational metrics, resource allocations, and employee metrics with high-fidelity visualization.</p>
-        </div>
-
-        {/* Timeframe selector header */}
-        <div className="flex bg-slate-50 border border-slate-200 p-1 rounded-xl w-fit shrink-0">
-          {['daily', 'weekly', 'monthly'].map((t) => (<button key={t} id={`timeframe-btn-${t}`} onClick={() => setTimeframe(t)} className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer ${timeframe === t
-                ? 'bg-slate-900 text-white shadow-xs'
-                : 'text-slate-500 hover:text-slate-900'}`}>
-              {t} metrics
-            </button>))}
-        </div>
-      </div>
-
-      {/* Analytics Bento Grid Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        
-        {/* User Engagement Radial/Circular progress */}
-        <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs text-left flex flex-col justify-between gap-5">
-          <div>
-            <span className="text-[10px] bg-slate-100 text-slate-550 px-2 py-0.5 rounded font-black font-mono tracking-wider">Workforce Seats</span>
-            <h4 className="font-display text-md font-bold text-slate-900 mt-2">Active Engagement ratios</h4>
-          </div>
-          
-          <div className="flex items-center gap-5 my-1">
-            {/* Custom SVG Donut Dial */}
-            <div className="relative w-24 h-24 flex items-center justify-center">
-              <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
-                <path className="text-slate-100" strokeWidth="3.5" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
-                <path className="text-blue-600" strokeDasharray="92, 100" strokeWidth="3.5" strokeLinecap="round" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
-              </svg>
-              <div className="absolute text-center">
-                <span className="text-[17px] font-extrabold text-slate-850 font-mono">92%</span>
-              </div>
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
+              <BarChart4 className="h-5 w-5" />
             </div>
-
-            <div className="flex-1 flex flex-col gap-0.5 text-xs text-slate-500">
-              <p><strong className="text-slate-900">{activeCount} seats</strong> online this hour.</p>
-              <p className="mt-1 flex items-center gap-1.5 text-emerald-600 font-bold">
-                <ArrowUpRight className="w-4.5 h-4.5"/> +4.2% Week-Over-Week
-              </p>
-            </div>
-          </div>
-
-          <p className="text-[11px] text-slate-450 italic border-t border-slate-100 pt-3">
-            Includes fully verified active operational sectors.
-          </p>
-        </div>
-
-        {/* Task Completion Radial progress */}
-        <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs text-left flex flex-col justify-between gap-5">
-          <div>
-            <span className="text-[10px] bg-indigo-50 text-indigo-650 px-2 py-0.5 rounded font-black font-mono tracking-wider">Duties Resolution</span>
-            <h4 className="font-display text-md font-bold text-slate-900 mt-2">Reminders Completion Metrics</h4>
-          </div>
-
-          <div className="flex items-center gap-5 my-1">
-            {/* Custom SVG Donut Dial */}
-            <div className="relative w-24 h-24 flex items-center justify-center">
-              <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
-                <path className="text-slate-100" strokeWidth="3.5" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
-                <path className="text-indigo-600" strokeDasharray={`${completionRatio}, 100`} strokeWidth="3.5" strokeLinecap="round" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
-              </svg>
-              <div className="absolute text-center">
-                <span className="text-[17px] font-extrabold text-slate-850 font-mono">{completionRatio}%</span>
-              </div>
-            </div>
-
-            <div className="flex-1 flex flex-col gap-0.5 text-xs text-slate-505">
-              <p><strong className="text-slate-900">{completedReminders} duties</strong> completed.</p>
-              <p className="mt-1"><strong className="text-slate-900">{activeReminders} active</strong> remaining.</p>
-            </div>
-          </div>
-
-          <p className="text-[11px] text-slate-450 italic border-t border-slate-100 pt-3">
-            Real time completion ratio tracking.
-          </p>
-        </div>
-
-        {/* Warehouse assets total status */}
-        <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs text-left flex flex-col justify-between gap-5">
-          <div>
-            <span className="text-[10px] bg-amber-50 text-amber-750 px-2 py-0.5 rounded font-black font-mono tracking-wider">Inventory counts</span>
-            <h4 className="font-display text-md font-bold text-slate-900 mt-2">Active Logistics Safety</h4>
-          </div>
-
-          <div className="flex flex-col gap-2.5 my-1 text-xs">
-            <div className="flex justify-between font-bold text-slate-700">
-              <span>Reserve Stocks health:</span>
-              <span className="text-emerald-600">80% secure</span>
-            </div>
-            <div className="w-full bg-slate-100 rounded-full h-3">
-              <div className="bg-emerald-500 h-3 rounded-full" style={{ width: '80%' }}/>
-            </div>
-            <p className="text-slate-400 text-[10px] leading-relaxed mt-1">Tracks catalog spare parts, hardware, and container safety allocations.</p>
-          </div>
-
-          <p className="text-[11px] text-slate-450 italic border-t border-slate-100 pt-3">
-            Synchronized with {stockCount} items.
-          </p>
-        </div>
-
-      </div>
-
-      {/* Interactive Charts Dashboard Frame (Fulfills exact Chart requests) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-2">
-        
-        {/* Area line chart of System activity */}
-        <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs flex flex-col gap-5 text-left">
-          <div>
-            <h4 className="font-display text-md font-bold text-slate-900">User Growth & Database Seats</h4>
-            <p className="text-xs text-slate-550 mt-0.5">Enrolled seats tracked in backend database accounts</p>
-          </div>
-
-          {/* Line Chart Area mockup */}
-          <div className="w-full h-56 relative flex items-end">
-            <div className="absolute inset-x-0 bottom-0 top-0 flex flex-col justify-between text-[9px] font-mono text-slate-450 select-nonepointer-events-none">
-              <span className="border-b border-dashed border-slate-100 pb-0.5 pl-1">10 users</span>
-              <span className="border-b border-dashed border-slate-100 pb-0.5 pl-1">8 users</span>
-              <span className="border-b border-dashed border-slate-100 pb-0.5 pl-1">6 users</span>
-              <span className="border-b border-dashed border-slate-100 pb-0.5 pl-1">4 users</span>
-              <span className="border-b border-dashed border-slate-100 pb-0.5 pl-1">2 users</span>
-            </div>
-            
-            <svg className="w-full h-44 z-10 overflow-visible" viewBox="0 0 400 150" preserveAspectRatio="none">
-              <path d="M 10 150 Q 80 130 160 90 T 320 40 T 390 10" fill="none" stroke="#2563EB" strokeWidth="4" strokeLinecap="round"/>
-              <circle cx="10" cy="150" r="5" fill="#1D4ED8" stroke="#FFFFFF" strokeWidth="2"/>
-              <circle cx="80" cy="140" r="5" fill="#1D4ED8" stroke="#FFFFFF" strokeWidth="2"/>
-              <circle cx="160" cy="90" r="5" fill="#1D4ED8" stroke="#FFFFFF" strokeWidth="2"/>
-              <circle cx="320" cy="40" r="5" fill="#1D4ED8" stroke="#FFFFFF" strokeWidth="2"/>
-              <circle cx="390" cy="10" r="6" fill="#1D4ED8" stroke="#FFFFFF" strokeWidth="2"/>
-            </svg>
-          </div>
-          
-          <div className="flex justify-between items-center text-[10px] font-mono text-slate-400 border-t border-slate-100 pt-2 px-1">
-            <span>Jan 2026</span>
-            <span>Mar 22</span>
-            <span>May 10</span>
-            <span>Jun 19 2026</span>
-          </div>
-        </div>
-
-        {/* Module Usage Bar Chart */}
-        <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs flex flex-col gap-5 text-left">
-          <div>
-            <h4 className="font-display text-md font-bold text-slate-900">Module Usage Statistics</h4>
-            <p className="text-xs text-slate-550 mt-0.5">Dispatched REST requests tracked across separate modules</p>
-          </div>
-
-          {/* Bar Chart mockup */}
-          <div className="h-56 flex items-end justify-between gap-4 px-4 relative pb-2 select-none">
-            {/* Helper grids */}
-            <div className="absolute inset-0 flex flex-col justify-between pointer-events-none text-[9px] text-slate-400 font-mono pb-8">
-              <div className="border-b border-slate-100 w-full text-right">300 Requests</div>
-              <div className="border-b border-slate-100 w-full text-right font-semibold">200 Requests</div>
-              <div className="border-b border-slate-100 w-full text-right">100 Requests</div>
-              <div className="border-b border-slate-100 w-full text-right">0</div>
-            </div>
-
-            {/* Individual Bars */}
-            <div className="flex flex-col items-center gap-2 z-10 w-1/5">
-              <div className="w-full bg-blue-600 rounded-lg transition-all hover:opacity-85" style={{ height: '140px' }}/>
-              <span className="text-[10px] font-bold text-slate-600 font-sans">Stock</span>
-            </div>
-            
-            <div className="flex flex-col items-center gap-2 z-10 w-1/5">
-              <div className="w-full bg-indigo-500 rounded-lg transition-all hover:opacity-85" style={{ height: '90px' }}/>
-              <span className="text-[10px] font-bold text-slate-600 font-sans">Users</span>
-            </div>
-
-            <div className="flex flex-col items-center gap-2 z-10 w-1/5">
-              <div className="w-full bg-violet-500 rounded-lg transition-all hover:opacity-85" style={{ height: '120px' }}/>
-              <span className="text-[10px] font-bold text-slate-600 font-sans">To-Dos</span>
-            </div>
-
-            <div className="flex flex-col items-center gap-2 z-10 w-1/5">
-              <div className="w-full bg-amber-55 rounded-lg transition-all hover:opacity-85" style={{ height: '60px' }}/>
-              <span className="text-[10px] font-bold text-slate-600 font-sans">Auth</span>
-            </div>
-
-            <div className="flex flex-col items-center gap-2 z-10 w-1/5">
-              <div className="w-full bg-slate-800 rounded-lg transition-all hover:opacity-85" style={{ height: '40px' }}/>
-              <span className="text-[10px] font-bold text-slate-600 font-sans">Perms</span>
+            <div>
+              <h1 className="text-2xl font-extrabold tracking-tight text-slate-950">Reports Management</h1>
+              <p className="mt-1 text-sm font-medium text-slate-500">Filter stock task completions by location, task, and completion date range.</p>
             </div>
           </div>
         </div>
-
-      </div>
-
-      {/* Reports generation download log entries (Fulfills Report management requirements) */}
-      <div className="bg-white border border-slate-200 rounded-3xl mt-2 overflow-hidden text-left shadow-xs">
-        <div className="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-          <div>
-            <h4 className="font-display font-bold text-md text-slate-900">Compile Export Reports</h4>
-            <p className="text-[11px] text-slate-500 mt-0.5">Generate compliant PDF/Excel sheets from active system state snapshots</p>
-          </div>
-        </div>
-
-        <div className="divide-y divide-slate-100">
-          
-          {/* User log report entry */}
-          <div className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl shrink-0">
-                <FileText className="w-5.5 h-5.5"/>
-              </div>
-              <div className="text-left font-sans text-xs">
-                <h5 className="font-bold text-slate-800 text-sm">System Workforce Directory Report</h5>
-                <p className="text-slate-400 mt-1">Contains active session status, division credentials, and assigned roles.</p>
-              </div>
-            </div>
-            
-            <div className="flex items-center gap-2 self-end sm:self-auto">
-              <button id="raw-user-excel-dl" disabled={downloadingFormat !== null} onClick={() => handleDownload('Workforce_Directory', 'Excel')} className="px-3.5 py-2 bg-slate-50 hover:bg-slate-100 text-slate-650 cursor-pointer border border-slate-200 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-50">
-                <FileSpreadsheet className="w-4 h-4 text-emerald-500"/>
-                Sheet spread
-              </button>
-              <button id="raw-user-pdf-dl" disabled={downloadingFormat !== null} onClick={() => handleDownload('Workforce_Directory', 'PDF')} className="px-3.5 py-2 bg-slate-50 hover:bg-slate-105 text-slate-650 cursor-pointer border border-slate-200 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-50">
-                <FileDown className="w-4 h-4 text-rose-500"/>
-                Document PDF
-              </button>
-            </div>
-          </div>
-
-          {/* Audit Trail report entry */}
-          <div className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl shrink-0">
-                <Shield className="w-5.5 h-5.5"/>
-              </div>
-              <div className="text-left font-sans text-xs">
-                <h5 className="font-bold text-slate-850 text-sm">Corporate Security Audit Trail Logs</h5>
-                <p className="text-slate-400 mt-1">Full sequential logs mapping CRUD changes, logins, and permission adjustments.</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 self-end sm:self-auto">
-              <button id="raw-audit-excel-dl" disabled={downloadingFormat !== null} onClick={() => handleDownload('Corporate_Audit_Trail', 'Excel')} className="px-3.5 py-2 bg-slate-50 hover:bg-slate-100 text-slate-655 cursor-pointer border border-slate-200 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-50">
-                <FileSpreadsheet className="w-4 h-4 text-emerald-500"/>
-                Sheet spread
-              </button>
-              <button id="raw-audit-pdf-dl" disabled={downloadingFormat !== null} onClick={() => handleDownload('Corporate_Audit_Trail', 'PDF')} className="px-3.5 py-2 bg-slate-50 hover:bg-slate-100 text-slate-655 cursor-pointer border border-slate-200 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-50">
-                <FileDown className="w-4 h-4 text-rose-500"/>
-                Document PDF
-              </button>
-            </div>
-          </div>
-
-          {/* Stock inventory report entry */}
-          <div className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl shrink-0">
-                <Layers className="w-5.5 h-5.5"/>
-              </div>
-              <div className="text-left font-sans text-xs">
-                <h5 className="font-bold text-slate-850 text-sm">Warehouse Assets Allocation Logs</h5>
-                <p className="text-slate-400 mt-1">Physical stock audit logs including low-threshold flags and warehouse parameters.</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 self-end sm:self-auto">
-              <button id="raw-assets-excel-dl" disabled={downloadingFormat !== null} onClick={() => handleDownload('Warehouse_Assets', 'Excel')} className="px-3.5 py-2 bg-slate-50 hover:bg-slate-100 text-slate-655 cursor-pointer border border-slate-200 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-50">
-                <FileSpreadsheet className="w-4 h-4 text-emerald-500"/>
-                Sheet spread
-              </button>
-              <button id="raw-assets-pdf-dl" disabled={downloadingFormat !== null} onClick={() => handleDownload('Warehouse_Assets', 'PDF')} className="px-3.5 py-2 bg-slate-50 hover:bg-slate-100 text-slate-655 cursor-pointer border border-slate-200 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-50">
-                <FileDown className="w-4 h-4 text-rose-500"/>
-                Document PDF
-              </button>
-            </div>
-          </div>
-
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => handleExportReport('csv')}
+            disabled={!canFetchReport || Boolean(exportingType)}
+            className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-extrabold text-emerald-700 shadow-sm transition-all hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {exportingType === 'csv' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+            Export CSV
+          </button>
+          <button
+            type="button"
+            onClick={() => fetchReport(page)}
+            disabled={!canFetchReport || loadingReport}
+            className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-extrabold text-slate-700 shadow-sm transition-all hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <RefreshCw className={`h-4 w-4 ${loadingReport ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
         </div>
       </div>
 
-    </div>);
+      <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-xs">
+        <div className="mb-4 flex items-center gap-2 text-xs font-extrabold uppercase tracking-wider text-slate-400">
+          <Filter className="h-4 w-4" />
+          Report Filters
+        </div>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="relative flex flex-col gap-1.5">
+            <span className="text-xs font-bold text-slate-600">Location</span>
+            <button
+              type="button"
+              onClick={() => setLocationDropdownOpen((prev) => !prev)}
+              className="flex w-full cursor-pointer items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-left text-sm font-extrabold text-slate-800 outline-none transition-all hover:bg-white focus:bg-white focus:ring-2 focus:ring-blue-100"
+            >
+              <span className="truncate">{loadingLocations ? 'Loading locations...' : selectedLocationLabel}</span>
+              <ChevronDown className={`h-4 w-4 shrink-0 text-slate-400 transition-transform ${locationDropdownOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {locationDropdownOpen ? (
+              <div className="absolute left-0 top-full z-30 mt-2 w-full min-w-[320px] rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl shadow-slate-200/80">
+                <div className="mb-2 flex items-center justify-between border-b border-slate-100 px-2 pb-2">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Choose locations</span>
+                  <button
+                    type="button"
+                    onClick={() => setLocationDropdownOpen(false)}
+                    className="cursor-pointer rounded-lg bg-slate-50 px-2 py-1 text-[10px] font-extrabold text-slate-500 hover:bg-slate-100"
+                  >
+                    Done
+                  </button>
+                </div>
+                <div className="max-h-64 overflow-y-auto pr-1">
+                  {loadingLocations ? (
+                    <p className="px-3 py-2 text-xs font-semibold text-slate-400">Loading locations...</p>
+                  ) : (
+                    <>
+                      <label className="flex cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-extrabold text-slate-900 transition-all hover:bg-blue-50">
+                        <input
+                          type="checkbox"
+                          checked={hasAllLocations(filters.location_ids)}
+                          onChange={handleToggleAllLocations}
+                          className="h-4 w-4 cursor-pointer rounded border-slate-300 accent-blue-600"
+                        />
+                        All locations
+                      </label>
+                      {locations.map((location) => {
+                        const locationId = String(location.location_id);
+                        const isSelected = !hasAllLocations(filters.location_ids) && filters.location_ids.includes(locationId);
+
+                        return (
+                          <label key={location.location_id} className={`flex cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 text-xs font-extrabold transition-all ${isSelected ? 'bg-blue-50 text-blue-700' : 'text-slate-700 hover:bg-slate-50'}`}>
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => handleToggleLocation(locationId)}
+                              className="h-4 w-4 cursor-pointer rounded border-slate-300 accent-blue-600"
+                            />
+                            <span className="truncate">{getLocationLabel(location)}</span>
+                          </label>
+                        );
+                      })}
+                      {locations.length === 0 ? (
+                        <p className="px-3 py-2 text-xs font-semibold text-slate-400">No locations found</p>
+                      ) : null}
+                    </>
+                  )}
+                </div>
+              </div>
+            ) : null}
+          </div>
+
+          <label className="flex flex-col gap-1.5">
+            <span className="text-xs font-bold text-slate-600">Stock Todo Task</span>
+            <select
+              value={filters.todo_id}
+              onChange={(event) => handleFilterChange('todo_id', event.target.value)}
+              disabled={!filters.location_ids.length || loadingTasks || stockTasks.length === 0}
+              className="cursor-pointer rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-800 outline-none transition-all focus:bg-white focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {loadingTasks ? <option>Loading stock tasks...</option> : null}
+              {!loadingTasks && stockTasks.length === 0 ? <option value="">No stock tasks found</option> : null}
+              {stockTasks.map((task) => (
+                <option key={task.todo_id} value={task.todo_id}>{task.title}</option>
+              ))}
+            </select>
+          </label>
+
+          <label className="flex flex-col gap-1.5">
+            <span className="text-xs font-bold text-slate-600">Start Date</span>
+            <input
+              type="date"
+              value={filters.start_date}
+              onChange={(event) => handleFilterChange('start_date', event.target.value)}
+              className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-800 outline-none transition-all focus:bg-white focus:ring-2 focus:ring-blue-100"
+            />
+          </label>
+
+          <label className="flex flex-col gap-1.5">
+            <span className="text-xs font-bold text-slate-600">End Date</span>
+            <input
+              type="date"
+              value={filters.end_date}
+              min={filters.start_date || undefined}
+              onChange={(event) => handleFilterChange('end_date', event.target.value)}
+              className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-800 outline-none transition-all focus:bg-white focus:ring-2 focus:ring-blue-100"
+            />
+          </label>
+        </div>
+      </section>
+
+      <section className="rounded-3xl border border-slate-200 bg-white shadow-xs">
+        <div className="flex flex-col gap-3 border-b border-slate-100 p-5 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-lg font-extrabold text-slate-950">Completion List</h2>
+            <p className="mt-1 text-xs font-semibold text-slate-500">Showing stock completion rows for the selected filters.</p>
+          </div>
+          <div className="inline-flex items-center gap-2 rounded-2xl bg-slate-50 px-3 py-2 text-xs font-extrabold text-slate-500">
+            <Search className="h-4 w-4" /> Page {page} of {totalPages}
+          </div>
+        </div>
+
+        {loadingReport ? (
+          <div className="flex min-h-80 items-center justify-center text-slate-500">
+            <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Loading report...
+          </div>
+        ) : records.length === 0 ? (
+          <div className="flex min-h-80 flex-col items-center justify-center p-8 text-center">
+            <div className="flex h-14 w-14 items-center justify-center rounded-3xl bg-slate-50 text-slate-300">
+              <ClipboardList className="h-7 w-7" />
+            </div>
+            <h3 className="mt-4 text-base font-extrabold text-slate-900">No report records found</h3>
+            <p className="mt-1 max-w-md text-sm font-medium text-slate-500">Try another location, stock task, or date range.</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-slate-100">
+              <thead className="bg-slate-50/70">
+                <tr>
+                  <th className="px-5 py-4 text-left text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Completion</th>
+                  <th className="px-5 py-4 text-left text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Completed By</th>
+                  <th className="px-5 py-4 text-left text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Location</th>
+                  <th className="px-5 py-4 text-left text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Stock Values (In MT)</th>
+                  <th className="px-5 py-4 text-left text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Total Stock Value  (In MT)</th>
+                  <th className="px-5 py-4 text-left text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Remarks</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 bg-white">
+                {records.map((record) => (
+                  <tr key={record.completion_id} className="align-top transition-colors hover:bg-slate-50/70">
+                    <td className="whitespace-nowrap px-5 py-4">
+                      <p className="text-sm font-extrabold text-slate-900">{formatDate(record.completion_date)}</p>
+                      <p className="mt-1 text-xs font-semibold text-slate-400">{formatDateTime(record.completed_at)}</p>
+                    </td>
+                    <td className="px-5 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
+                          <UserRound className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-extrabold text-slate-900">{record.completed_by_user?.full_name || `User #${record.completed_by}`}</p>
+                          <p className="text-xs font-semibold text-slate-500">{record.completed_by_user?.phone_number || '-'}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="min-w-[220px] px-5 py-4">
+                      <p className="text-sm font-extrabold leading-relaxed text-slate-700">{getLocationLabel(record.location)}</p>
+                    </td>
+                    <td className="min-w-[360px] px-5 py-4">
+                      <div className="flex flex-wrap gap-1.5">
+                        {(record.stock_item_sections || []).map((section) => (
+                          <StockSection key={`${record.completion_id}-${section.stock_name}`} section={section} />
+                        ))}
+                      </div>
+                    </td>
+                    <td className="whitespace-nowrap px-5 py-4">
+                      <div className="inline-flex min-w-28 items-center justify-center rounded-2xl bg-emerald-50 px-4 py-3 text-lg font-extrabold text-emerald-700">
+                        {getRecordStockTotal(record).toFixed(2)}
+                      </div>
+                    </td>
+                    <td className="px-5 py-4">
+                      <p className="max-w-xs text-sm font-semibold leading-relaxed text-slate-600">{record.remarks || '-'}</p>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <div className="flex flex-col gap-3 border-t border-slate-100 p-5 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-xs font-bold text-slate-500">Showing {records.length} of {totalRecords} records</p>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
+              disabled={page <= 1 || loadingReport}
+              className="cursor-pointer rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-extrabold text-slate-600 transition-all hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Previous
+            </button>
+            <button
+              type="button"
+              onClick={() => setPage((prev) => Math.min(prev + 1, totalPages))}
+              disabled={page >= totalPages || loadingReport}
+              className="cursor-pointer rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-extrabold text-slate-600 transition-all hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
 };

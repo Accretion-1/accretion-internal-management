@@ -60,3 +60,7 @@ export const getAdminManagerTodayTodosController = apiHandler(async (req, res) =
   return apiResponse(FETCH, "Today Todos", result, res, "object");
 });
 
+export const getStockCompletionReportController = apiHandler(async (req, res) => {
+  const result = await todoService.getStockCompletionReportService(req.query, req.user);
+  return apiResponse(FETCH, "Stock Completion Report", result, res, "object");
+});

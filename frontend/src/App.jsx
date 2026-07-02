@@ -29,6 +29,7 @@ const PANEL_ROUTE_BY_ID = {
     4: '/reminder-schedule',
     5: '/locations',
     6: '/settings',
+    7: '/reports',
 };
 const PANEL_ROUTE_BY_NAME = {
     dashboard: '/dashboard',
@@ -38,6 +39,8 @@ const PANEL_ROUTE_BY_NAME = {
     'reminder schedule management': '/reminder-schedule',
     locations: '/locations',
     settings: '/settings',
+    'reports management': '/reports',
+    reports: '/reports',
 };
 const normalizePanelName = (panelName) => String(panelName || '').trim().toLowerCase();
 const getAuthenticatedHomePath = (authUser) => {

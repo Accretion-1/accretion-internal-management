@@ -362,6 +362,24 @@ const normalizePaginationQuery = (query = {}) => {
   };
 };
 
+const normalizeReportLocationIds = (query = {}) => {
+  if (query.location_ids === "all") return [];
+
+  if (Array.isArray(query.location_ids)) {
+    return [...new Set(query.location_ids.map(Number).filter(Boolean))];
+  }
+
+  if (typeof query.location_ids === "string" && query.location_ids.trim()) {
+    return [...new Set(query.location_ids.split(",").map(Number).filter(Boolean))];
+  }
+
+  if (query.location_id) {
+    return [Number(query.location_id)];
+  }
+
+  return [];
+};
+
 const groupFilesByCompletionId = (files = []) => files.reduce((acc, file) => {
   const completionId = Number(file.completion_id);
   if (!acc.has(completionId)) acc.set(completionId, []);
@@ -472,6 +490,38 @@ const formatTodoCompletion = (completion, files = [], stockItems = []) => {
     files: files.map(formatCompletionFile),
   };
 };
+
+const formatStockReportRecord = (record, stockItems = []) => ({
+  completion_id: record.completion_id,
+  todo_id: record.todo_id,
+  todo_title: record.todo_title,
+  todo_description: record.todo_description,
+  todo_schedule: record.todo_schedule,
+  todo_due_time: record.todo_due_time,
+  todo_location_id: record.todo_location_id,
+  completion_date: formatDateOnly(record.completion_date),
+  completed_at: record.completed_at,
+  updated_at: record.updated_at,
+  remarks: record.remarks,
+  completed_by: record.completed_by,
+  completed_by_user: record.completed_by
+    ? {
+        user_id: record.completed_by,
+        full_name: record.completed_by_name,
+        phone_number: record.completed_by_phone_number,
+      }
+    : null,
+  location: {
+    location_id: record.location_id,
+    district: record.district,
+    godown: record.godown,
+    sloc: record.sloc,
+    cap: record.cap,
+    remark: record.location_remark,
+  },
+  stock_items: stockItems,
+  stock_item_sections: buildStockItemSections(stockItems),
+});
 
 const normalizeBoolean = (value) => {
   if (value === true || value === 1 || value === "1" || value === "true") return true;
@@ -827,6 +877,51 @@ export const getTodoCompletionsService = async (todoId, query = {}, user) => {
   } catch (error) {
     if (error instanceof ApiError) throw error;
     throw new ApiError(FETCH_ERROR, "Todo Completions", error, false);
+  }
+};
+
+export const getStockCompletionReportService = async (query = {}, user) => {
+  try {
+    ensureAdminOrManagerAccess(user);
+
+    const { page, limit } = normalizePaginationQuery(query);
+    const locationIds = normalizeReportLocationIds(query);
+    const basePayload = {
+      location_id: null,
+      location_ids: locationIds,
+      todo_id: Number(query.todo_id),
+      start_date: query.start_date,
+      end_date: query.end_date,
+    };
+
+    const [records, totalRecords] = await Promise.all([
+      todoModel.getStockCompletionReportModel({
+        ...basePayload,
+        page,
+        limit,
+      }),
+      todoModel.countStockCompletionReportModel(basePayload),
+    ]);
+
+    const completionIds = records.map((record) => record.completion_id);
+    const stockItems = await todoModel.getCompletionItemsByCompletionIdsModel(completionIds);
+    const stockItemsByCompletionId = groupCompletionItemsByCompletionId(stockItems);
+
+    return {
+      records: records.map((record) =>
+        formatStockReportRecord(
+          record,
+          stockItemsByCompletionId.get(Number(record.completion_id)) || [],
+        ),
+      ),
+      total_records: totalRecords,
+      total_pages: Math.ceil(totalRecords / limit),
+      current_page: page,
+      limit,
+    };
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    throw new ApiError(FETCH_ERROR, "Stock Completion Report", error, false);
   }
 };
 

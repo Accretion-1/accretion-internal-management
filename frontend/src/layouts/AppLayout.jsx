@@ -13,6 +13,7 @@ const SIDEBAR_ITEMS = [
     { id: 'todos', label: 'To-Dos Management', icon: CheckSquare, allowedRoles: ['Admin', 'Manager', 'User'] },
     { id: 'reminder-schedule', label: 'Reminder Schedule Management', icon: BellRing, allowedRoles: ['Admin', 'Manager', 'User'] },
     { id: 'locations', label: 'Locations', icon: MapPin, allowedRoles: ['Admin', 'Manager', 'User'] },
+    { id: 'reports', label: 'Reports Management', icon: BarChart4, allowedRoles: ['Admin', 'Manager'] },
     { id: 'settings', label: 'Settings', icon: Settings, allowedRoles: ['Admin', 'Manager', 'User'] }
 ];
 const ROUTE_ACCESS_ITEMS = [
@@ -28,6 +29,7 @@ const PANEL_ROUTE_BY_ID = {
     4: 'reminder-schedule',
     5: 'locations',
     6: 'settings',
+    7: 'reports',
 };
 const PANEL_ROUTE_BY_NAME = {
     dashboard: 'dashboard',
@@ -37,6 +39,8 @@ const PANEL_ROUTE_BY_NAME = {
     'reminder schedule management': 'reminder-schedule',
     locations: 'locations',
     settings: 'settings',
+    'reports management': 'reports',
+    reports: 'reports',
 };
 const normalizePanelName = (panelName) => String(panelName || '').trim().toLowerCase();
 const getUserPanelRouteIds = (panels = []) => new Set(
