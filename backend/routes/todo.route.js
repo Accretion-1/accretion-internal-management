@@ -9,6 +9,7 @@ import {
   getTodosController,
   updateTodoController,
   getAdminManagerTodayTodosController,
+  getStockCompletionReportController,
 } from "../controllers/todo.controller.js";
 import { authGuard } from "../middlewares/guard.middleware.js";
 import { fields as uploadFields } from "../middlewares/multer.middleware.js";
@@ -22,6 +23,7 @@ import {
   todoIdParamSchema,
   updateTodoSchema,
   getAdminManagerTodayTodosQuerySchema,
+  getStockCompletionReportQuerySchema,
 } from "../validations/todo.validation.js";
 
 const router = express.Router();
@@ -51,6 +53,11 @@ router.get(
   "/today-tasks",
   validate(getAdminManagerTodayTodosQuerySchema, "query"),
   getAdminManagerTodayTodosController,
+);
+router.get(
+  "/reports/stock-completions",
+  validate(getStockCompletionReportQuerySchema, "query"),
+  getStockCompletionReportController,
 );
 router.get(
   "/:todo_id/completions",

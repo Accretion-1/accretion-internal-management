@@ -154,6 +154,28 @@ export const getAdminManagerTodayTodosQuerySchema = Joi.object({
   limit: Joi.number().integer().positive().max(100).default(10).optional(),
 }).messages(messages);
 
+export const getStockCompletionReportQuerySchema = Joi.object({
+  location_id: Joi.number().integer().positive().optional(),
+  location_ids: Joi.alternatives().try(
+    Joi.string().trim().valid("all"),
+    Joi.string().trim().pattern(/^\d+(,\d+)*$/),
+    Joi.array().items(Joi.number().integer().positive()).min(1),
+  ).optional(),
+  todo_id: Joi.number().integer().positive().required(),
+  start_date: dateValidation.required(),
+  end_date: dateValidation.required(),
+  page: Joi.number().integer().positive().default(1).optional(),
+  limit: Joi.number().integer().positive().max(100).default(20).optional(),
+})
+  .or("location_id", "location_ids")
+  .custom((value, helpers) => {
+    if (value.start_date > value.end_date) {
+      return helpers.message("start_date cannot be greater than end_date");
+    }
+
+    return value;
+  }).messages(messages);
+
 
 export const createTodoSchema = Joi.object({
   type: Joi.string().valid(...todoTypes).required(),

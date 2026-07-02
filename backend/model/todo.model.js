@@ -568,6 +568,135 @@ export const countTodoCompletionsModel = async ({ todo_id, location_id = null })
   }
 };
 
+const buildStockCompletionReportWhere = ({
+  location_id,
+  location_ids = [],
+  todo_id,
+  start_date,
+  end_date,
+  values,
+}) => {
+  let whereSql = "WHERE t.type = 'stock'";
+
+  if (location_id) {
+    whereSql += " AND tl.location_id = ?";
+    values.push(location_id);
+  }
+
+  if (Array.isArray(location_ids) && location_ids.length) {
+    whereSql += " AND tl.location_id IN (?)";
+    values.push(location_ids);
+  }
+
+  if (todo_id) {
+    whereSql += " AND tc.todo_id = ?";
+    values.push(todo_id);
+  }
+
+  if (start_date) {
+    whereSql += " AND tc.completion_date >= ?";
+    values.push(start_date);
+  }
+
+  if (end_date) {
+    whereSql += " AND tc.completion_date <= ?";
+    values.push(end_date);
+  }
+
+  return whereSql;
+};
+
+export const getStockCompletionReportModel = async ({
+  location_id,
+  location_ids = [],
+  todo_id,
+  start_date,
+  end_date,
+  page = 1,
+  limit = 20,
+}) => {
+  try {
+    const values = [];
+    const whereSql = buildStockCompletionReportWhere({
+      location_id,
+      location_ids,
+      todo_id,
+      start_date,
+      end_date,
+      values,
+    });
+    const offset = (page - 1) * limit;
+
+    return await db.query(
+      `SELECT
+        tc.completion_id,
+        tc.todo_id,
+        tc.todo_location_id,
+        tc.completed_by,
+        DATE_FORMAT(tc.completion_date, '%Y-%m-%d') AS completion_date,
+        tc.remarks,
+        tc.completed_at,
+        tc.updated_at,
+        t.title AS todo_title,
+        t.description AS todo_description,
+        t.schedule AS todo_schedule,
+        t.due_time AS todo_due_time,
+        u.full_name AS completed_by_name,
+        u.phone_number AS completed_by_phone_number,
+        tl.location_id,
+        l.district,
+        l.godown,
+        l.sloc,
+        l.cap,
+        l.remark AS location_remark
+       FROM todo_completions tc
+       INNER JOIN todos t ON t.todo_id = tc.todo_id
+       INNER JOIN todo_locations tl ON tl.todo_location_id = tc.todo_location_id
+       INNER JOIN locations l ON l.location_id = tl.location_id
+       LEFT JOIN users u ON u.user_id = tc.completed_by
+       ${whereSql}
+       ORDER BY tc.completion_date DESC, tc.completed_at DESC, tc.completion_id DESC
+       LIMIT ? OFFSET ?`,
+      [...values, limit, offset],
+    );
+  } catch (error) {
+    throw new ApiError(DB_ERROR, "Fetching Stock Completion Report", error, false);
+  }
+};
+
+export const countStockCompletionReportModel = async ({
+  location_id,
+  location_ids = [],
+  todo_id,
+  start_date,
+  end_date,
+}) => {
+  try {
+    const values = [];
+    const whereSql = buildStockCompletionReportWhere({
+      location_id,
+      location_ids,
+      todo_id,
+      start_date,
+      end_date,
+      values,
+    });
+
+    const [result] = await db.query(
+      `SELECT COUNT(*) AS total_records
+       FROM todo_completions tc
+       INNER JOIN todos t ON t.todo_id = tc.todo_id
+       INNER JOIN todo_locations tl ON tl.todo_location_id = tc.todo_location_id
+       ${whereSql}`,
+      values,
+    );
+
+    return Number(result?.total_records || 0);
+  } catch (error) {
+    throw new ApiError(DB_ERROR, "Counting Stock Completion Report", error, false);
+  }
+};
+
 export const getCompletionFilesByCompletionIdsModel = async (completionIds = []) => {
   try {
     if (!completionIds.length) return [];
