@@ -24,12 +24,11 @@ export const verifyOTPSchema = Joi.object({
   fcm_token: Joi.string().trim().allow("", null).optional(),
   otp: Joi.alternatives()
     .try(
-      Joi.string().trim().pattern(/^(?:\d{4}|\d{6})$/),
+      Joi.string().trim().pattern(/^\d{4}$/),
       Joi.number().integer().min(1000).max(9999),
-      Joi.number().integer().min(100000).max(999999),
     )
     .required()
-    .messages({ "alternatives.match": "otp must be a 4 or 6-digit code" }),
+    .messages({ "alternatives.match": "otp must be a 4-digit code" }),
 });
 
 export const resendOTPSchema = Joi.object({
