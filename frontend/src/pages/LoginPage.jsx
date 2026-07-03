@@ -35,7 +35,7 @@ export const LoginPage = () => {
             if (import.meta.env.DEV) {
                 setSmsIncomingAlert({
                     show: true,
-                    text: 'Development verification code: 123456. Valid for 5 minutes.',
+                    text: 'Development verification code: 1234. Valid for 5 minutes.',
                 });
             }
         }
@@ -46,8 +46,8 @@ export const LoginPage = () => {
 
     const handleOtpSubmit = async (e) => {
         e.preventDefault();
-        if (otpValue.length !== 6) {
-            setOtpError('OTP must be exactly 6 digits.');
+        if (otpValue.length !== 4) {
+            setOtpError('OTP must be exactly 4 digits.');
             return;
         }
         setOtpError('');
@@ -147,7 +147,7 @@ export const LoginPage = () => {
                             >
                                 <div>
                                     <h2 className="font-display text-2xl font-bold tracking-tight text-slate-900">Enter OTP</h2>
-                                    <p className="mt-1 text-xs text-slate-500">Enter the 6-digit code sent to your phone.</p>
+                                    <p className="mt-1 text-xs text-slate-500">Enter the 4-digit code sent to your phone.</p>
                                     <div className="mt-2.5 inline-block rounded-xl border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
                                         Sending token to {phoneNumber}
                                     </div>
@@ -155,12 +155,12 @@ export const LoginPage = () => {
 
                                 <form onSubmit={handleOtpSubmit} className="flex flex-col gap-4">
                                     <div className="flex flex-col gap-1.5">
-                                        <label className="text-xs font-semibold text-slate-700">6-Digit OTP</label>
+                                        <label className="text-xs font-semibold text-slate-700">4-Digit OTP</label>
                                         <input
                                             id="otp-input"
                                             type="text"
-                                            maxLength={6}
-                                            placeholder="••••••"
+                                            maxLength={4}
+                                            placeholder="••••"
                                             value={otpValue}
                                             onChange={(e) => setOtpValue(e.target.value.replace(/[^0-9]/g, ''))}
                                             className={`w-full rounded-2xl border bg-slate-50 px-4 py-3.5 text-center text-xl font-bold tracking-widest text-slate-900 transition-all focus:bg-white focus:outline-none focus:ring-4 focus:ring-blue-100 ${otpError ? 'border-rose-400' : 'border-slate-200'}`}
@@ -232,10 +232,10 @@ export const LoginPage = () => {
                                 <p className="mt-1 font-mono text-xs font-semibold text-slate-200">{smsIncomingAlert.text}</p>
                                 <button
                                     id="magic-copy-otp-btn"
-                                    onClick={() => setOtpValue('123456')}
+                                    onClick={() => setOtpValue('1234')}
                                     className="mt-2 text-[11px] font-bold text-blue-400 transition-colors hover:text-blue-300"
                                 >
-                                    Autofill Code 123456
+                                    Autofill Code 1234
                                 </button>
                             </div>
                             <button

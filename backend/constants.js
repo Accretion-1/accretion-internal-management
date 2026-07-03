@@ -25,6 +25,9 @@ export const twillio_serviceSid = process.env.twillio_serviceSid;
 export const twilio_number = process.env.twilio_number;
 export const MSG91_AUTH_KEY = process.env.MSG91_AUTH_KEY;
 export const MSG91_TEMPLATE_ID = process.env.MSG91_TEMPLATE_ID;
+export const MSG91_SENDER_ID = process.env.MSG91_SENDER_ID;
+export const MSG91_ROUTE = process.env.MSG91_ROUTE;
+export const MSG91_COUNTRY_CODE = process.env.MSG91_COUNTRY_CODE;
 export const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
 export const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
 

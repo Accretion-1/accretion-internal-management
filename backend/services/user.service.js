@@ -7,7 +7,7 @@ import * as userModel from "../model/user.model.js";
 import { ApiError } from "../utils/api.util.js";
 import { ADD_ERROR, CUSTOM_ERROR, EXISTS, FORBIDDEN, INVALID, NOT_FOUND, UPDATE_ERROR } from "../utils/message.util.js";
 import { generateJWTToken, generateOTPCode, isEmpty } from "../utils/misc.util.js";
-import { sendOTP } from "../utils/twillio.util.js";
+import { sendOTP } from "../utils/msg91.util.js";
 
 const OTP_EXPIRY = "5m";
 const isDevelopment = NODE_ENV === "development";
@@ -81,7 +81,8 @@ const issueOTP = async (user) => {
   if (isDevelopment) return;
 
   try {
-    await sendOTP(user.phone_number, otp);
+    const data = await sendOTP(user.phone_number, otp);
+    console.log(`MSG91 OTP accepted. request_id=${data.request_id || "-"} mobile=${data.mobile}`);
   } catch (error) {
     await userModel.clearUserOTPModel(user.user_id);
     throw error;
