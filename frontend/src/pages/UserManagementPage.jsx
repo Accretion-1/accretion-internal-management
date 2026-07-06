@@ -62,8 +62,6 @@ export const UserManagementPage = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [roleFilter, setRoleFilter] = useState('All');
     const [statusFilter, setStatusFilter] = useState('All');
-    const [sortField, setSortField] = useState('name');
-    const [sortOrder, setSortOrder] = useState('asc');
     const [selectedUserIds, setSelectedUserIds] = useState([]);
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [isEditOpen, setIsEditOpen] = useState(false);
@@ -74,22 +72,23 @@ export const UserManagementPage = () => {
 
     const normalizedUsers = useMemo(() => users.map(normalizeUser), [users]);
 
-    const filteredUsers = useMemo(() => normalizedUsers
-        .filter((user) => {
-            const searchString = `${user.name} ${user.phone} ${user.role} ${user.locationLabel}`.toLowerCase();
-            const matchesSearch = searchString.includes(searchQuery.toLowerCase());
-            const matchesRole = roleFilter === 'All' || user.role === roleFilter;
-            const matchesStatus = statusFilter === 'All' || user.status === statusFilter;
-            return matchesSearch && matchesRole && matchesStatus;
-        })
-        .sort((userA, userB) => {
-            const fieldA = userA[sortField];
-            const fieldB = userB[sortField];
-            if (typeof fieldA === 'string' && typeof fieldB === 'string') {
-                return sortOrder === 'asc' ? fieldA.localeCompare(fieldB) : fieldB.localeCompare(fieldA);
-            }
-            return 0;
-        }), [normalizedUsers, roleFilter, searchQuery, sortField, sortOrder, statusFilter]);
+    const filteredUsers = useMemo(() => {
+        return normalizedUsers
+            .filter((user) => {
+                const searchString = `${user.name} ${user.phone} ${user.role} ${user.locationLabel}`.toLowerCase();
+                const matchesSearch = searchString.includes(searchQuery.toLowerCase());
+                const matchesRole = roleFilter === 'All' || user.role === roleFilter;
+                const matchesStatus = statusFilter === 'All' || user.status === statusFilter;
+                return matchesSearch && matchesRole && matchesStatus;
+            })
+            .sort((userA, userB) => {
+                const locA = userA.locationLabel || '';
+                const locB = userB.locationLabel || '';
+                const locCompare = locA.localeCompare(locB);
+                if (locCompare !== 0) return locCompare;
+                return userA.name.localeCompare(userB.name);
+            });
+    }, [normalizedUsers, roleFilter, searchQuery, statusFilter]);
 
     const fetchUsers = async () => {
         const response = await apiHandler({ method: 'GET', url: API_ENDPOINTS.USER.BASE });
@@ -118,14 +117,7 @@ export const UserManagementPage = () => {
         fetchPageData();
     }, []);
 
-    const handleSort = (field) => {
-        if (sortField === field) {
-            setSortOrder((prev) => prev === 'asc' ? 'desc' : 'asc');
-            return;
-        }
-        setSortField(field);
-        setSortOrder('asc');
-    };
+
 
     const validateForm = ({ mode }) => {
         const nextErrors = {};
@@ -407,10 +399,10 @@ export const UserManagementPage = () => {
                                 <th className="w-12 px-6 py-4 text-center">
                                     <input type="checkbox" onChange={handleSelectAll} checked={filteredUsers.length > 0 && selectedUserIds.length === filteredUsers.length} className="cursor-pointer rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
                                 </th>
-                                <th className="cursor-pointer px-6 py-4 hover:text-slate-700" onClick={() => handleSort('name')}>Employee</th>
-                                <th className="cursor-pointer px-6 py-4 hover:text-slate-700" onClick={() => handleSort('role')}>Role</th>
+                                <th className="px-6 py-4">Employee</th>
+                                <th className="px-6 py-4">Role</th>
                                 <th className="px-6 py-4">Location</th>
-                                <th className="cursor-pointer px-6 py-4 hover:text-slate-700" onClick={() => handleSort('status')}>Status</th>
+                                <th className="px-6 py-4">Status</th>
                                 <th className="px-6 py-4">Assigned Panels</th>
                                 <th className="px-6 py-4 text-center">Actions</th>
                             </tr>

@@ -29,6 +29,7 @@ export const DashboardPage = () => {
   const [locationsLoading, setLocationsLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   const [activeAttachment, setActiveAttachment] = useState(null);
   const [taskStats, setTaskStats] = useState({ total: 0, completed: 0, pending: 0 });
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -62,7 +63,7 @@ export const DashboardPage = () => {
     try {
       const params = {
         page: currentPage,
-        limit: 5,
+        limit: itemsPerPage,
       };
       if (selectedLocationId) {
         params.location_id = selectedLocationId;
@@ -97,7 +98,7 @@ export const DashboardPage = () => {
     if (role === 'Admin' || role === 'Manager') {
       fetchTodayTasks();
     }
-  }, [role, selectedLocationId, selectedStatus, currentPage]);
+  }, [role, selectedLocationId, selectedStatus, currentPage, itemsPerPage]);
 
   const handleLocationChange = (e) => {
     setSelectedLocationId(e.target.value);
@@ -934,11 +935,28 @@ export const DashboardPage = () => {
             </div>
 
             {/* Pagination Controls */}
-            {totalPages > 1 && (
-              <div className="flex items-center justify-between border-t border-slate-100 pt-4 mt-2">
-                <p className="text-xs font-bold text-slate-500">
-                  Page {currentPage} of {totalPages}
-                </p>
+            {(totalPages > 1 || todayTasks.length > 0) && (
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-t border-slate-100 pt-4 mt-2">
+                <div className="flex items-center gap-3">
+                  <p className="text-xs font-bold text-slate-500">
+                    Page {currentPage} of {totalPages}
+                  </p>
+                  <div className="flex items-center gap-1.5 border-l border-slate-200 pl-3">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Show:</span>
+                    <select
+                      value={itemsPerPage}
+                      onChange={(e) => {
+                        setItemsPerPage(Number(e.target.value));
+                        setCurrentPage(1);
+                      }}
+                      className="cursor-pointer rounded-lg border border-slate-200 bg-slate-50 py-1 px-2 text-xs font-bold text-slate-700 focus:outline-none"
+                    >
+                      <option value={10}>10</option>
+                      <option value={25}>25</option>
+                      <option value={50}>50</option>
+                    </select>
+                  </div>
+                </div>
                 <div className="flex items-center gap-2">
                   <button
                     disabled={currentPage <= 1}
