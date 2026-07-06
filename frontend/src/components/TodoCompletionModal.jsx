@@ -192,7 +192,7 @@ export const TodoCompletionModal = ({ isOpen, todo, onClose, onCompleted }) => {
             }
 
             if (Object.keys(advancedConstraints).length) {
-                await videoTrack.applyConstraints({ advanced: [advancedConstraints] }).catch(() => {});
+                await videoTrack.applyConstraints({ advanced: [advancedConstraints] }).catch(() => { });
             }
 
             streamRef.current = stream;
@@ -477,14 +477,14 @@ export const TodoCompletionModal = ({ isOpen, todo, onClose, onCompleted }) => {
             stopCamera();
             setIsCapturing(false);
             const previewUrl = URL.createObjectURL(file);
-                setPreviewFile({
-                    file,
-                    url: previewUrl,
-                    type: 'photo',
-                    index: newIndex,
-                    isNew: true
-                });
-            }
+            setPreviewFile({
+                file,
+                url: previewUrl,
+                type: 'photo',
+                index: newIndex,
+                isNew: true
+            });
+        }
     };
 
     const handleStartRecording = () => {
@@ -559,7 +559,7 @@ export const TodoCompletionModal = ({ isOpen, todo, onClose, onCompleted }) => {
                 ));
 
                 if (hasInvalidStockItem) {
-                    nextErrors.stock_items = 'Stock value is required for every row. Week is required only when value is greater than 0.00.';
+                    nextErrors.stock_items = 'Stock quantity is required for every row. Week is required only when quantity is greater than 0.00.';
                 }
             }
         }
@@ -690,8 +690,8 @@ export const TodoCompletionModal = ({ isOpen, todo, onClose, onCompleted }) => {
                                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                                     <div>
                                         <div>
-                                            <label className="text-xs font-extrabold uppercase tracking-wider text-slate-500">Stock Values</label>
-                                            <p className="mt-1 text-[11px] font-semibold text-slate-400">Each stock type has its own week/value rows. All values default to 0.00.</p>
+                                            <label className="text-xs font-extrabold uppercase tracking-wider text-slate-500">Stock Quantity</label>
+                                            <p className="mt-1 text-[11px] font-semibold text-slate-400">Each stock type has its own week/quantity rows. All Quantity default to 0.00 MT.</p>
                                         </div>
                                     </div>
 
@@ -728,7 +728,7 @@ export const TodoCompletionModal = ({ isOpen, todo, onClose, onCompleted }) => {
                                                                     />
                                                                 </div>
                                                                 <div className="flex flex-col gap-1.5">
-                                                                    <label className="text-xs font-bold text-slate-600">{stockLabel} Value</label>
+                                                                    <label className="text-xs font-bold text-slate-600">{stockLabel} Quantity</label>
                                                                     <input
                                                                         type="number"
                                                                         min="0"
@@ -757,7 +757,7 @@ export const TodoCompletionModal = ({ isOpen, todo, onClose, onCompleted }) => {
                                                             className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-blue-600 px-3 py-2 text-xs font-extrabold text-white transition-all hover:bg-blue-700"
                                                         >
                                                             <Plus className="h-4 w-4" />
-                                                            Add {stockLabel}
+                                                            Add Week
                                                         </button>
                                                     </div>
                                                 </div>
@@ -802,7 +802,7 @@ export const TodoCompletionModal = ({ isOpen, todo, onClose, onCompleted }) => {
                                         <ImageIcon className="h-4 w-4 text-blue-600" />
                                         Capture Photos
                                     </label>
-                                    
+
                                     {isUser ? (
                                         <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center">
                                             <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-blue-50 text-blue-600">
@@ -1157,28 +1157,28 @@ export const TodoCompletionModal = ({ isOpen, todo, onClose, onCompleted }) => {
                     footerButtons={
                         previewFile.isNew
                             ? [
-                                  {
-                                      label: 'Retake / Discard',
-                                      onClick: handleDiscardCaptured,
-                                      variant: 'danger',
-                                  },
-                                  {
-                                      label: 'Keep / Use',
-                                      onClick: handleKeepCaptured,
-                                      variant: 'primary',
-                                  },
-                              ]
+                                {
+                                    label: 'Retake / Discard',
+                                    onClick: handleDiscardCaptured,
+                                    variant: 'danger',
+                                },
+                                {
+                                    label: 'Keep / Use',
+                                    onClick: handleKeepCaptured,
+                                    variant: 'primary',
+                                },
+                            ]
                             : [
-                                  {
-                                      label: 'Close',
-                                      onClick: () => setPreviewFile(null),
-                                  },
-                                  {
-                                      label: 'Remove / Delete',
-                                      onClick: handleDiscardCaptured,
-                                      variant: 'danger',
-                                  },
-                              ]
+                                {
+                                    label: 'Close',
+                                    onClick: () => setPreviewFile(null),
+                                },
+                                {
+                                    label: 'Remove / Delete',
+                                    onClick: handleDiscardCaptured,
+                                    variant: 'danger',
+                                },
+                            ]
                     }
                 >
                     <div className="flex justify-center overflow-hidden rounded-2xl bg-slate-950 p-2">
