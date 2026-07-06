@@ -25,10 +25,13 @@ export const DashboardPage = () => {
   const [locationsList, setLocationsList] = useState([]);
   const [selectedLocationId, setSelectedLocationId] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('all');
+  const [selectedTodoId, setSelectedTodoId] = useState('');
+  const [uniqueTodayTasks, setUniqueTodayTasks] = useState([]);
   const [tasksLoading, setTasksLoading] = useState(false);
   const [locationsLoading, setLocationsLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   const [activeAttachment, setActiveAttachment] = useState(null);
   const [taskStats, setTaskStats] = useState({ total: 0, completed: 0, pending: 0 });
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -62,10 +65,13 @@ export const DashboardPage = () => {
     try {
       const params = {
         page: currentPage,
-        limit: 5,
+        limit: itemsPerPage,
       };
       if (selectedLocationId) {
         params.location_id = selectedLocationId;
+      }
+      if (selectedTodoId) {
+        params.todo_id = selectedTodoId;
       }
       if (selectedStatus && selectedStatus !== 'all') {
         params.status = selectedStatus;
@@ -90,14 +96,27 @@ export const DashboardPage = () => {
   useEffect(() => {
     if (role === 'Admin' || role === 'Manager') {
       fetchLocations();
+      fetchUniqueTodayTasks();
     }
   }, [role]);
+
+  const fetchUniqueTodayTasks = async () => {
+    try {
+      const response = await apiHandler({
+        method: 'GET',
+        url: API_ENDPOINTS.TODOS.TODAY_UNIQUE_TASKS,
+      });
+      setUniqueTodayTasks(Array.isArray(response?.data) ? response.data : []);
+    } catch (error) {
+      console.error('Error fetching unique today tasks:', error);
+    }
+  };
 
   useEffect(() => {
     if (role === 'Admin' || role === 'Manager') {
       fetchTodayTasks();
     }
-  }, [role, selectedLocationId, selectedStatus, currentPage]);
+  }, [role, selectedLocationId, selectedTodoId, selectedStatus, currentPage, itemsPerPage]);
 
   const handleLocationChange = (e) => {
     setSelectedLocationId(e.target.value);
@@ -717,7 +736,7 @@ export const DashboardPage = () => {
         </div>
 
         {/* Filter Bar */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-bold text-slate-600">Filter by Location</label>
             <div className="relative">
@@ -735,6 +754,26 @@ export const DashboardPage = () => {
                 ))}
               </select>
             </div>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-bold text-slate-600">Filter by Task</label>
+            <select
+              id="dashboard-task-filter"
+              value={selectedTodoId}
+              onChange={(e) => {
+                setSelectedTodoId(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="cursor-pointer rounded-xl border border-slate-200 bg-slate-50 py-2.5 px-3 text-xs font-bold text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
+            >
+              <option value="">All Tasks</option>
+              {uniqueTodayTasks.map((task) => (
+                <option key={task.todo_id} value={task.todo_id}>
+                  {task.title}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className="flex flex-col gap-1.5">
@@ -934,11 +973,28 @@ export const DashboardPage = () => {
             </div>
 
             {/* Pagination Controls */}
-            {totalPages > 1 && (
-              <div className="flex items-center justify-between border-t border-slate-100 pt-4 mt-2">
-                <p className="text-xs font-bold text-slate-500">
-                  Page {currentPage} of {totalPages}
-                </p>
+            {(totalPages > 1 || todayTasks.length > 0) && (
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-t border-slate-100 pt-4 mt-2">
+                <div className="flex items-center gap-3">
+                  <p className="text-xs font-bold text-slate-500">
+                    Page {currentPage} of {totalPages}
+                  </p>
+                  <div className="flex items-center gap-1.5 border-l border-slate-200 pl-3">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Show:</span>
+                    <select
+                      value={itemsPerPage}
+                      onChange={(e) => {
+                        setItemsPerPage(Number(e.target.value));
+                        setCurrentPage(1);
+                      }}
+                      className="cursor-pointer rounded-lg border border-slate-200 bg-slate-50 py-1 px-2 text-xs font-bold text-slate-700 focus:outline-none"
+                    >
+                      <option value={10}>10</option>
+                      <option value={25}>25</option>
+                      <option value={50}>50</option>
+                    </select>
+                  </div>
+                </div>
                 <div className="flex items-center gap-2">
                   <button
                     disabled={currentPage <= 1}

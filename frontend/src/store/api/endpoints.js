@@ -34,6 +34,7 @@ export const API_ENDPOINTS = Object.freeze({
     MY_BY_ID: (todoId) => `/todos/my/${todoId}`,
     COMPLETE: (todoId) => `/todos/my/${todoId}/complete`,
     TODAY_TASKS: "/todos/today-tasks",
+    TODAY_UNIQUE_TASKS: "/todos/today-unique-tasks",
     STOCK_REPORT: "/todos/reports/stock-completions",
   }),
   HOSTING: Object.freeze({}),

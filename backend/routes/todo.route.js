@@ -9,6 +9,7 @@ import {
   getTodosController,
   updateTodoController,
   getAdminManagerTodayTodosController,
+  getAdminManagerTodayUniqueTodosController,
   getStockCompletionReportController,
 } from "../controllers/todo.controller.js";
 import { authGuard } from "../middlewares/guard.middleware.js";
@@ -53,6 +54,10 @@ router.get(
   "/today-tasks",
   validate(getAdminManagerTodayTodosQuerySchema, "query"),
   getAdminManagerTodayTodosController,
+);
+router.get(
+  "/today-unique-tasks",
+  getAdminManagerTodayUniqueTodosController,
 );
 router.get(
   "/reports/stock-completions",

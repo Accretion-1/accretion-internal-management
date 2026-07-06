@@ -149,6 +149,7 @@ export const getTodoCompletionsQuerySchema = Joi.object({
 
 export const getAdminManagerTodayTodosQuerySchema = Joi.object({
   location_id: Joi.number().integer().positive().optional(),
+  todo_id: Joi.number().integer().positive().optional(),
   status: Joi.string().valid("active", "completed").optional(),
   page: Joi.number().integer().positive().default(1).optional(),
   limit: Joi.number().integer().positive().max(100).default(10).optional(),
