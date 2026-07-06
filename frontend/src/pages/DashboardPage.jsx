@@ -25,6 +25,8 @@ export const DashboardPage = () => {
   const [locationsList, setLocationsList] = useState([]);
   const [selectedLocationId, setSelectedLocationId] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('all');
+  const [selectedTodoId, setSelectedTodoId] = useState('');
+  const [uniqueTodayTasks, setUniqueTodayTasks] = useState([]);
   const [tasksLoading, setTasksLoading] = useState(false);
   const [locationsLoading, setLocationsLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -68,6 +70,9 @@ export const DashboardPage = () => {
       if (selectedLocationId) {
         params.location_id = selectedLocationId;
       }
+      if (selectedTodoId) {
+        params.todo_id = selectedTodoId;
+      }
       if (selectedStatus && selectedStatus !== 'all') {
         params.status = selectedStatus;
       }
@@ -91,14 +96,27 @@ export const DashboardPage = () => {
   useEffect(() => {
     if (role === 'Admin' || role === 'Manager') {
       fetchLocations();
+      fetchUniqueTodayTasks();
     }
   }, [role]);
+
+  const fetchUniqueTodayTasks = async () => {
+    try {
+      const response = await apiHandler({
+        method: 'GET',
+        url: API_ENDPOINTS.TODOS.TODAY_UNIQUE_TASKS,
+      });
+      setUniqueTodayTasks(Array.isArray(response?.data) ? response.data : []);
+    } catch (error) {
+      console.error('Error fetching unique today tasks:', error);
+    }
+  };
 
   useEffect(() => {
     if (role === 'Admin' || role === 'Manager') {
       fetchTodayTasks();
     }
-  }, [role, selectedLocationId, selectedStatus, currentPage, itemsPerPage]);
+  }, [role, selectedLocationId, selectedTodoId, selectedStatus, currentPage, itemsPerPage]);
 
   const handleLocationChange = (e) => {
     setSelectedLocationId(e.target.value);
@@ -718,7 +736,7 @@ export const DashboardPage = () => {
         </div>
 
         {/* Filter Bar */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-bold text-slate-600">Filter by Location</label>
             <div className="relative">
@@ -736,6 +754,26 @@ export const DashboardPage = () => {
                 ))}
               </select>
             </div>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-bold text-slate-600">Filter by Task</label>
+            <select
+              id="dashboard-task-filter"
+              value={selectedTodoId}
+              onChange={(e) => {
+                setSelectedTodoId(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="cursor-pointer rounded-xl border border-slate-200 bg-slate-50 py-2.5 px-3 text-xs font-bold text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
+            >
+              <option value="">All Tasks</option>
+              {uniqueTodayTasks.map((task) => (
+                <option key={task.todo_id} value={task.todo_id}>
+                  {task.title}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className="flex flex-col gap-1.5">

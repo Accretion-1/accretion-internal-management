@@ -715,6 +715,7 @@ export const getCompletionFilesByCompletionIdsModel = async (completionIds = [])
 
 export const getAdminManagerTodayTodosModel = async ({
   location_id = null,
+  todo_id = null,
   status = null,
   page = 1,
   limit = 10,
@@ -739,6 +740,11 @@ export const getAdminManagerTodayTodosModel = async ({
     if (location_id) {
       whereSql += ` AND tl.location_id = ? `;
       values.push(location_id);
+    }
+
+    if (todo_id) {
+      whereSql += ` AND t.todo_id = ? `;
+      values.push(todo_id);
     }
 
     if (status === "active") {
@@ -825,6 +831,7 @@ export const getAdminManagerTodayTodosModel = async ({
 
 export const countAdminManagerTodayTodosModel = async ({
   location_id = null,
+  todo_id = null,
   status = null,
 }) => {
   try {
@@ -846,6 +853,11 @@ export const countAdminManagerTodayTodosModel = async ({
     if (location_id) {
       whereSql += ` AND tl.location_id = ? `;
       values.push(location_id);
+    }
+
+    if (todo_id) {
+      whereSql += ` AND t.todo_id = ? `;
+      values.push(todo_id);
     }
 
     if (status === "active") {
@@ -968,5 +980,30 @@ export const updateTodoLastReminderSentAtModel = async (todoId) => {
     );
   } catch (error) {
     throw new ApiError(DB_ERROR, "Updating Todo Last Reminder Sent At", error, false);
+  }
+};
+
+export const getAdminManagerTodayUniqueTodosModel = async () => {
+  try {
+    const querySql = `
+      SELECT DISTINCT t.todo_id, t.title
+      FROM todos t
+      INNER JOIN todo_locations tl ON tl.todo_id = t.todo_id
+      WHERE tl.is_deleted = FALSE
+        AND t.is_active = TRUE
+        AND t.start_date <= CURDATE()
+        AND (t.end_date IS NULL OR t.end_date >= CURDATE())
+        AND (
+          t.schedule = 'daily'
+          OR (t.schedule = 'weekly' AND t.day_of_week = CASE WHEN DAYOFWEEK(CURDATE()) = 1 THEN 7 ELSE DAYOFWEEK(CURDATE()) - 1 END)
+          OR (t.schedule = 'monthly' AND t.day_of_month = DAY(CURDATE()))
+          OR (t.schedule = 'single' AND t.start_date <= CURDATE() AND (t.end_date IS NULL OR t.end_date >= CURDATE()))
+        )
+      ORDER BY t.title ASC
+    `;
+
+    return await db.query(querySql);
+  } catch (error) {
+    throw new ApiError(DB_ERROR, "Fetching Today Unique Todos", error, false);
   }
 };

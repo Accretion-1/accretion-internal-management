@@ -932,29 +932,35 @@ export const getAdminManagerTodayTodosService = async (query = {}, user) => {
     const page = Number(query.page || 1);
     const limit = Number(query.limit || 10);
     const locationId = query.location_id ? Number(query.location_id) : null;
+    const todoId = query.todo_id ? Number(query.todo_id) : null;
     const status = query.status || null;
 
     const [records, totalRecords, totalCount, completedCount, activeCount] = await Promise.all([
       todoModel.getAdminManagerTodayTodosModel({
         location_id: locationId,
+        todo_id: todoId,
         status,
         page,
         limit,
       }),
       todoModel.countAdminManagerTodayTodosModel({
         location_id: locationId,
+        todo_id: todoId,
         status,
       }),
       todoModel.countAdminManagerTodayTodosModel({
         location_id: locationId,
+        todo_id: todoId,
         status: null,
       }),
       todoModel.countAdminManagerTodayTodosModel({
         location_id: locationId,
+        todo_id: todoId,
         status: 'completed',
       }),
       todoModel.countAdminManagerTodayTodosModel({
         location_id: locationId,
+        todo_id: todoId,
         status: 'active',
       }),
     ]);
@@ -1077,5 +1083,15 @@ export const getAdminManagerTodayTodosService = async (query = {}, user) => {
   } catch (error) {
     if (error instanceof ApiError) throw error;
     throw new ApiError(FETCH_ERROR, "Today's Todos", error, false);
+  }
+};
+
+export const getAdminManagerTodayUniqueTodosService = async (user) => {
+  try {
+    ensureAdminOrManagerAccess(user);
+    return await todoModel.getAdminManagerTodayUniqueTodosModel();
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    throw new ApiError(FETCH_ERROR, "Today Unique Todos", error, false);
   }
 };
