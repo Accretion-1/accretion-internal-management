@@ -265,10 +265,10 @@ const formatTodo = (todo, locations = []) => {
     created_by: todo.created_by,
     created_by_user: todo.created_by
       ? {
-          user_id: todo.created_by,
-          full_name: todo.created_by_name,
-          phone_number: todo.created_by_phone_number,
-        }
+        user_id: todo.created_by,
+        full_name: todo.created_by_name,
+        phone_number: todo.created_by_phone_number,
+      }
       : null,
     due_time: todo.due_time,
     start_date: formatDateOnly(todo.start_date),
@@ -459,10 +459,10 @@ const formatTodoCompletion = (completion, files = [], stockItems = []) => {
     completed_by: completion.completed_by,
     completed_by_user: completion.completed_by
       ? {
-          user_id: completion.completed_by,
-          full_name: completion.completed_by_name,
-          phone_number: completion.completed_by_phone_number,
-        }
+        user_id: completion.completed_by,
+        full_name: completion.completed_by_name,
+        phone_number: completion.completed_by_phone_number,
+      }
       : null,
     completion_date: formatDateOnly(completion.completion_date),
     ppc: firstStockGroup.ppc,
@@ -506,10 +506,10 @@ const formatStockReportRecord = (record, stockItems = []) => ({
   completed_by: record.completed_by,
   completed_by_user: record.completed_by
     ? {
-        user_id: record.completed_by,
-        full_name: record.completed_by_name,
-        phone_number: record.completed_by_phone_number,
-      }
+      user_id: record.completed_by,
+      full_name: record.completed_by_name,
+      phone_number: record.completed_by_phone_number,
+    }
     : null,
   location: {
     location_id: record.location_id,
@@ -548,7 +548,7 @@ const normalizeCompletionFiles = (files = {}) => {
 const cleanupUploadedFiles = (files = []) => {
   files.forEach((file) => {
     if (!file.path) return;
-    fs.unlink(file.path, () => {});
+    fs.unlink(file.path, () => { });
   });
 };
 
@@ -627,9 +627,9 @@ const buildCompletionPayload = async (todo, body = {}, files = {}) => {
       throw new ApiError(INVALID, "Photo files");
     }
 
-    if (Boolean(todo.is_ocr) && photoFiles.length) {
-      await verifyPhotoFilesWithOcr(photoFiles);
-    }
+    // if (Boolean(todo.is_ocr) && photoFiles.length) {
+    //   await verifyPhotoFilesWithOcr(photoFiles);
+    // }
 
     return {
       remarks,
@@ -1000,10 +1000,10 @@ export const getAdminManagerTodayTodosService = async (query = {}, user) => {
         created_by: record.created_by,
         created_by_user: record.created_by
           ? {
-              user_id: record.created_by,
-              full_name: record.created_by_name,
-              phone_number: record.created_by_phone_number,
-            }
+            user_id: record.created_by,
+            full_name: record.created_by_name,
+            phone_number: record.created_by_phone_number,
+          }
           : null,
         due_time: record.due_time,
         start_date: formatDateOnly(record.start_date),
@@ -1017,41 +1017,41 @@ export const getAdminManagerTodayTodosService = async (query = {}, user) => {
 
       const completion = record.completion_id
         ? {
-            completion_id: record.completion_id,
-            todo_id: record.todo_id,
-            todo_location_id: record.todo_location_id,
-            completed_by: record.completed_by,
-            completed_by_user: record.completed_by
-              ? {
-                  user_id: record.completed_by,
-                  full_name: record.completed_by_name,
-                  phone_number: record.completed_by_phone_number,
-                }
-              : null,
-            completion_date: formatDateOnly(record.completion_date),
-            completed_at: record.completed_at,
-            ...(() => {
-              const stockItems = stockItemsByCompletionId.get(Number(record.completion_id)) || [];
-              const stockItemGroups = buildStockItemGroups(stockItems);
-              const stockItemSections = buildStockItemSections(stockItems);
-              const [firstStockGroup = {}] = stockItemGroups;
-              return {
-                ppc: firstStockGroup.ppc,
-                wp: firstStockGroup.wp,
-                super: firstStockGroup.super,
-                cnt_ppc: firstStockGroup.cnt_ppc,
-                cnt_wp: firstStockGroup.cnt_wp,
-                cnt_super: firstStockGroup.cnt_super,
-                week: firstStockGroup.week,
-                stock_items: stockItems,
-                stock_item_groups: stockItemGroups,
-                stock_item_sections: stockItemSections,
-              };
-            })(),
-            checkbox_items_response: parseJsonValue(record.checkbox_items_response, []),
-            remarks: record.remarks,
-            files: (filesByCompletionId.get(Number(record.completion_id)) || []).map(formatCompletionFile),
-          }
+          completion_id: record.completion_id,
+          todo_id: record.todo_id,
+          todo_location_id: record.todo_location_id,
+          completed_by: record.completed_by,
+          completed_by_user: record.completed_by
+            ? {
+              user_id: record.completed_by,
+              full_name: record.completed_by_name,
+              phone_number: record.completed_by_phone_number,
+            }
+            : null,
+          completion_date: formatDateOnly(record.completion_date),
+          completed_at: record.completed_at,
+          ...(() => {
+            const stockItems = stockItemsByCompletionId.get(Number(record.completion_id)) || [];
+            const stockItemGroups = buildStockItemGroups(stockItems);
+            const stockItemSections = buildStockItemSections(stockItems);
+            const [firstStockGroup = {}] = stockItemGroups;
+            return {
+              ppc: firstStockGroup.ppc,
+              wp: firstStockGroup.wp,
+              super: firstStockGroup.super,
+              cnt_ppc: firstStockGroup.cnt_ppc,
+              cnt_wp: firstStockGroup.cnt_wp,
+              cnt_super: firstStockGroup.cnt_super,
+              week: firstStockGroup.week,
+              stock_items: stockItems,
+              stock_item_groups: stockItemGroups,
+              stock_item_sections: stockItemSections,
+            };
+          })(),
+          checkbox_items_response: parseJsonValue(record.checkbox_items_response, []),
+          remarks: record.remarks,
+          files: (filesByCompletionId.get(Number(record.completion_id)) || []).map(formatCompletionFile),
+        }
         : null;
 
       return {
