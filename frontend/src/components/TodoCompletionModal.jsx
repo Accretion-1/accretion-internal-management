@@ -4,6 +4,7 @@ import { Modal } from './Modal';
 import apiHandler from '../store/api/apiHandler';
 import { API_ENDPOINTS } from '../store/api/endpoints';
 import { useAppState } from '../contexts/StateContext';
+import { verifyOcrFile } from '../services/ocr.service';
 
 
 const INITIAL_FORM = {
@@ -380,17 +381,8 @@ export const TodoCompletionModal = ({ isOpen, todo, onClose, onCompleted }) => {
             [fileKey]: { status: 'checking' },
         }));
 
-        const formData = new FormData();
-        formData.append('image', file);
-
         try {
-            const response = await apiHandler({
-                method: 'POST',
-                url: API_ENDPOINTS.OCR.VERIFY,
-                data: formData,
-                showNotification: false,
-            });
-            const data = response?.data || {};
+            const data = await verifyOcrFile(file);
             const score = data.best_match?.score ?? 0;
             const status = data.is_matched ? 'matched' : 'failed';
 
@@ -406,14 +398,11 @@ export const TodoCompletionModal = ({ isOpen, todo, onClose, onCompleted }) => {
                 },
             }));
         } catch (error) {
-            const isNetworkError = !error?.status || error?.message === 'Network Error';
             setOcrResults((prev) => ({
                 ...prev,
                 [fileKey]: {
                     status: 'failed',
-                    message: isNetworkError
-                        ? 'OCR request failed. Please check network, API URL, CORS, or upload size limit.'
-                        : error?.message || 'Unable to verify image with OCR.',
+                    message: error?.message || 'Unable to verify image with OCR on this device.',
                 },
             }));
         }
