@@ -4,7 +4,7 @@ import { Modal } from './Modal';
 import apiHandler from '../store/api/apiHandler';
 import { API_ENDPOINTS } from '../store/api/endpoints';
 import { useAppState } from '../contexts/StateContext';
-import { verifyOcrFile } from '../services/ocr.service';
+import { verifyOcrFile, warmUpOcrEngine } from '../services/ocr.service';
 
 
 const INITIAL_FORM = {
@@ -256,6 +256,9 @@ export const TodoCompletionModal = ({ isOpen, todo, onClose, onCompleted }) => {
     }, [isCapturing]);
 
     const handleOpenCamera = () => {
+        if (shouldVerifyPhotoOcr) {
+            warmUpOcrEngine().catch(() => { });
+        }
         setIsCapturing(true);
     };
 
@@ -284,6 +287,11 @@ export const TodoCompletionModal = ({ isOpen, todo, onClose, onCompleted }) => {
         setPhotoPreviews(previews);
         return () => previews.forEach((preview) => URL.revokeObjectURL(preview.url));
     }, [form.photos]);
+
+    useEffect(() => {
+        if (!isOpen || !shouldVerifyPhotoOcr) return;
+        warmUpOcrEngine().catch(() => { });
+    }, [isOpen, shouldVerifyPhotoOcr]);
 
     useEffect(() => {
         const previews = form.videos.map((file) => ({
@@ -866,7 +874,6 @@ export const TodoCompletionModal = ({ isOpen, todo, onClose, onCompleted }) => {
                                             ))}
                                         </div>
                                     )}
-                                    <FileList files={form.photos} onRemove={(index) => handleRemoveFile('photos', index)} ocrResults={shouldVerifyPhotoOcr ? ocrResults : {}} />
                                 </div>
                             )}
 

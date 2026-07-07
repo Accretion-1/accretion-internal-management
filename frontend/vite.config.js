@@ -88,6 +88,23 @@ export default defineConfig(() => {
                                 },
                             },
                         },
+                        {
+                            urlPattern: ({ url }) =>
+                                url.hostname === 'paddle-model-ecology.bj.bcebos.com'
+                                || url.pathname.endsWith('.wasm')
+                                || url.pathname.endsWith('.mjs'),
+                            handler: 'CacheFirst',
+                            options: {
+                                cacheName: 'ocr-runtime-cache',
+                                cacheableResponse: {
+                                    statuses: [0, 200],
+                                },
+                                expiration: {
+                                    maxEntries: 20,
+                                    maxAgeSeconds: 60 * 60 * 24 * 30,
+                                },
+                            },
+                        },
                     ],
                 },
             }),

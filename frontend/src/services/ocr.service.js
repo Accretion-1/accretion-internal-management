@@ -1,11 +1,16 @@
 import ocrMatchData from '../data/ocr-match';
 
 const DEFAULT_MIN_MATCH_SCORE = 70;
+const OCR_IMAGE_MAX_SIDE = 1600;
 const PADDLE_OCR_OPTIONS = {
-    textDetectionModelName: 'PP-OCRv5_mobile_det',
-    textRecognitionModelName: 'PP-OCRv5_mobile_rec',
+    textDetectionModelName: 'PP-OCRv6_tiny_det',
+    textRecognitionModelName: 'PP-OCRv6_tiny_rec',
+    textDetectionBatchSize: 1,
+    textRecognitionBatchSize: 4,
     ortOptions: {
         backend: 'wasm',
+        numThreads: Math.min(typeof navigator !== 'undefined' ? navigator.hardwareConcurrency || 2 : 2, 4),
+        simd: true,
     },
     worker: true,
 };
@@ -224,15 +229,68 @@ const getPaddleOcrInstance = async () => {
     return paddleOcrInstancePromise;
 };
 
+export const warmUpOcrEngine = async () => {
+    await getPaddleOcrInstance();
+};
+
 const getAverageConfidence = (items = []) => {
     if (!items.length) return 0;
     const confidence = items.reduce((sum, item) => sum + Number(item.score || 0), 0) / items.length;
     return confidence <= 1 ? confidence * 100 : confidence;
 };
 
+const createImageElement = (file) => new Promise((resolve, reject) => {
+    const image = new Image();
+    const objectUrl = URL.createObjectURL(file);
+
+    image.onload = () => {
+        URL.revokeObjectURL(objectUrl);
+        resolve(image);
+    };
+    image.onerror = () => {
+        URL.revokeObjectURL(objectUrl);
+        reject(new Error('Unable to read captured photo for OCR.'));
+    };
+    image.src = objectUrl;
+});
+
+const prepareImageForOcr = async (file) => {
+    if (!file?.type?.startsWith('image/')) return file;
+
+    const image = await createImageElement(file);
+    const scale = Math.min(1, OCR_IMAGE_MAX_SIDE / Math.max(image.naturalWidth, image.naturalHeight));
+
+    if (scale >= 1 && file.size <= 1.5 * 1024 * 1024) {
+        return file;
+    }
+
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+    canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+
+    const context = canvas.getContext('2d', { willReadFrequently: true });
+    if (!context) return file;
+
+    context.imageSmoothingEnabled = true;
+    context.imageSmoothingQuality = 'high';
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+    return new Promise((resolve) => {
+        canvas.toBlob((blob) => {
+            resolve(blob ? new File([blob], file.name, { type: 'image/jpeg' }) : file);
+        }, 'image/jpeg', 0.9);
+    });
+};
+
 const extractTextWithPaddleOcr = async (file) => {
     const ocr = await getPaddleOcrInstance();
-    const [result] = await ocr.predict(file);
+    const ocrFile = await prepareImageForOcr(file);
+    const [result] = await ocr.predict(ocrFile, {
+        textDetLimitSideLen: 960,
+        textDetLimitType: 'max',
+        textDetMaxSideLimit: OCR_IMAGE_MAX_SIDE,
+        textRecScoreThresh: 0,
+    });
     const items = Array.isArray(result?.items) ? result.items : [];
 
     return {
