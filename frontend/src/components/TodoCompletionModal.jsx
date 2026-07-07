@@ -4,6 +4,7 @@ import { Modal } from './Modal';
 import apiHandler from '../store/api/apiHandler';
 import { API_ENDPOINTS } from '../store/api/endpoints';
 import { useAppState } from '../contexts/StateContext';
+import { verifyOcrFile, warmUpOcrEngine } from '../services/ocr.service';
 
 
 const INITIAL_FORM = {
@@ -37,6 +38,9 @@ const PHOTO_CAPTURE_CONSTRAINTS = {
     height: { ideal: 2160 },
     aspectRatio: { ideal: 1.777777778 },
 };
+const PHOTO_UPLOAD_MAX_SIDE = 1600;
+const PHOTO_UPLOAD_TARGET_BYTES = 900 * 1024;
+const PHOTO_UPLOAD_QUALITIES = [0.82, 0.74, 0.66, 0.58, 0.5];
 
 const getTaskTypeLabel = (type) => String(type || '').replace(/^\w/, (letter) => letter.toUpperCase());
 
@@ -128,6 +132,7 @@ export const TodoCompletionModal = ({ isOpen, todo, onClose, onCompleted }) => {
 
     // New states for User role enhancements
     const [isCapturing, setIsCapturing] = useState(false);
+    const [isPhotoProcessing, setIsPhotoProcessing] = useState(false);
     const [previewFile, setPreviewFile] = useState(null);
 
     const todoType = todo?.type;
@@ -255,6 +260,9 @@ export const TodoCompletionModal = ({ isOpen, todo, onClose, onCompleted }) => {
     }, [isCapturing]);
 
     const handleOpenCamera = () => {
+        if (shouldVerifyPhotoOcr) {
+            warmUpOcrEngine().catch(() => { });
+        }
         setIsCapturing(true);
     };
 
@@ -283,6 +291,11 @@ export const TodoCompletionModal = ({ isOpen, todo, onClose, onCompleted }) => {
         setPhotoPreviews(previews);
         return () => previews.forEach((preview) => URL.revokeObjectURL(preview.url));
     }, [form.photos]);
+
+    useEffect(() => {
+        if (!isOpen || !shouldVerifyPhotoOcr) return;
+        warmUpOcrEngine().catch(() => { });
+    }, [isOpen, shouldVerifyPhotoOcr]);
 
     useEffect(() => {
         const previews = form.videos.map((file) => ({
@@ -380,17 +393,8 @@ export const TodoCompletionModal = ({ isOpen, todo, onClose, onCompleted }) => {
             [fileKey]: { status: 'checking' },
         }));
 
-        const formData = new FormData();
-        formData.append('image', file);
-
         try {
-            const response = await apiHandler({
-                method: 'POST',
-                url: API_ENDPOINTS.OCR.VERIFY,
-                data: formData,
-                showNotification: false,
-            });
-            const data = response?.data || {};
+            const data = await verifyOcrFile(file);
             const score = data.best_match?.score ?? 0;
             const status = data.is_matched ? 'matched' : 'failed';
 
@@ -406,14 +410,11 @@ export const TodoCompletionModal = ({ isOpen, todo, onClose, onCompleted }) => {
                 },
             }));
         } catch (error) {
-            const isNetworkError = !error?.status || error?.message === 'Network Error';
             setOcrResults((prev) => ({
                 ...prev,
                 [fileKey]: {
                     status: 'failed',
-                    message: isNetworkError
-                        ? 'OCR request failed. Please check network, API URL, CORS, or upload size limit.'
-                        : error?.message || 'Unable to verify image with OCR.',
+                    message: error?.message || 'Unable to verify image with OCR on this device.',
                 },
             }));
         }
@@ -463,8 +464,78 @@ export const TodoCompletionModal = ({ isOpen, todo, onClose, onCompleted }) => {
         });
     };
 
+    const createImageElementFromFile = (file) => new Promise((resolve, reject) => {
+        const image = new Image();
+        const objectUrl = URL.createObjectURL(file);
+
+        image.onload = () => {
+            URL.revokeObjectURL(objectUrl);
+            resolve(image);
+        };
+        image.onerror = () => {
+            URL.revokeObjectURL(objectUrl);
+            reject(new Error('Unable to process captured photo.'));
+        };
+        image.src = objectUrl;
+    });
+
+    const canvasToFile = (canvas, fileName, quality) => new Promise((resolve) => {
+        canvas.toBlob((blob) => {
+            resolve(blob ? new File([blob], fileName, { type: 'image/jpeg', lastModified: Date.now() }) : null);
+        }, 'image/jpeg', quality);
+    });
+
+    const compressPhotoFile = async (file) => {
+        if (!file?.type?.startsWith('image/')) return file;
+
+        try {
+            const image = await createImageElementFromFile(file);
+            const longestSide = Math.max(image.naturalWidth, image.naturalHeight);
+            const scale = Math.min(1, PHOTO_UPLOAD_MAX_SIDE / longestSide);
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+            canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+
+            const context = canvas.getContext('2d', { willReadFrequently: true });
+            if (!context) return file;
+
+            context.imageSmoothingEnabled = true;
+            context.imageSmoothingQuality = 'high';
+            context.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+            const compressedName = file.name.replace(/\.[^.]+$/, '') || `photo-${Date.now()}`;
+            let bestFile = file;
+
+            for (const quality of PHOTO_UPLOAD_QUALITIES) {
+                const compressedFile = await canvasToFile(canvas, `${compressedName}.jpg`, quality);
+                if (!compressedFile) continue;
+
+                bestFile = compressedFile;
+                if (compressedFile.size <= PHOTO_UPLOAD_TARGET_BYTES) {
+                    break;
+                }
+            }
+
+            return bestFile.size < file.size ? bestFile : file;
+        } catch {
+            return file;
+        }
+    };
+
     const handleCapturePhoto = async () => {
-        const file = await createPhotoFile();
+        if (isPhotoProcessing) return;
+
+        let file;
+
+        try {
+            setIsPhotoProcessing(true);
+            const capturedFile = await createPhotoFile();
+            if (!capturedFile) return;
+            file = await compressPhotoFile(capturedFile);
+        } finally {
+            setIsPhotoProcessing(false);
+        }
+
         if (!file) return;
 
         const newIndex = form.photos.length;
@@ -825,11 +896,11 @@ export const TodoCompletionModal = ({ isOpen, todo, onClose, onCompleted }) => {
                                             <button
                                                 type="button"
                                                 onClick={handleCapturePhoto}
-                                                disabled={!isCameraReady}
+                                                disabled={!isCameraReady || isPhotoProcessing}
                                                 className="mt-3 inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-extrabold text-white transition-all hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
                                             >
-                                                <Camera className="h-4 w-4" />
-                                                Capture Photo
+                                                {isPhotoProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
+                                                {isPhotoProcessing ? 'Compressing Photo...' : 'Capture Photo'}
                                             </button>
                                         </>
                                     )}
@@ -877,7 +948,6 @@ export const TodoCompletionModal = ({ isOpen, todo, onClose, onCompleted }) => {
                                             ))}
                                         </div>
                                     )}
-                                    <FileList files={form.photos} onRemove={(index) => handleRemoveFile('photos', index)} ocrResults={shouldVerifyPhotoOcr ? ocrResults : {}} />
                                 </div>
                             )}
 
@@ -1127,10 +1197,10 @@ export const TodoCompletionModal = ({ isOpen, todo, onClose, onCompleted }) => {
                                 <button
                                     type="button"
                                     onClick={handleCapturePhoto}
-                                    disabled={!isCameraReady}
+                                    disabled={!isCameraReady || isPhotoProcessing}
                                     className="flex h-20 w-20 items-center justify-center rounded-full border-4 border-white bg-white/10 active:bg-white transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                    <div className="h-14 w-14 rounded-full bg-white" />
+                                    {isPhotoProcessing ? <Loader2 className="h-8 w-8 animate-spin text-white" /> : <div className="h-14 w-14 rounded-full bg-white" />}
                                 </button>
                             ) : (
                                 <button

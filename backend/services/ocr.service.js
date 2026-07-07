@@ -208,6 +208,7 @@ const extractTextFromImage = async (imageBuffer) => {
   return {
     text: data?.text || "",
     confidence: Number((data?.confidence || 0).toFixed(2)),
+    engine: "tesseract",
   };
 };
 
@@ -234,6 +235,7 @@ export const verifyOcrImageService = async (file) => {
       ocr: {
         text: ocrResult.text,
         confidence: ocrResult.confidence,
+        engine: ocrResult.engine,
       },
       file: {
         original_name: file.originalname,

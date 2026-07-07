@@ -50,6 +50,10 @@ export default defineConfig(() => {
                     globPatterns: [
                         '**/*.{js,css,html,ico,png,jpg,jpeg,svg,webp,avif,woff,woff2,ttf}',
                     ],
+                    globIgnores: [
+                        '**/paddle-ocr*.js',
+                        '**/worker-entry-*.js',
+                    ],
                     runtimeCaching: [
                         {
                             urlPattern: ({ url, request }) =>
@@ -84,6 +88,23 @@ export default defineConfig(() => {
                                 },
                             },
                         },
+                        {
+                            urlPattern: ({ url }) =>
+                                url.hostname === 'paddle-model-ecology.bj.bcebos.com'
+                                || url.pathname.endsWith('.wasm')
+                                || url.pathname.endsWith('.mjs'),
+                            handler: 'CacheFirst',
+                            options: {
+                                cacheName: 'ocr-runtime-cache',
+                                cacheableResponse: {
+                                    statuses: [0, 200],
+                                },
+                                expiration: {
+                                    maxEntries: 20,
+                                    maxAgeSeconds: 60 * 60 * 24 * 30,
+                                },
+                            },
+                        },
                     ],
                 },
             }),
@@ -99,6 +120,23 @@ export default defineConfig(() => {
             hmr: process.env.DISABLE_HMR !== 'true',
             // Disable file watching when DISABLE_HMR is true to save CPU during agent edits.
             watch: process.env.DISABLE_HMR === 'true' ? null : {},
+        },
+        build: {
+            rollupOptions: {
+                output: {
+                    manualChunks(id) {
+                        if (
+                            id.includes('@paddleocr/paddleocr-js')
+                            || id.includes('@techstark/opencv-js')
+                            || id.includes('onnxruntime-web')
+                        ) {
+                            return 'paddle-ocr';
+                        }
+
+                        return undefined;
+                    },
+                },
+            },
         },
     };
 });
