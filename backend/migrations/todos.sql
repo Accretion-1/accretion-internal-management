@@ -139,3 +139,5 @@ ALTER TABLE `todo_completions`
         ON DELETE CASCADE
         ON UPDATE CASCADE
 );
+
+ALTER TABLE `todo_completion_items` CHANGE `stock_name` `stock_name` ENUM('ppc','wp','super','cnt_ppc','cnt_wp','cnt_super','damage_ppc','damage_wp','damage_super') CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL;

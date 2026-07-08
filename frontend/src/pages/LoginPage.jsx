@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Phone, ShieldAlert, ArrowRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { loginUser, resendOtp, verifyOtp } from '../store/slices/authSlice';
@@ -18,7 +18,34 @@ export const LoginPage = () => {
     const [smsIncomingAlert, setSmsIncomingAlert] = useState(null);
     const [fcmToken, setFcmToken] = useState(null);
     const phoneSubmitLockRef = useRef(false);
+    const otpAbortControllerRef = useRef(null);
+    const otpPollTimerRef = useRef(null);
+    const otpInputRef = useRef(null);
+    const otpSubmitLockRef = useRef(false);
+    const pendingOtpCodeRef = useRef('');
+    const fcmTokenRef = useRef(null);
     const [phoneSubmitting, setPhoneSubmitting] = useState(false);
+
+    // Ref that always reflects the latest otpValue, so the DOM-polling
+    // fallback (which runs on a setInterval, not a re-render) never
+    // compares against a stale closured value.
+    const otpValueRef = useRef(otpValue);
+
+    useEffect(() => {
+        otpValueRef.current = otpValue;
+    }, [otpValue]);
+
+    const stopOtpAutofillSession = useCallback(() => {
+        if (otpAbortControllerRef.current) {
+            otpAbortControllerRef.current.abort();
+            otpAbortControllerRef.current = null;
+        }
+
+        if (otpPollTimerRef.current) {
+            clearInterval(otpPollTimerRef.current);
+            otpPollTimerRef.current = null;
+        }
+    }, []);
 
     const handlePhoneSubmit = async (e) => {
         e.preventDefault();
@@ -37,6 +64,7 @@ export const LoginPage = () => {
         setPhoneError('');
         try {
             const generatedFcmToken = await getFcmTokenSafely();
+            fcmTokenRef.current = generatedFcmToken;
             setFcmToken(generatedFcmToken);
             await dispatch(loginUser({ phone_number: cleanPhone })).unwrap();
             setPhoneNumber(cleanPhone);
@@ -57,20 +85,34 @@ export const LoginPage = () => {
         }
     };
 
-    const handleOtpSubmit = async (e) => {
-        e.preventDefault();
-        if (otpValue.length !== 4) {
+    const submitOtpCode = useCallback(async (code, tokenOverride = fcmTokenRef.current || fcmToken) => {
+        const cleanCode = String(code || '').replace(/[^0-9]/g, '').slice(0, 4);
+        if (otpSubmitLockRef.current || isLoading) {
+            return;
+        }
+
+        if (cleanCode.length !== 4) {
             setOtpError('OTP must be exactly 4 digits.');
             return;
         }
+
+        otpSubmitLockRef.current = true;
         setOtpError('');
         try {
-            await dispatch(verifyOtp({ phone_number: phoneNumber, otp: otpValue, fcm_token: fcmToken })).unwrap();
+            await dispatch(verifyOtp({ phone_number: phoneNumber, otp: cleanCode, fcm_token: tokenOverride })).unwrap();
             setSmsIncomingAlert(null);
         }
         catch (error) {
             setOtpError(error?.message || 'Unable to verify OTP.');
         }
+        finally {
+            otpSubmitLockRef.current = false;
+        }
+    }, [dispatch, fcmToken, isLoading, phoneNumber]);
+
+    const handleOtpSubmit = async (e) => {
+        e.preventDefault();
+        await submitOtpCode(otpValue);
     };
 
     const handleResendOtp = async () => {
@@ -82,6 +124,98 @@ export const LoginPage = () => {
             setOtpError(error?.message || 'Unable to resend OTP.');
         }
     };
+
+    const startOtpAutofillSession = useCallback(() => {
+        if (typeof window === 'undefined' || !('OTPCredential' in window) || !navigator.credentials?.get) {
+            return;
+        }
+
+        if (otpAbortControllerRef.current) {
+            return;
+        }
+
+        const controller = new AbortController();
+        otpAbortControllerRef.current = controller;
+        otpInputRef.current?.focus();
+
+        const startPollingForAutofill = () => {
+            let attempts = 0;
+            otpPollTimerRef.current = window.setInterval(() => {
+                attempts += 1;
+                const domValue = String(otpInputRef.current?.value || '').replace(/[^0-9]/g, '').slice(0, 4);
+                if (domValue.length === 4 && domValue !== otpValueRef.current) {
+                    pendingOtpCodeRef.current = domValue;
+                    setOtpValue(domValue);
+                    setOtpError('');
+                    clearInterval(otpPollTimerRef.current);
+                    otpPollTimerRef.current = null;
+                    submitOtpCode(domValue);
+                    return;
+                }
+
+                if (attempts >= 32) {
+                    clearInterval(otpPollTimerRef.current);
+                    otpPollTimerRef.current = null;
+                }
+            }, 250);
+        };
+
+        startPollingForAutofill();
+
+        const startOtpListener = async () => {
+            try {
+                const credential = await navigator.credentials.get({
+                    otp: { transport: ['sms'] },
+                    signal: controller.signal,
+                });
+
+                const receivedCode = credential?.code ? String(credential.code).replace(/[^0-9]/g, '').slice(0, 4) : '';
+                if (receivedCode.length === 4) {
+                    pendingOtpCodeRef.current = receivedCode;
+                    setOtpValue(receivedCode);
+                    setOtpError('');
+                    if (otpInputRef.current) {
+                        otpInputRef.current.value = receivedCode;
+                    }
+                    if (otpPollTimerRef.current) {
+                        clearInterval(otpPollTimerRef.current);
+                        otpPollTimerRef.current = null;
+                    }
+                    await submitOtpCode(receivedCode);
+                }
+            }
+            catch {
+                // Silent fallback: aborted (user left OTP screen) or
+                // browser/platform doesn't support Web OTP.
+            }
+        };
+
+        startOtpListener();
+    }, [submitOtpCode]);
+
+    // Web OTP's AbortSignal is scoped to the OTP screen's lifecycle:
+    // start listening the moment the OTP screen mounts, stop the moment
+    // the user leaves it (back to phone step) or the component unmounts.
+    useEffect(() => {
+        if (step !== 'otp') {
+            pendingOtpCodeRef.current = '';
+            return;
+        }
+
+        if (pendingOtpCodeRef.current?.length === 4) {
+            const pendingCode = pendingOtpCodeRef.current;
+            pendingOtpCodeRef.current = '';
+            submitOtpCode(pendingCode);
+        } else {
+            otpInputRef.current?.focus();
+        }
+
+        startOtpAutofillSession();
+
+        return () => {
+            stopOtpAutofillSession();
+        };
+    }, [step, submitOtpCode, startOtpAutofillSession, stopOtpAutofillSession]);
 
     return (
         <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-slate-50 px-4 py-10 font-sans selection:bg-blue-100">
@@ -170,12 +304,17 @@ export const LoginPage = () => {
                                     <div className="flex flex-col gap-1.5">
                                         <label className="text-xs font-semibold text-slate-700">4-Digit OTP</label>
                                         <input
+                                            ref={otpInputRef}
                                             id="otp-input"
                                             type="text"
                                             maxLength={4}
                                             placeholder="••••"
+                                            autoComplete="one-time-code"
+                                            inputMode="numeric"
+                                            name="one-time-code"
                                             value={otpValue}
                                             onChange={(e) => setOtpValue(e.target.value.replace(/[^0-9]/g, ''))}
+                                            onInput={(e) => setOtpValue(e.currentTarget.value.replace(/[^0-9]/g, ''))}
                                             className={`w-full rounded-2xl border bg-slate-50 px-4 py-3.5 text-center text-xl font-bold tracking-widest text-slate-900 transition-all focus:bg-white focus:outline-none focus:ring-4 focus:ring-blue-100 ${otpError ? 'border-rose-400' : 'border-slate-200'}`}
                                         />
                                         {otpError && (

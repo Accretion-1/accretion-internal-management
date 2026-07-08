@@ -15,7 +15,17 @@ import {
 } from "../utils/message.util.js";
 import { CustomImagePath, isEmpty } from "../utils/misc.util.js";
 
-const STOCK_ITEM_NAMES = ["ppc", "wp", "super", "cnt_ppc", "cnt_wp", "cnt_super"];
+const STOCK_ITEM_NAMES = [
+  "ppc",
+  "wp",
+  "super",
+  "cnt_ppc",
+  "cnt_wp",
+  "cnt_super",
+  "damage_ppc",
+  "damage_wp",
+  "damage_super",
+];
 
 const normalizeOptionalText = (value) => {
   if (value === undefined || value === null || value === "") return null;
@@ -414,6 +424,9 @@ const buildStockItemGroups = (items = []) => {
         cnt_ppc: 0,
         cnt_wp: 0,
         cnt_super: 0,
+        damage_ppc: 0,
+        damage_wp: 0,
+        damage_super: 0,
       });
     }
 
@@ -471,6 +484,9 @@ const formatTodoCompletion = (completion, files = [], stockItems = []) => {
     cnt_ppc: firstStockGroup.cnt_ppc,
     cnt_wp: firstStockGroup.cnt_wp,
     cnt_super: firstStockGroup.cnt_super,
+    damage_ppc: firstStockGroup.damage_ppc,
+    damage_wp: firstStockGroup.damage_wp,
+    damage_super: firstStockGroup.damage_super,
     week: firstStockGroup.week,
     stock_items: stockItems,
     stock_item_groups: stockItemGroups,
@@ -521,6 +537,9 @@ const formatStockReportRecord = (record, stockItems = []) => ({
   },
   stock_items: stockItems,
   stock_item_sections: buildStockItemSections(stockItems),
+  damage_ppc: stockItems.find((item) => item.stock_name === "damage_ppc")?.stock_value ?? 0,
+  damage_wp: stockItems.find((item) => item.stock_name === "damage_wp")?.stock_value ?? 0,
+  damage_super: stockItems.find((item) => item.stock_name === "damage_super")?.stock_value ?? 0,
 });
 
 const normalizeBoolean = (value) => {
@@ -1049,6 +1068,9 @@ export const getAdminManagerTodayTodosService = async (query = {}, user) => {
               cnt_ppc: firstStockGroup.cnt_ppc,
               cnt_wp: firstStockGroup.cnt_wp,
               cnt_super: firstStockGroup.cnt_super,
+              damage_ppc: firstStockGroup.damage_ppc,
+              damage_wp: firstStockGroup.damage_wp,
+              damage_super: firstStockGroup.damage_super,
               week: firstStockGroup.week,
               stock_items: stockItems,
               stock_item_groups: stockItemGroups,
