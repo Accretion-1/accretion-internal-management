@@ -19,6 +19,7 @@ export const LoginPage = () => {
     const [fcmToken, setFcmToken] = useState(null);
     const phoneSubmitLockRef = useRef(false);
     const otpAbortControllerRef = useRef(null);
+    const otpPollTimerRef = useRef(null);
     const otpInputRef = useRef(null);
     const otpSubmitLockRef = useRef(false);
     const [phoneSubmitting, setPhoneSubmitting] = useState(false);
@@ -106,15 +107,46 @@ export const LoginPage = () => {
                 otpAbortControllerRef.current.abort();
                 otpAbortControllerRef.current = null;
             }
+            if (otpPollTimerRef.current) {
+                clearInterval(otpPollTimerRef.current);
+                otpPollTimerRef.current = null;
+            }
             return undefined;
         }
 
         if (typeof window === 'undefined' || !('OTPCredential' in window) || !navigator.credentials?.get) {
+            if (otpInputRef.current) {
+                otpInputRef.current.focus();
+            }
             return undefined;
         }
 
         const controller = new AbortController();
         otpAbortControllerRef.current = controller;
+        otpInputRef.current?.focus();
+
+        const startPollingForAutofill = () => {
+            let attempts = 0;
+            otpPollTimerRef.current = window.setInterval(() => {
+                attempts += 1;
+                const domValue = String(otpInputRef.current?.value || '').replace(/[^0-9]/g, '').slice(0, 4);
+                if (domValue.length === 4 && domValue !== otpValue) {
+                    setOtpValue(domValue);
+                    setOtpError('');
+                    clearInterval(otpPollTimerRef.current);
+                    otpPollTimerRef.current = null;
+                    submitOtpCode(domValue);
+                    return;
+                }
+
+                if (attempts >= 20) {
+                    clearInterval(otpPollTimerRef.current);
+                    otpPollTimerRef.current = null;
+                }
+            }, 250);
+        };
+
+        startPollingForAutofill();
 
         const startOtpListener = async () => {
             try {
@@ -130,6 +162,10 @@ export const LoginPage = () => {
                     if (otpInputRef.current) {
                         otpInputRef.current.value = receivedCode;
                     }
+                    if (otpPollTimerRef.current) {
+                        clearInterval(otpPollTimerRef.current);
+                        otpPollTimerRef.current = null;
+                    }
                     await submitOtpCode(receivedCode);
                 }
             }
@@ -144,6 +180,10 @@ export const LoginPage = () => {
             controller.abort();
             if (otpAbortControllerRef.current === controller) {
                 otpAbortControllerRef.current = null;
+            }
+            if (otpPollTimerRef.current) {
+                clearInterval(otpPollTimerRef.current);
+                otpPollTimerRef.current = null;
             }
         };
     }, [step, submitOtpCode]);
@@ -245,6 +285,7 @@ export const LoginPage = () => {
                                             name="one-time-code"
                                             value={otpValue}
                                             onChange={(e) => setOtpValue(e.target.value.replace(/[^0-9]/g, ''))}
+                                            onInput={(e) => setOtpValue(e.currentTarget.value.replace(/[^0-9]/g, ''))}
                                             className={`w-full rounded-2xl border bg-slate-50 px-4 py-3.5 text-center text-xl font-bold tracking-widest text-slate-900 transition-all focus:bg-white focus:outline-none focus:ring-4 focus:ring-blue-100 ${otpError ? 'border-rose-400' : 'border-slate-200'}`}
                                         />
                                         {otpError && (
