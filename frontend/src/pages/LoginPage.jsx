@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Phone, ShieldAlert, ArrowRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { loginUser, resendOtp, verifyOtp } from '../store/slices/authSlice';
@@ -19,6 +19,8 @@ export const LoginPage = () => {
     const [fcmToken, setFcmToken] = useState(null);
     const phoneSubmitLockRef = useRef(false);
     const otpAbortControllerRef = useRef(null);
+    const otpInputRef = useRef(null);
+    const otpSubmitLockRef = useRef(false);
     const [phoneSubmitting, setPhoneSubmitting] = useState(false);
 
     const handlePhoneSubmit = async (e) => {
@@ -58,20 +60,34 @@ export const LoginPage = () => {
         }
     };
 
-    const handleOtpSubmit = async (e) => {
-        e.preventDefault();
-        if (otpValue.length !== 4) {
+    const submitOtpCode = useCallback(async (code) => {
+        const cleanCode = String(code || '').replace(/[^0-9]/g, '').slice(0, 4);
+        if (otpSubmitLockRef.current || isLoading) {
+            return;
+        }
+
+        if (cleanCode.length !== 4) {
             setOtpError('OTP must be exactly 4 digits.');
             return;
         }
+
+        otpSubmitLockRef.current = true;
         setOtpError('');
         try {
-            await dispatch(verifyOtp({ phone_number: phoneNumber, otp: otpValue, fcm_token: fcmToken })).unwrap();
+            await dispatch(verifyOtp({ phone_number: phoneNumber, otp: cleanCode, fcm_token: fcmToken })).unwrap();
             setSmsIncomingAlert(null);
         }
         catch (error) {
             setOtpError(error?.message || 'Unable to verify OTP.');
         }
+        finally {
+            otpSubmitLockRef.current = false;
+        }
+    }, [dispatch, fcmToken, isLoading, phoneNumber]);
+
+    const handleOtpSubmit = async (e) => {
+        e.preventDefault();
+        await submitOtpCode(otpValue);
     };
 
     const handleResendOtp = async () => {
@@ -111,6 +127,10 @@ export const LoginPage = () => {
                 if (receivedCode.length === 4) {
                     setOtpValue(receivedCode);
                     setOtpError('');
+                    if (otpInputRef.current) {
+                        otpInputRef.current.value = receivedCode;
+                    }
+                    await submitOtpCode(receivedCode);
                 }
             }
             catch {
@@ -126,7 +146,7 @@ export const LoginPage = () => {
                 otpAbortControllerRef.current = null;
             }
         };
-    }, [step]);
+    }, [step, submitOtpCode]);
 
     return (
         <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-slate-50 px-4 py-10 font-sans selection:bg-blue-100">
@@ -215,10 +235,14 @@ export const LoginPage = () => {
                                     <div className="flex flex-col gap-1.5">
                                         <label className="text-xs font-semibold text-slate-700">4-Digit OTP</label>
                                         <input
+                                            ref={otpInputRef}
                                             id="otp-input"
                                             type="text"
                                             maxLength={4}
                                             placeholder="••••"
+                                            autoComplete="one-time-code"
+                                            inputMode="numeric"
+                                            name="one-time-code"
                                             value={otpValue}
                                             onChange={(e) => setOtpValue(e.target.value.replace(/[^0-9]/g, ''))}
                                             className={`w-full rounded-2xl border bg-slate-50 px-4 py-3.5 text-center text-xl font-bold tracking-widest text-slate-900 transition-all focus:bg-white focus:outline-none focus:ring-4 focus:ring-blue-100 ${otpError ? 'border-rose-400' : 'border-slate-200'}`}
