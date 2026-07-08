@@ -57,7 +57,17 @@ const checkboxItemsResponseValidation = Joi.alternatives().try(
   }),
 );
 
-const stockItemNames = ["ppc", "wp", "super", "cnt_ppc", "cnt_wp", "cnt_super"];
+const stockItemNames = [
+  "ppc",
+  "wp",
+  "super",
+  "cnt_ppc",
+  "cnt_wp",
+  "cnt_super",
+  "damage_ppc",
+  "damage_wp",
+  "damage_super",
+];
 
 const stockItemsValidation = Joi.alternatives().try(
   Joi.array()
@@ -80,6 +90,9 @@ const stockItemsValidation = Joi.alternatives().try(
           cnt_ppc: Joi.number().precision(2).min(0).required(),
           cnt_wp: Joi.number().precision(2).min(0).required(),
           cnt_super: Joi.number().precision(2).min(0).required(),
+          damage_ppc: Joi.number().precision(2).min(0).required(),
+          damage_wp: Joi.number().precision(2).min(0).required(),
+          damage_super: Joi.number().precision(2).min(0).required(),
         }),
       ),
     )
@@ -266,6 +279,9 @@ export const completeTodoSchema = Joi.object({
   cnt_ppc: Joi.number().precision(2).min(0).optional(),
   cnt_wp: Joi.number().precision(2).min(0).optional(),
   cnt_super: Joi.number().precision(2).min(0).optional(),
+  damage_ppc: Joi.number().precision(2).min(0).optional(),
+  damage_wp: Joi.number().precision(2).min(0).optional(),
+  damage_super: Joi.number().precision(2).min(0).optional(),
   week: Joi.string().trim().allow("", null).optional(),
   checkbox_items_response: checkboxItemsResponseValidation.optional(),
   remarks: nullableTextValidation.optional(),

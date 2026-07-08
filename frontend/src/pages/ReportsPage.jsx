@@ -10,6 +10,9 @@ const STOCK_FIELDS = [
   ['cnt_ppc', 'CNT PPC'],
   ['cnt_wp', 'CNT WP'],
   ['cnt_super', 'CNT Super'],
+  ['damage_ppc', 'Damage PPC'],
+  ['damage_wp', 'Damage WP'],
+  ['damage_super', 'Damage Super'],
 ];
 
 const formatLocalDateInput = (date) => {
