@@ -22,7 +22,21 @@ export const LoginPage = () => {
     const otpPollTimerRef = useRef(null);
     const otpInputRef = useRef(null);
     const otpSubmitLockRef = useRef(false);
+    const pendingOtpCodeRef = useRef('');
+    const fcmTokenRef = useRef(null);
     const [phoneSubmitting, setPhoneSubmitting] = useState(false);
+
+    const stopOtpAutofillSession = useCallback(() => {
+        if (otpAbortControllerRef.current) {
+            otpAbortControllerRef.current.abort();
+            otpAbortControllerRef.current = null;
+        }
+
+        if (otpPollTimerRef.current) {
+            clearInterval(otpPollTimerRef.current);
+            otpPollTimerRef.current = null;
+        }
+    }, []);
 
     const handlePhoneSubmit = async (e) => {
         e.preventDefault();
@@ -41,7 +55,9 @@ export const LoginPage = () => {
         setPhoneError('');
         try {
             const generatedFcmToken = await getFcmTokenSafely();
+            fcmTokenRef.current = generatedFcmToken;
             setFcmToken(generatedFcmToken);
+            startOtpAutofillSession();
             await dispatch(loginUser({ phone_number: cleanPhone })).unwrap();
             setPhoneNumber(cleanPhone);
             setStep('otp');
@@ -61,7 +77,7 @@ export const LoginPage = () => {
         }
     };
 
-    const submitOtpCode = useCallback(async (code) => {
+    const submitOtpCode = useCallback(async (code, tokenOverride = fcmTokenRef.current || fcmToken) => {
         const cleanCode = String(code || '').replace(/[^0-9]/g, '').slice(0, 4);
         if (otpSubmitLockRef.current || isLoading) {
             return;
@@ -75,7 +91,7 @@ export const LoginPage = () => {
         otpSubmitLockRef.current = true;
         setOtpError('');
         try {
-            await dispatch(verifyOtp({ phone_number: phoneNumber, otp: cleanCode, fcm_token: fcmToken })).unwrap();
+            await dispatch(verifyOtp({ phone_number: phoneNumber, otp: cleanCode, fcm_token: tokenOverride })).unwrap();
             setSmsIncomingAlert(null);
         }
         catch (error) {
@@ -101,24 +117,13 @@ export const LoginPage = () => {
         }
     };
 
-    useEffect(() => {
-        if (step !== 'otp') {
-            if (otpAbortControllerRef.current) {
-                otpAbortControllerRef.current.abort();
-                otpAbortControllerRef.current = null;
-            }
-            if (otpPollTimerRef.current) {
-                clearInterval(otpPollTimerRef.current);
-                otpPollTimerRef.current = null;
-            }
-            return undefined;
+    const startOtpAutofillSession = useCallback(() => {
+        if (typeof window === 'undefined' || !('OTPCredential' in window) || !navigator.credentials?.get) {
+            return;
         }
 
-        if (typeof window === 'undefined' || !('OTPCredential' in window) || !navigator.credentials?.get) {
-            if (otpInputRef.current) {
-                otpInputRef.current.focus();
-            }
-            return undefined;
+        if (otpAbortControllerRef.current) {
+            return;
         }
 
         const controller = new AbortController();
@@ -131,15 +136,18 @@ export const LoginPage = () => {
                 attempts += 1;
                 const domValue = String(otpInputRef.current?.value || '').replace(/[^0-9]/g, '').slice(0, 4);
                 if (domValue.length === 4 && domValue !== otpValue) {
+                    pendingOtpCodeRef.current = domValue;
                     setOtpValue(domValue);
                     setOtpError('');
                     clearInterval(otpPollTimerRef.current);
                     otpPollTimerRef.current = null;
-                    submitOtpCode(domValue);
+                    if (step === 'otp') {
+                        submitOtpCode(domValue);
+                    }
                     return;
                 }
 
-                if (attempts >= 20) {
+                if (attempts >= 32) {
                     clearInterval(otpPollTimerRef.current);
                     otpPollTimerRef.current = null;
                 }
@@ -157,6 +165,7 @@ export const LoginPage = () => {
 
                 const receivedCode = credential?.code ? String(credential.code).replace(/[^0-9]/g, '').slice(0, 4) : '';
                 if (receivedCode.length === 4) {
+                    pendingOtpCodeRef.current = receivedCode;
                     setOtpValue(receivedCode);
                     setOtpError('');
                     if (otpInputRef.current) {
@@ -166,7 +175,9 @@ export const LoginPage = () => {
                         clearInterval(otpPollTimerRef.current);
                         otpPollTimerRef.current = null;
                     }
-                    await submitOtpCode(receivedCode);
+                    if (step === 'otp') {
+                        await submitOtpCode(receivedCode);
+                    }
                 }
             }
             catch {
@@ -175,18 +186,34 @@ export const LoginPage = () => {
         };
 
         startOtpListener();
+    }, [step, submitOtpCode, otpValue]);
 
+    useEffect(() => {
         return () => {
-            controller.abort();
-            if (otpAbortControllerRef.current === controller) {
-                otpAbortControllerRef.current = null;
-            }
-            if (otpPollTimerRef.current) {
-                clearInterval(otpPollTimerRef.current);
-                otpPollTimerRef.current = null;
-            }
+            stopOtpAutofillSession();
         };
+    }, [stopOtpAutofillSession]);
+
+    useEffect(() => {
+        if (step !== 'otp') {
+            return;
+        }
+
+        if (pendingOtpCodeRef.current?.length === 4) {
+            const pendingCode = pendingOtpCodeRef.current;
+            pendingOtpCodeRef.current = '';
+            submitOtpCode(pendingCode);
+        } else {
+            otpInputRef.current?.focus();
+        }
     }, [step, submitOtpCode]);
+
+    useEffect(() => {
+        if (step === 'phone') {
+            stopOtpAutofillSession();
+            pendingOtpCodeRef.current = '';
+        }
+    }, [step, stopOtpAutofillSession]);
 
     return (
         <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-slate-50 px-4 py-10 font-sans selection:bg-blue-100">
