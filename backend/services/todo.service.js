@@ -842,6 +842,7 @@ export const getTodoCompletionsService = async (todoId, query = {}, user) => {
     const basePayload = {
       todo_id: Number(todoId),
       location_id: query.location_id ? Number(query.location_id) : null,
+      date: query.date || null,
     };
 
     const [completions, totalRecords] = await Promise.all([

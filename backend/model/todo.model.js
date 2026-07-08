@@ -191,7 +191,7 @@ export const getTodosModel = async ({ location_id = null } = {}) => {
     return await db.query(
       `${TODO_SELECT}
        ${whereSql}
-       ORDER BY t.todo_id DESC`,
+       ORDER BY t.start_date ASC, t.todo_id ASC`,
       values,
     );
   } catch (error) {
@@ -345,7 +345,7 @@ export const getUserEligibleTodosModel = async ({
        ${USER_TODO_COMPLETION_JOIN}
        ${USER_TODO_WHERE}
        ${statusSql}
-       ORDER BY t.todo_id DESC
+       ORDER BY t.start_date ASC, t.todo_id ASC
        LIMIT ? OFFSET ?`,
       [...values, limit, offset],
     );
@@ -480,6 +480,7 @@ export const completeTodoModel = async ({
 export const getTodoCompletionsModel = async ({
   todo_id,
   location_id = null,
+  date = null,
   page = 1,
   limit = 10,
 }) => {
@@ -487,8 +488,10 @@ export const getTodoCompletionsModel = async ({
     const offset = (page - 1) * limit;
     const values = [todo_id];
     const locationFilter = location_id ? " AND tl.location_id = ? " : "";
+    const dateFilter = date ? " AND tc.completion_date = ? " : "";
 
     if (location_id) values.push(location_id);
+    if (date) values.push(date);
 
     return await db.query(
       `SELECT
@@ -515,6 +518,7 @@ export const getTodoCompletionsModel = async ({
        LEFT JOIN users u ON u.user_id = tc.completed_by
        WHERE tc.todo_id = ?
        ${locationFilter}
+       ${dateFilter}
        ORDER BY tc.completion_date DESC, tc.completed_at DESC, tc.completion_id DESC
        LIMIT ? OFFSET ?`,
       [...values, limit, offset],
@@ -546,19 +550,22 @@ export const getCompletionItemsByCompletionIdsModel = async (completionIds = [])
   }
 };
 
-export const countTodoCompletionsModel = async ({ todo_id, location_id = null }) => {
+export const countTodoCompletionsModel = async ({ todo_id, location_id = null, date = null }) => {
   try {
     const values = [todo_id];
     const locationFilter = location_id ? " AND tl.location_id = ? " : "";
+    const dateFilter = date ? " AND tc.completion_date = ? " : "";
 
     if (location_id) values.push(location_id);
+    if (date) values.push(date);
 
     const [result] = await db.query(
       `SELECT COUNT(*) AS total_records
        FROM todo_completions tc
        INNER JOIN todo_locations tl ON tl.todo_location_id = tc.todo_location_id
        WHERE tc.todo_id = ?
-       ${locationFilter}`,
+       ${locationFilter}
+       ${dateFilter}`,
       values,
     );
 
@@ -819,7 +826,7 @@ export const getAdminManagerTodayTodosModel = async ({
       ) tc ON tc.todo_id = t.todo_id AND tc.todo_location_id = tl.todo_location_id
       LEFT JOIN users u_completer ON u_completer.user_id = tc.completed_by
       ${whereSql}
-      ORDER BY t.todo_id DESC, tl.location_id ASC
+      ORDER BY t.start_date ASC, t.todo_id ASC, tl.location_id ASC
       LIMIT ? OFFSET ?
     `;
 
@@ -986,7 +993,7 @@ export const updateTodoLastReminderSentAtModel = async (todoId) => {
 export const getAdminManagerTodayUniqueTodosModel = async () => {
   try {
     const querySql = `
-      SELECT DISTINCT t.todo_id, t.title
+      SELECT DISTINCT t.todo_id, t.title, t.start_date
       FROM todos t
       INNER JOIN todo_locations tl ON tl.todo_id = t.todo_id
       WHERE tl.is_deleted = FALSE
@@ -999,7 +1006,7 @@ export const getAdminManagerTodayUniqueTodosModel = async () => {
           OR (t.schedule = 'monthly' AND t.day_of_month = DAY(CURDATE()))
           OR (t.schedule = 'single' AND t.start_date <= CURDATE() AND (t.end_date IS NULL OR t.end_date >= CURDATE()))
         )
-      ORDER BY t.title ASC
+      ORDER BY t.start_date ASC, t.title ASC, t.todo_id ASC
     `;
 
     return await db.query(querySql);

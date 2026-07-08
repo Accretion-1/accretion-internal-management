@@ -81,7 +81,7 @@ define(['./workbox-1cab10dd'], (function (workbox) { 'use strict';
     "revision": "d41d8cd98f00b204e9800998ecf8427e"
   }, {
     "url": "/index.html",
-    "revision": "0.mdpd028fvj8"
+    "revision": "0.l223s970pu4"
   }], {});
   workbox.cleanupOutdatedCaches();
   workbox.registerRoute(new workbox.NavigationRoute(workbox.createHandlerBoundToURL("/index.html"), {
@@ -109,6 +109,17 @@ define(['./workbox-1cab10dd'], (function (workbox) { 'use strict';
       statuses: [0, 200]
     }), new workbox.ExpirationPlugin({
       maxEntries: 100,
+      maxAgeSeconds: 2592000
+    })]
+  }), 'GET');
+  workbox.registerRoute(({
+    url
+  }) => url.hostname === "paddle-model-ecology.bj.bcebos.com" || url.pathname.endsWith(".wasm") || url.pathname.endsWith(".mjs"), new workbox.CacheFirst({
+    "cacheName": "ocr-runtime-cache",
+    plugins: [new workbox.CacheableResponsePlugin({
+      statuses: [0, 200]
+    }), new workbox.ExpirationPlugin({
+      maxEntries: 20,
       maxAgeSeconds: 2592000
     })]
   }), 'GET');
