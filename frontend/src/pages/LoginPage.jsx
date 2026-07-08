@@ -26,6 +26,15 @@ export const LoginPage = () => {
     const fcmTokenRef = useRef(null);
     const [phoneSubmitting, setPhoneSubmitting] = useState(false);
 
+    // Ref that always reflects the latest otpValue, so the DOM-polling
+    // fallback (which runs on a setInterval, not a re-render) never
+    // compares against a stale closured value.
+    const otpValueRef = useRef(otpValue);
+
+    useEffect(() => {
+        otpValueRef.current = otpValue;
+    }, [otpValue]);
+
     const stopOtpAutofillSession = useCallback(() => {
         if (otpAbortControllerRef.current) {
             otpAbortControllerRef.current.abort();
@@ -57,7 +66,6 @@ export const LoginPage = () => {
             const generatedFcmToken = await getFcmTokenSafely();
             fcmTokenRef.current = generatedFcmToken;
             setFcmToken(generatedFcmToken);
-            startOtpAutofillSession();
             await dispatch(loginUser({ phone_number: cleanPhone })).unwrap();
             setPhoneNumber(cleanPhone);
             setStep('otp');
@@ -135,15 +143,13 @@ export const LoginPage = () => {
             otpPollTimerRef.current = window.setInterval(() => {
                 attempts += 1;
                 const domValue = String(otpInputRef.current?.value || '').replace(/[^0-9]/g, '').slice(0, 4);
-                if (domValue.length === 4 && domValue !== otpValue) {
+                if (domValue.length === 4 && domValue !== otpValueRef.current) {
                     pendingOtpCodeRef.current = domValue;
                     setOtpValue(domValue);
                     setOtpError('');
                     clearInterval(otpPollTimerRef.current);
                     otpPollTimerRef.current = null;
-                    if (step === 'otp') {
-                        submitOtpCode(domValue);
-                    }
+                    submitOtpCode(domValue);
                     return;
                 }
 
@@ -175,27 +181,24 @@ export const LoginPage = () => {
                         clearInterval(otpPollTimerRef.current);
                         otpPollTimerRef.current = null;
                     }
-                    if (step === 'otp') {
-                        await submitOtpCode(receivedCode);
-                    }
+                    await submitOtpCode(receivedCode);
                 }
             }
             catch {
-                // Silent fallback: browser or platform may not support Web OTP.
+                // Silent fallback: aborted (user left OTP screen) or
+                // browser/platform doesn't support Web OTP.
             }
         };
 
         startOtpListener();
-    }, [step, submitOtpCode, otpValue]);
+    }, [submitOtpCode]);
 
-    useEffect(() => {
-        return () => {
-            stopOtpAutofillSession();
-        };
-    }, [stopOtpAutofillSession]);
-
+    // Web OTP's AbortSignal is scoped to the OTP screen's lifecycle:
+    // start listening the moment the OTP screen mounts, stop the moment
+    // the user leaves it (back to phone step) or the component unmounts.
     useEffect(() => {
         if (step !== 'otp') {
+            pendingOtpCodeRef.current = '';
             return;
         }
 
@@ -206,14 +209,13 @@ export const LoginPage = () => {
         } else {
             otpInputRef.current?.focus();
         }
-    }, [step, submitOtpCode]);
 
-    useEffect(() => {
-        if (step === 'phone') {
+        startOtpAutofillSession();
+
+        return () => {
             stopOtpAutofillSession();
-            pendingOtpCodeRef.current = '';
-        }
-    }, [step, stopOtpAutofillSession]);
+        };
+    }, [step, submitOtpCode, startOtpAutofillSession, stopOtpAutofillSession]);
 
     return (
         <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-slate-50 px-4 py-10 font-sans selection:bg-blue-100">
