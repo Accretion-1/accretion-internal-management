@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Phone, ShieldAlert, ArrowRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { loginUser, resendOtp, verifyOtp } from '../store/slices/authSlice';
@@ -18,6 +18,7 @@ export const LoginPage = () => {
     const [smsIncomingAlert, setSmsIncomingAlert] = useState(null);
     const [fcmToken, setFcmToken] = useState(null);
     const phoneSubmitLockRef = useRef(false);
+    const otpAbortControllerRef = useRef(null);
     const [phoneSubmitting, setPhoneSubmitting] = useState(false);
 
     const handlePhoneSubmit = async (e) => {
@@ -82,6 +83,50 @@ export const LoginPage = () => {
             setOtpError(error?.message || 'Unable to resend OTP.');
         }
     };
+
+    useEffect(() => {
+        if (step !== 'otp') {
+            if (otpAbortControllerRef.current) {
+                otpAbortControllerRef.current.abort();
+                otpAbortControllerRef.current = null;
+            }
+            return undefined;
+        }
+
+        if (typeof window === 'undefined' || !('OTPCredential' in window) || !navigator.credentials?.get) {
+            return undefined;
+        }
+
+        const controller = new AbortController();
+        otpAbortControllerRef.current = controller;
+
+        const startOtpListener = async () => {
+            try {
+                const credential = await navigator.credentials.get({
+                    otp: { transport: ['sms'] },
+                    signal: controller.signal,
+                });
+
+                const receivedCode = credential?.code ? String(credential.code).replace(/[^0-9]/g, '').slice(0, 4) : '';
+                if (receivedCode.length === 4) {
+                    setOtpValue(receivedCode);
+                    setOtpError('');
+                }
+            }
+            catch {
+                // Silent fallback: browser or platform may not support Web OTP.
+            }
+        };
+
+        startOtpListener();
+
+        return () => {
+            controller.abort();
+            if (otpAbortControllerRef.current === controller) {
+                otpAbortControllerRef.current = null;
+            }
+        };
+    }, [step]);
 
     return (
         <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-slate-50 px-4 py-10 font-sans selection:bg-blue-100">
