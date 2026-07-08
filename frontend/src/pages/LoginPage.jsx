@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Phone, ShieldAlert, ArrowRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { loginUser, resendOtp, verifyOtp } from '../store/slices/authSlice';
@@ -17,14 +17,23 @@ export const LoginPage = () => {
     const [otpError, setOtpError] = useState('');
     const [smsIncomingAlert, setSmsIncomingAlert] = useState(null);
     const [fcmToken, setFcmToken] = useState(null);
+    const phoneSubmitLockRef = useRef(false);
+    const [phoneSubmitting, setPhoneSubmitting] = useState(false);
 
     const handlePhoneSubmit = async (e) => {
         e.preventDefault();
+        if (phoneSubmitLockRef.current || isLoading || phoneSubmitting) {
+            return;
+        }
+
         const cleanPhone = phoneNumber.replace(/[^0-9]/g, '');
         if (cleanPhone.length !== 10) {
             setPhoneError('Please enter a valid 10-digit mobile number.');
             return;
         }
+
+        phoneSubmitLockRef.current = true;
+        setPhoneSubmitting(true);
         setPhoneError('');
         try {
             const generatedFcmToken = await getFcmTokenSafely();
@@ -41,6 +50,10 @@ export const LoginPage = () => {
         }
         catch (error) {
             setPhoneError(error?.message || 'Unable to send OTP.');
+        }
+        finally {
+            phoneSubmitLockRef.current = false;
+            setPhoneSubmitting(false);
         }
     };
 
@@ -129,10 +142,10 @@ export const LoginPage = () => {
                                     <button
                                         id="send-otp-btn"
                                         type="submit"
-                                        disabled={isLoading}
+                                        disabled={isLoading || phoneSubmitting}
                                         className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-2xl bg-blue-600 py-3.5 text-sm font-semibold text-white shadow-md shadow-blue-100 transition-all hover:bg-blue-700 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-70"
                                     >
-                                        {isLoading ? 'Sending OTP...' : 'Send OTP Code'}
+                                        {isLoading || phoneSubmitting ? 'Sending OTP...' : 'Send OTP Code'}
                                         <ArrowRight className="h-4 w-4" />
                                     </button>
                                 </form>

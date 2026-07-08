@@ -143,6 +143,7 @@ export const getUserTodosQuerySchema = Joi.object({
 
 export const getTodoCompletionsQuerySchema = Joi.object({
   location_id: Joi.number().integer().positive().optional(),
+  date: dateValidation.optional(),
   page: Joi.number().integer().positive().default(1).optional(),
   limit: Joi.number().integer().positive().max(100).default(10).optional(),
 }).messages(messages);

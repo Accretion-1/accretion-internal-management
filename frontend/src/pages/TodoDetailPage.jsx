@@ -373,6 +373,7 @@ export const TodoDetailPage = () => {
     const [isSaving, setIsSaving] = useState(false);
     const [completions, setCompletions] = useState([]);
     const [completionLocationFilter, setCompletionLocationFilter] = useState('');
+    const [completionDateFilter, setCompletionDateFilter] = useState('');
     const [completionPagination, setCompletionPagination] = useState({
         total_records: 0,
         total_pages: 1,
@@ -416,13 +417,14 @@ export const TodoDetailPage = () => {
         try {
             const response = await apiHandler({
                 method: 'GET',
-                url: API_ENDPOINTS.TODOS.COMPLETIONS(todoId),
-                params: {
-                    page,
-                    limit: completionPagination.limit,
-                    ...(completionLocationFilter ? { location_id: completionLocationFilter } : {}),
-                },
-            });
+                    url: API_ENDPOINTS.TODOS.COMPLETIONS(todoId),
+                    params: {
+                        page,
+                        limit: completionPagination.limit,
+                        ...(completionLocationFilter ? { location_id: completionLocationFilter } : {}),
+                        ...(completionDateFilter ? { date: completionDateFilter } : {}),
+                    },
+                });
             const payload = response?.data || {};
 
             setCompletions(Array.isArray(payload.records) ? payload.records : []);
@@ -453,7 +455,7 @@ export const TodoDetailPage = () => {
         if (isAdminOrManager) {
             fetchCompletions(completionPagination.current_page);
         }
-    }, [isAdminOrManager, todoId, completionLocationFilter, completionPagination.current_page]);
+    }, [isAdminOrManager, todoId, completionLocationFilter, completionDateFilter, completionPagination.current_page]);
 
     const scheduleText = useMemo(() => {
         if (!todo) return '-';
@@ -657,6 +659,16 @@ export const TodoDetailPage = () => {
         setCompletionPagination((prev) => ({ ...prev, current_page: 1 }));
     };
 
+    const handleCompletionDateFilterChange = (value) => {
+        setCompletionDateFilter(value);
+        setCompletionPagination((prev) => ({ ...prev, current_page: 1 }));
+    };
+
+    const handleClearCompletionDateFilter = () => {
+        setCompletionDateFilter('');
+        setCompletionPagination((prev) => ({ ...prev, current_page: 1 }));
+    };
+
     const handleCompletionPageChange = (page) => {
         setCompletionPagination((prev) => ({
             ...prev,
@@ -835,7 +847,7 @@ export const TodoDetailPage = () => {
                                     </button>
                                 </div>
 
-                                <div className="mb-5 grid grid-cols-1 gap-3 lg:grid-cols-[1fr_auto] lg:items-end">
+                                <div className="mb-5 grid grid-cols-1 gap-3 xl:grid-cols-[1fr_1fr_auto] xl:items-end">
                                     <div className="flex flex-col gap-1.5">
                                         <label className="text-xs font-extrabold uppercase tracking-wider text-slate-400">Filter by Location</label>
                                         <select
@@ -852,10 +864,53 @@ export const TodoDetailPage = () => {
                                         </select>
                                     </div>
 
+                                    <div className="flex flex-col gap-1.5">
+                                        <label className="text-xs font-extrabold uppercase tracking-wider text-slate-400">Filter by Date</label>
+                                        <div className="flex items-center gap-2">
+                                            <div className="relative min-w-0 flex-1">
+                                                <input
+                                                    type="date"
+                                                    value={completionDateFilter}
+                                                    max={getTodayDateValue()}
+                                                    onChange={(event) => handleCompletionDateFilterChange(event.target.value)}
+                                                    className="w-full cursor-pointer rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 pr-10 text-sm font-bold text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
+                                                />
+                                                <CalendarDays className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                                            </div>
+                                            {completionDateFilter && (
+                                                <button
+                                                    type="button"
+                                                    onClick={handleClearCompletionDateFilter}
+                                                    className="inline-flex shrink-0 cursor-pointer items-center justify-center rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold text-slate-600 transition-all hover:bg-slate-50"
+                                                >
+                                                    Clear
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+
                                     <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs font-bold text-slate-500">
                                         {completionPagination.total_records} completed record(s)
                                     </div>
                                 </div>
+
+                                {(completionLocationFilter || completionDateFilter) && (
+                                    <div className="mb-4 flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                                        <span className="text-xs font-extrabold uppercase tracking-wider text-slate-400">Active Filters</span>
+                                        {completionLocationFilter && (
+                                            <span className="rounded-full bg-blue-50 px-3 py-1 text-[11px] font-bold text-blue-700">
+                                                {assignedTodoLocations.find((location) => String(location.location_id) === String(completionLocationFilter))
+                                                    ? getLocationLabel(assignedTodoLocations.find((location) => String(location.location_id) === String(completionLocationFilter)))
+                                                    : 'Selected location'}
+                                            </span>
+                                        )}
+                                        {completionDateFilter && (
+                                            <span className="rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-bold text-emerald-700">
+                                                {formatDate(completionDateFilter)}
+                                            </span>
+                                        )}
+                                    </div>
+                                )}
 
                                 {isCompletionsLoading ? (
                                     <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 py-12 text-center text-sm font-semibold text-slate-400">
