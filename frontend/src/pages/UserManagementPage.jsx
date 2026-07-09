@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Plus, Search, Edit2, X, Eye, Users, Phone, MapPin, ShieldCheck, Layers, UserCheck, UserX } from 'lucide-react';
+import { Plus, Search, Edit2, X, Eye, Users, Phone, MapPin, ShieldCheck, Layers, Trash2, AlertTriangle } from 'lucide-react';
 import { Modal } from '../components/Modal';
 import { useAppState } from '../contexts/StateContext';
 import apiHandler from '../store/api/apiHandler';
@@ -67,6 +67,7 @@ export const UserManagementPage = () => {
     const [isEditOpen, setIsEditOpen] = useState(false);
     const [isViewOpen, setIsViewOpen] = useState(false);
     const [activeUser, setActiveUser] = useState(null);
+    const [deleteTargetUser, setDeleteTargetUser] = useState(null);
     const [form, setForm] = useState(EMPTY_FORM);
     const [errors, setErrors] = useState({});
 
@@ -271,22 +272,24 @@ export const UserManagementPage = () => {
         }
     };
 
-    const handleToggleActive = async (user) => {
+    const handleOpenDelete = (user) => {
         if (!canManageUser(user)) return;
+        setDeleteTargetUser(user);
+    };
+
+    const handleConfirmDelete = async () => {
+        if (!deleteTargetUser) return;
+
         setIsSaving(true);
         try {
-            const response = await apiHandler({
-                method: 'PUT',
-                url: API_ENDPOINTS.USER.UPDATE(user.user_id),
-                data: { is_active: !user.is_active },
+            await apiHandler({
+                method: 'DELETE',
+                url: API_ENDPOINTS.USER.DELETE(deleteTargetUser.user_id),
             });
 
-            if (response?.data?.user_id) {
-                setUsers((prev) => prev.map((item) => item.user_id === response.data.user_id ? response.data : item));
-            }
-            else {
-                await fetchUsers();
-            }
+            setUsers((prev) => prev.filter((user) => user.user_id !== deleteTargetUser.user_id));
+            setSelectedUserIds((prev) => prev.filter((id) => id !== String(deleteTargetUser.user_id)));
+            setDeleteTargetUser(null);
         }
         finally {
             setIsSaving(false);
@@ -466,8 +469,8 @@ export const UserManagementPage = () => {
                                                     </button>
                                                 )}
                                                 {canManageUser(user) && (
-                                                    <button id={`toggle-user-${user.id}`} onClick={() => handleToggleActive(user)} disabled={isSaving} className={`cursor-pointer rounded-lg p-1.5 transition-colors disabled:opacity-50 ${user.is_active ? 'text-amber-500 hover:bg-amber-50 hover:text-amber-700' : 'text-emerald-500 hover:bg-emerald-50 hover:text-emerald-700'}`} title={user.is_active ? 'Deactivate user' : 'Activate user'}>
-                                                        {user.is_active ? <UserX className="h-4 w-4" /> : <UserCheck className="h-4 w-4" />}
+                                                    <button id={`delete-user-${user.id}`} onClick={() => handleOpenDelete(user)} disabled={isSaving} className="cursor-pointer rounded-lg p-1.5 text-orange-500 transition-colors disabled:opacity-50 hover:bg-orange-50 hover:text-orange-700" title="Delete user">
+                                                        <Trash2 className="h-4 w-4" />
                                                     </button>
                                                 )}
                                             </div>
@@ -623,6 +626,36 @@ export const UserManagementPage = () => {
                                     <span key={panel.panel_id} className="rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">{panel.panel_name || `Panel ${panel.panel_id}`}</span>
                                 )) : <span className="text-xs font-semibold text-slate-400">No panels assigned.</span>}
                             </div>
+                        </div>
+                    </div>
+                )}
+            </Modal>
+
+            <Modal
+                isOpen={Boolean(deleteTargetUser)}
+                onClose={() => !isSaving && setDeleteTargetUser(null)}
+                title="Delete User"
+                maxWidthClass="max-w-md"
+                footerButtons={[
+                    { label: 'Cancel', onClick: () => setDeleteTargetUser(null) },
+                    { label: 'Delete User', onClick: handleConfirmDelete, variant: 'primary', isLoading: isSaving },
+                ]}
+            >
+                {deleteTargetUser && (
+                    <div className="flex flex-col gap-4 text-left">
+                        <div className="flex items-start gap-3 rounded-2xl border border-orange-200 bg-orange-50 p-4 text-orange-800">
+                            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
+                            <div>
+                                <p className="text-sm font-bold">Are you sure?</p>
+                                <p className="mt-1 text-xs font-medium">
+                                    Are you sure you want to delete <span className="font-semibold">{deleteTargetUser.name}</span>? The user will no longer be able to log in.
+                                </p>
+                            </div>
+                        </div>
+                        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">User</p>
+                            <p className="mt-1 text-sm font-semibold text-slate-800">{deleteTargetUser.name}</p>
+                            <p className="text-xs text-slate-500">{deleteTargetUser.phone || '-'}</p>
                         </div>
                     </div>
                 )}
