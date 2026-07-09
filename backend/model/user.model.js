@@ -4,7 +4,10 @@ import { DB_ERROR } from "../utils/message.util.js";
 
 export const getUserByPhoneNumberModel = async (phoneNumber) => {
   try {
-    return await db.query("SELECT * FROM users WHERE phone_number = ? LIMIT 1", [phoneNumber]);
+    return await db.query(
+      "SELECT * FROM users WHERE phone_number = ? AND is_deleted = 0 LIMIT 1",
+      [phoneNumber],
+    );
   } catch (error) {
     throw new ApiError(DB_ERROR, "Checking User", error, false);
   }
@@ -12,7 +15,10 @@ export const getUserByPhoneNumberModel = async (phoneNumber) => {
 
 export const getUserByIdModel = async (userId) => {
   try {
-    const [user] = await db.query("SELECT * FROM users WHERE user_id = ? LIMIT 1", [userId]);
+    const [user] = await db.query(
+      "SELECT * FROM users WHERE user_id = ? AND is_deleted = 0 LIMIT 1",
+      [userId],
+    );
     return user;
   } catch (error) {
     throw new ApiError(DB_ERROR, "Checking User", error, false);
@@ -34,15 +40,16 @@ export const getUserDetailByIdModel = async (userId) => {
         l.cap,
         l.remark,
         u.gender,
-        u.profile_image,
-        u.is_verified,
-        u.is_active,
-        u.created_at,
-        u.updated_at,
-        u.role
+       u.profile_image,
+       u.is_verified,
+       u.is_active,
+       u.is_deleted,
+       u.created_at,
+       u.updated_at,
+       u.role
        FROM users u
        LEFT JOIN locations l ON l.location_id = u.location_id
-       WHERE u.user_id = ?
+       WHERE u.user_id = ? AND u.is_deleted = 0
        LIMIT 1`,
       [userId],
     );
@@ -70,12 +77,13 @@ export const getUsersModel = async (user_id) => {
         u.profile_image,
         u.is_verified,
         u.is_active,
+        u.is_deleted,
         u.created_at,
         u.updated_at,
         u.role
       FROM users u
       LEFT JOIN locations l ON l.location_id = u.location_id
-      WHERE u.user_id != ?
+      WHERE u.user_id != ? AND u.is_deleted = 0
       ORDER BY u.user_id DESC`,
       [user_id]
     );
@@ -175,6 +183,19 @@ export const updateUserDetailsModel = async (userId, payload) => {
   } catch (error) {
     await db.rollback(connection);
     throw new ApiError(DB_ERROR, "Updating User", error, false);
+  }
+};
+
+export const softDeleteUserModel = async (userId) => {
+  try {
+    return await db.query(
+      `UPDATE users
+       SET is_deleted = 1, updated_at = CURRENT_TIMESTAMP
+       WHERE user_id = ? AND is_deleted = 0`,
+      [userId],
+    );
+  } catch (error) {
+    throw new ApiError(DB_ERROR, "Deleting User", error, false);
   }
 };
 

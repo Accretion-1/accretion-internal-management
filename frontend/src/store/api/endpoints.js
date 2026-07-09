@@ -9,6 +9,7 @@ export const API_ENDPOINTS = Object.freeze({
     ADD: "/user/add",
     BY_ID: (userId) => `/user/${userId}`,
     UPDATE: (userId) => `/user/update/${userId}`,
+    DELETE: (userId) => `/user/delete/${userId}`,
     UPDATE_FCM_TOKEN: "/user/fcm-token",
   }),
   NOTIFICATIONS: Object.freeze({

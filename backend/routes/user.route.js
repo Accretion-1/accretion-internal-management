@@ -1,6 +1,7 @@
 import express from "express";
 import {
   createUserController,
+  deleteUserController,
   getUserByIdController,
   getUserProfileController,
   getUsersController,
@@ -38,6 +39,12 @@ router.put(
   validate(userIdParamSchema, "params"),
   validate(updateUserSchema, "body"),
   updateUserController,
+);
+router.delete(
+  "/delete/:user_id",
+  authGuard,
+  validate(userIdParamSchema, "params"),
+  deleteUserController,
 );
 
 export default router;

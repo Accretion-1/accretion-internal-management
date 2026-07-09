@@ -141,3 +141,5 @@ ALTER TABLE `todo_completions`
 );
 
 ALTER TABLE `todo_completion_items` CHANGE `stock_name` `stock_name` ENUM('ppc','wp','super','cnt_ppc','cnt_wp','cnt_super','damage_ppc','damage_wp','damage_super') CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL;
+
+ALTER TABLE `users` ADD `is_deleted` BOOLEAN NOT NULL DEFAULT FALSE;

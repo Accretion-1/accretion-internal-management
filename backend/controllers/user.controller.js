@@ -42,6 +42,11 @@ export const updateUserController = apiHandler(async (req, res) => {
   return apiResponse(UPDATE_SUCCESS, "User", user, res, "object");
 });
 
+export const deleteUserController = apiHandler(async (req, res) => {
+  const user = await userService.deleteUserService(req.params.user_id, req.user);
+  return apiResponse(UPDATE_SUCCESS, "User deleted successfully", user, res, "object");
+});
+
 export const updateUserFcmTokenController = apiHandler(async (req, res) => {
   await userService.updateUserFcmTokenService(req.user.user_id, req.body.fcm_token);
   return apiResponse(UPDATE_SUCCESS, "FCM token", null, res, "object");

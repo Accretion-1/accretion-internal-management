@@ -42,6 +42,9 @@ apiClient.interceptors.response.use(
     if (status === 401) {
       clearStoredAuth();
       window.dispatchEvent(new CustomEvent("auth:unauthorized"));
+      if (window.location.pathname !== "/login") {
+        window.location.replace("/login");
+      }
     }
 
     return Promise.reject({

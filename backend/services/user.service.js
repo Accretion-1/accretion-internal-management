@@ -5,7 +5,7 @@ import * as notificationService from "./notification.service.js";
 import * as panelModel from "../model/panel.model.js";
 import * as userModel from "../model/user.model.js";
 import { ApiError } from "../utils/api.util.js";
-import { ADD_ERROR, CUSTOM_ERROR, EXISTS, FORBIDDEN, INVALID, NOT_FOUND, UPDATE_ERROR } from "../utils/message.util.js";
+import { ADD_ERROR, CUSTOM_ERROR, DELETE_ERROR, EXISTS, FORBIDDEN, INVALID, NOT_FOUND, UPDATE_ERROR } from "../utils/message.util.js";
 import { generateJWTToken, generateOTPCode, isEmpty } from "../utils/misc.util.js";
 import { sendOTP } from "../utils/msg91.util.js";
 
@@ -54,6 +54,16 @@ const getActiveUser = async (phoneNumber) => {
 
   if (!user.is_active) {
     throw new ApiError(CUSTOM_ERROR, "Your account is inactive");
+  }
+
+  return user;
+};
+
+const ensureUserExists = async (userId) => {
+  const user = await userModel.getUserDetailByIdModel(userId);
+
+  if (isEmpty(user)) {
+    throw new ApiError(NOT_FOUND, "User");
   }
 
   return user;
@@ -311,10 +321,7 @@ export const createUserService = async (payload, actorUser) => {
 
 export const updateUserService = async (userId, payload, actorUser) => {
   try {
-    const existingUser = await userModel.getUserByIdModel(userId);
-    if (isEmpty(existingUser)) {
-      throw new ApiError(NOT_FOUND, "User");
-    }
+    const existingUser = await ensureUserExists(userId);
 
     if (!canManageRole(actorUser?.role, existingUser.role)) {
       throw new ApiError(FORBIDDEN, "User");
@@ -352,6 +359,29 @@ export const updateUserService = async (userId, payload, actorUser) => {
   } catch (error) {
     if (error instanceof ApiError) throw error;
     throw new ApiError(UPDATE_ERROR, "User", error, false);
+  }
+};
+
+export const deleteUserService = async (userId, actorUser) => {
+  try {
+    const existingUser = await ensureUserExists(userId);
+
+    if (Number(actorUser?.user_id) === Number(userId)) {
+      throw new ApiError(FORBIDDEN, "User");
+    }
+
+    if (!canManageRole(actorUser?.role, existingUser.role)) {
+      throw new ApiError(FORBIDDEN, "User");
+    }
+
+    await userModel.softDeleteUserModel(userId);
+    return {
+      user_id: Number(userId),
+      is_deleted: true,
+    };
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    throw new ApiError(DELETE_ERROR, "User", error, false);
   }
 };
 
