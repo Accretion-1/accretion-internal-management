@@ -133,6 +133,11 @@ export const DashboardPage = () => {
     setCurrentPage(1);
   };
 
+  const applyStatusFilter = (status) => {
+    setSelectedStatus(status);
+    setCurrentPage(1);
+  };
+
   const formatDateTime = (value) => {
     if (!value) return '-';
     return new Date(value).toLocaleString('en-IN', {
@@ -234,7 +239,11 @@ export const DashboardPage = () => {
     {(role === 'ADMIN' || role === 'MANAGER') && (
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
         {/* Card 1: Total Tasks */}
-        <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs hover:border-blue-300 transition-all hover:shadow-md cursor-pointer group">
+        <button
+          type="button"
+          onClick={() => applyStatusFilter('all')}
+          className={`bg-white p-6 rounded-2xl border shadow-xs transition-all hover:shadow-md cursor-pointer group text-left ${selectedStatus === 'all' ? 'border-blue-400 ring-2 ring-blue-100' : 'border-slate-200/80 hover:border-blue-300'}`}
+        >
           <div className="flex justify-between items-start">
             <div>
               <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Total Today's Tasks</p>
@@ -247,10 +256,14 @@ export const DashboardPage = () => {
           <div className="mt-4 flex items-center justify-between text-xs text-slate-500">
             <span>Assigned for today</span>
           </div>
-        </div>
+        </button>
 
         {/* Card 2: Completed Tasks */}
-        <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs hover:border-emerald-300 transition-all hover:shadow-md cursor-pointer group">
+        <button
+          type="button"
+          onClick={() => applyStatusFilter('completed')}
+          className={`bg-white p-6 rounded-2xl border shadow-xs transition-all hover:shadow-md cursor-pointer group text-left ${selectedStatus === 'completed' ? 'border-emerald-400 ring-2 ring-emerald-100' : 'border-slate-200/80 hover:border-emerald-300'}`}
+        >
           <div className="flex justify-between items-start">
             <div>
               <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Completed Tasks</p>
@@ -265,10 +278,14 @@ export const DashboardPage = () => {
               {taskStats.total > 0 ? `${Math.round((taskStats.completed / taskStats.total) * 100)}%` : '0%'} Completion Rate
             </span>
           </div>
-        </div>
+        </button>
 
         {/* Card 3: Pending Tasks */}
-        <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs hover:border-amber-300 transition-all hover:shadow-md cursor-pointer group">
+        <button
+          type="button"
+          onClick={() => applyStatusFilter('active')}
+          className={`bg-white p-6 rounded-2xl border shadow-xs transition-all hover:shadow-md cursor-pointer group text-left ${selectedStatus === 'active' ? 'border-amber-400 ring-2 ring-amber-100' : 'border-slate-200/80 hover:border-amber-300'}`}
+        >
           <div className="flex justify-between items-start">
             <div>
               <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Pending Tasks</p>
@@ -281,7 +298,7 @@ export const DashboardPage = () => {
           <div className="mt-4 flex items-center justify-between text-xs text-slate-500">
             <span>Awaiting worker action</span>
           </div>
-        </div>
+        </button>
       </div>
     )}
 
