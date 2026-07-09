@@ -116,7 +116,8 @@ const FileList = ({ files, onRemove, ocrResults = {} }) => {
 
 export const TodoCompletionModal = ({ isOpen, todo, onClose, onCompleted }) => {
     const { currentUser } = useAppState();
-    const isUser = currentUser?.role?.toUpperCase() === 'USER';
+    const normalizedRole = String(currentUser?.role || '').toUpperCase();
+    const isUser = normalizedRole === 'USER';
 
     const videoRef = useRef(null);
     const streamRef = useRef(null);
@@ -703,9 +704,13 @@ export const TodoCompletionModal = ({ isOpen, todo, onClose, onCompleted }) => {
 
         setIsSubmitting(true);
         try {
+            const completionUrl = isUser
+                ? API_ENDPOINTS.TODOS.COMPLETE(todo.todo_id)
+                : API_ENDPOINTS.TODOS.COMPLETE_FOR_LOCATION(todo.todo_id, todo.location_id || todo.location?.location_id);
+
             const response = await apiHandler({
                 method: 'POST',
-                url: API_ENDPOINTS.TODOS.COMPLETE(todo.todo_id),
+                url: completionUrl,
                 data: buildFormData(),
             });
 

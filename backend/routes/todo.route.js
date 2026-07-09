@@ -1,6 +1,7 @@
 import express from "express";
 import {
   completeLoggedInUserTodoController,
+  completeAdminManagerTodoController,
   createTodoController,
   getLoggedInUserTodoByIdController,
   getLoggedInUserTodosController,
@@ -22,6 +23,7 @@ import {
   getTodosQuerySchema,
   getUserTodosQuerySchema,
   todoIdParamSchema,
+  todoLocationCompleteParamSchema,
   updateTodoSchema,
   getAdminManagerTodayTodosQuerySchema,
   getStockCompletionReportQuerySchema,
@@ -43,6 +45,17 @@ router.post(
   ]),
   validate(completeTodoSchema, "body"),
   completeLoggedInUserTodoController,
+);
+router.post(
+  "/:todo_id/location/:location_id/complete",
+  validate(todoLocationCompleteParamSchema, "params"),
+  uploadFields("", [
+    { name: "photos", maxCount: 10 },
+    { name: "videos", maxCount: 10 },
+    { name: "files", maxCount: 10 },
+  ]),
+  validate(completeTodoSchema, "body"),
+  completeAdminManagerTodoController,
 );
 router.get(
   "/my/:todo_id",

@@ -7,6 +7,7 @@ import {
 import apiHandler from '../store/api/apiHandler';
 import { API_ENDPOINTS } from '../store/api/endpoints';
 import { Modal } from '../components/Modal';
+import { TodoCompletionModal } from '../components/TodoCompletionModal';
 
 const STOCK_FIELDS = [
   ['ppc', 'PPC'],
@@ -36,6 +37,7 @@ export const DashboardPage = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [activeAttachment, setActiveAttachment] = useState(null);
+  const [activeTodoToComplete, setActiveTodoToComplete] = useState(null);
   const [taskStats, setTaskStats] = useState({ total: 0, completed: 0, pending: 0 });
   const [currentTime, setCurrentTime] = useState(new Date());
 
@@ -46,7 +48,7 @@ export const DashboardPage = () => {
     return () => clearInterval(timer);
   }, []);
 
-  const role = currentUser?.role;
+  const role = String(currentUser?.role || '').toUpperCase();
 
   const fetchLocations = async () => {
     setLocationsLoading(true);
@@ -97,7 +99,7 @@ export const DashboardPage = () => {
   };
 
   useEffect(() => {
-    if (role === 'Admin' || role === 'Manager') {
+    if (role === 'ADMIN' || role === 'MANAGER') {
       fetchLocations();
       fetchUniqueTodayTasks();
     }
@@ -116,7 +118,7 @@ export const DashboardPage = () => {
   };
 
   useEffect(() => {
-    if (role === 'Admin' || role === 'Manager') {
+    if (role === 'ADMIN' || role === 'MANAGER') {
       fetchTodayTasks();
     }
   }, [role, selectedLocationId, selectedTodoId, selectedStatus, currentPage, itemsPerPage]);
@@ -155,6 +157,8 @@ export const DashboardPage = () => {
     }
   };
 
+  const canCompleteAdminTask = role === 'ADMIN' || role === 'MANAGER';
+
   const downloadAttachment = (url, fileName = 'attachment') => {
     if (!url) return;
     const link = document.createElement('a');
@@ -167,11 +171,19 @@ export const DashboardPage = () => {
     document.body.removeChild(link);
   };
 
+  const handleTodoCompleted = async () => {
+    setActiveTodoToComplete(null);
+    await Promise.all([
+      fetchTodayTasks(),
+      fetchUniqueTodayTasks(),
+    ]);
+  };
+
   if (!currentUser)
     return null;
   // Global calculations
   const totalEmployees = users.length;
-  const totalManagers = users.filter((u) => u.role === 'Manager').length;
+  const totalManagers = users.filter((u) => String(u.role || '').toUpperCase() === 'MANAGER').length;
   const activeUsers = users.filter((u) => u.status === 'Active').length;
   const pendingReminders = reminders.filter((r) => r.status === 'Active').length;
   const lowStockCount = stocks.filter((s) => s.quantity <= s.minThreshold).length;
@@ -219,7 +231,7 @@ export const DashboardPage = () => {
     </div>
 
     {/* Dynamic Metrics Cards for Admin/Manager */}
-    {(role === 'Admin' || role === 'Manager') && (
+    {(role === 'ADMIN' || role === 'MANAGER') && (
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
         {/* Card 1: Total Tasks */}
         <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs hover:border-blue-300 transition-all hover:shadow-md cursor-pointer group">
@@ -274,7 +286,7 @@ export const DashboardPage = () => {
     )}
 
     {/* ADMIN DASHBOARD VIEW */}
-    {role === 'Admin' && false && (<div className="flex flex-col gap-8">
+    {role === 'ADMIN' && false && (<div className="flex flex-col gap-8">
 
       {/* Admin Metrics Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -502,7 +514,7 @@ export const DashboardPage = () => {
     </div>)}
 
     {/* MANAGER DASHBOARD VIEW */}
-    {role === 'Manager' && false && (<div className="flex flex-col gap-8">
+    {role === 'MANAGER' && false && (<div className="flex flex-col gap-8">
 
       {/* Manager Metrics */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -606,7 +618,7 @@ export const DashboardPage = () => {
     </div>)}
 
     {/* OPERATIONAL USER DASHBOARD VIEW */}
-    {role === 'User' && (<div className="flex flex-col gap-8">
+    {role === 'USER' && (<div className="flex flex-col gap-8">
 
       {/* User Metrics */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -714,7 +726,7 @@ export const DashboardPage = () => {
     </div>)}
 
     {/* Today's Tasks Section for Admin/Manager */}
-    {(role === 'Admin' || role === 'Manager') && (
+    {(role === 'ADMIN' || role === 'MANAGER') && (
       <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs flex flex-col gap-6 text-left mt-8">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-5">
           <div className="flex items-center gap-3">
@@ -816,45 +828,60 @@ export const DashboardPage = () => {
                     key={`${task.todo_id}-${task.todo_location_id}`}
                     className="p-5 bg-slate-50/70 hover:bg-slate-50 rounded-2xl border border-slate-200/80 transition-all shadow-xs flex flex-col gap-4"
                   >
-                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-                      <div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className={`px-2 py-0.5 rounded-lg text-[10px] font-extrabold uppercase tracking-wider ${task.schedule === 'daily' ? 'bg-blue-50 text-blue-700 border border-blue-100' :
-                              task.schedule === 'weekly' ? 'bg-violet-50 text-violet-700 border border-violet-100' :
-                                task.schedule === 'monthly' ? 'bg-amber-50 text-amber-700 border border-amber-100' :
-                                  'bg-slate-100 text-slate-700 border border-slate-200'
-                            }`}>
-                            {task.schedule}
-                          </span>
-                          <span className="px-2 py-0.5 rounded-lg text-[10px] font-extrabold uppercase tracking-wider bg-slate-200/80 text-slate-700">
-                            {task.type}
-                          </span>
-                          {isCompleted ? (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-emerald-50 text-emerald-700 font-extrabold rounded-lg text-[10px] border border-emerald-100">
-                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Completed
+                    <div className="flex flex-col gap-3">
+                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className={`px-2 py-0.5 rounded-lg text-[10px] font-extrabold uppercase tracking-wider ${task.schedule === 'daily' ? 'bg-blue-50 text-blue-700 border border-blue-100' :
+                                task.schedule === 'weekly' ? 'bg-violet-50 text-violet-700 border border-violet-100' :
+                                  task.schedule === 'monthly' ? 'bg-amber-50 text-amber-700 border border-amber-100' :
+                                    'bg-slate-100 text-slate-700 border border-slate-200'
+                              }`}>
+                              {task.schedule}
                             </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-amber-50 text-amber-700 font-extrabold rounded-lg text-[10px] border border-amber-100">
-                              <Clock className="w-3.5 h-3.5 text-amber-600" /> Pending
+                            <span className="px-2 py-0.5 rounded-lg text-[10px] font-extrabold uppercase tracking-wider bg-slate-200/80 text-slate-700">
+                              {task.type}
                             </span>
+                            {isCompleted ? (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-emerald-50 text-emerald-700 font-extrabold rounded-lg text-[10px] border border-emerald-100">
+                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Completed
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-amber-50 text-amber-700 font-extrabold rounded-lg text-[10px] border border-amber-100">
+                                <Clock className="w-3.5 h-3.5 text-amber-600" /> Pending
+                              </span>
+                            )}
+                          </div>
+                          <h4 className="font-bold text-sm text-slate-800 mt-2">{task.title}</h4>
+                          {task.description && (
+                            <p className="text-xs text-slate-500 mt-1 leading-normal max-w-2xl">{task.description}</p>
                           )}
                         </div>
-                        <h4 className="font-bold text-sm text-slate-800 mt-2">{task.title}</h4>
-                        {task.description && (
-                          <p className="text-xs text-slate-500 mt-1 leading-normal max-w-2xl">{task.description}</p>
-                        )}
+
+                        {/* Location Details */}
+                        <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-left sm:text-right shrink-0">
+                          <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Location</p>
+                          <p className="text-xs font-bold text-slate-800 mt-0.5">
+                            {task.location?.godown || 'N/A'}
+                          </p>
+                          <p className="text-[10px] text-slate-500 font-medium">
+                            {task.location?.district || 'N/A'} {task.location?.sloc ? `• ${task.location.sloc}` : ''}
+                          </p>
+                        </div>
                       </div>
 
-                      {/* Location Details */}
-                      <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-left sm:text-right shrink-0">
-                        <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Location</p>
-                        <p className="text-xs font-bold text-slate-800 mt-0.5">
-                          {task.location?.godown || 'N/A'}
-                        </p>
-                        <p className="text-[10px] text-slate-500 font-medium">
-                          {task.location?.district || 'N/A'} {task.location?.sloc ? `• ${task.location.sloc}` : ''}
-                        </p>
-                      </div>
+                      {!isCompleted && canCompleteAdminTask && (
+                        <div className="flex justify-start sm:justify-end">
+                          <button
+                            type="button"
+                            onClick={() => setActiveTodoToComplete(task)}
+                            className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-sm transition-all hover:bg-blue-700"
+                          >
+                            <CheckSquare className="h-3.5 w-3.5" />
+                            Complete Task
+                          </button>
+                        </div>
+                      )}
                     </div>
 
                     {/* Completion Metadata & Files */}
@@ -1041,6 +1068,13 @@ export const DashboardPage = () => {
         )}
       </div>
     </Modal>
+
+    <TodoCompletionModal
+      isOpen={Boolean(activeTodoToComplete)}
+      todo={activeTodoToComplete}
+      onClose={() => setActiveTodoToComplete(null)}
+      onCompleted={handleTodoCompleted}
+    />
 
   </div>);
 };
