@@ -144,6 +144,11 @@ export const todoIdParamSchema = Joi.object({
   todo_id: Joi.number().integer().positive().required(),
 }).messages(messages);
 
+export const todoLocationCompleteParamSchema = Joi.object({
+  todo_id: Joi.number().integer().positive().required(),
+  location_id: Joi.number().integer().positive().required(),
+}).messages(messages);
+
 export const getTodosQuerySchema = Joi.object({
   location_id: Joi.number().integer().positive().optional(),
 }).messages(messages);

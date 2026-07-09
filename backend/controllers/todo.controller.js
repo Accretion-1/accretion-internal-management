@@ -46,6 +46,17 @@ export const completeLoggedInUserTodoController = apiHandler(async (req, res) =>
   return apiResponse(UPDATE_SUCCESS, "Todo completed", completion, res, "object");
 });
 
+export const completeAdminManagerTodoController = apiHandler(async (req, res) => {
+  const completion = await todoService.completeAdminManagerTodoService(
+    req.params.todo_id,
+    req.params.location_id,
+    req.body,
+    req.files,
+    req.user,
+  );
+  return apiResponse(UPDATE_SUCCESS, "Todo completed", completion, res, "object");
+});
+
 export const getTodoCompletionsController = apiHandler(async (req, res) => {
   const completions = await todoService.getTodoCompletionsService(
     req.params.todo_id,

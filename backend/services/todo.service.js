@@ -301,6 +301,16 @@ const formatUserTodo = (todo) => {
   };
 };
 
+const formatAdminManagerTodo = (todo) => {
+  const location = formatLocation(todo);
+
+  return {
+    ...formatTodo(todo, [location]),
+    todo_location_id: todo.todo_location_id,
+    is_completed: Boolean(todo.is_completed),
+  };
+};
+
 const ensureLocationExists = async (locationId) => {
   const location = await locationModel.getLocationByIdModel(locationId);
 
@@ -842,6 +852,56 @@ export const completeLoggedInUserTodoService = async (todoId, body = {}, files =
       ...completion,
       todo: {
         ...formatUserTodo(todo),
+        is_completed: true,
+      },
+    };
+  } catch (error) {
+    cleanupUploadedFiles(uploadedFiles);
+    if (error instanceof ApiError) throw error;
+    throw new ApiError(UPDATE_ERROR, "Todo completion", error, false);
+  }
+};
+
+export const completeAdminManagerTodoService = async (
+  todoId,
+  locationId,
+  body = {},
+  files = {},
+  user,
+) => {
+  const uploadedFiles = normalizeCompletionFiles(files);
+
+  try {
+    ensureAdminOrManagerAccess(user);
+
+    const [todo] = await todoModel.getAdminManagerTodayTodosModel({
+      todo_id: Number(todoId),
+      location_id: Number(locationId),
+      page: 1,
+      limit: 1,
+    });
+
+    if (isEmpty(todo)) {
+      throw new ApiError(NOT_FOUND, "Todo");
+    }
+
+    if (Boolean(todo.is_completed)) {
+      throw new ApiError(CUSTOM_ERROR, "Todo is already completed");
+    }
+
+    const completionPayload = await buildCompletionPayload(todo, body, files);
+
+    const completion = await todoModel.completeTodoModel({
+      todo_id: Number(todo.todo_id),
+      todo_location_id: Number(todo.todo_location_id),
+      completed_by: Number(user.user_id),
+      ...completionPayload,
+    });
+
+    return {
+      ...completion,
+      todo: {
+        ...formatAdminManagerTodo(todo),
         is_completed: true,
       },
     };
