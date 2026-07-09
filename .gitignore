@@ -93,3 +93,5 @@ backend/keys/
 **/firebase-service-account.json
 **/*service-account*.json
 ocr-service/venv/*
+ocr-service/uploads/*
+ocr-service/routes/__pycache__/*
