@@ -92,3 +92,4 @@ backend/firebase-service-account.json
 backend/keys/
 **/firebase-service-account.json
 **/*service-account*.json
+ocr-service/venv/*
