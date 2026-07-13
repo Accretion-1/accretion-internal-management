@@ -9,3 +9,4 @@ paddlex[ocr]
 opencv-python-headless
 pillow
 numpy
+rapidfuzz

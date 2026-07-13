@@ -28,7 +28,12 @@ def is_valid_vehicle_no(v: str) -> bool:
 
 
 def is_nonempty_text(v: str) -> bool:
-    return len(v.strip()) >= 2
+    text = v.strip()
+    if len(text) < 2:
+        return False
+    if "<" in text or ">" in text:
+        return False
+    return True
 
 
 def is_numeric(v: str) -> bool:

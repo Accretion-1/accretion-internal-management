@@ -27,6 +27,7 @@ import json
 import os
 import shutil
 import time
+import re
 from dataclasses import dataclass, field
 from difflib import SequenceMatcher
 from typing import Callable, Optional
@@ -55,6 +56,18 @@ def _best_match(raw: str, candidates: list):
         return (lower_map[m[0]], m[1]) if m else (None, 0)
     best = max(candidates, key=lambda c: _score(raw, c))
     return best, _score(raw, best)
+
+
+HTML_ARTIFACT_RE = re.compile(r"</?(?:table|thead|tbody|tfoot|tr|td|th|div|span|p|br)\b|<[^>]+>", re.IGNORECASE)
+
+
+def _is_valid_candidate_value(value: str) -> bool:
+    text = (value or "").strip()
+    if not text:
+        return False
+    if HTML_ARTIFACT_RE.search(text):
+        return False
+    return True
 
 
 @dataclass
@@ -97,6 +110,9 @@ class MasterList:
         if self.validator is not None and not self.validator(raw):
             return {"value": raw, "status": "rejected_invalid_format", "score": 0}
 
+        if not _is_valid_candidate_value(raw):
+            return {"value": raw, "status": "rejected_invalid_format", "score": 0}
+
         self.candidates[raw] = {"count": 1, "first_seen": time.time(), "last_seen": time.time()}
         return {"value": raw, "status": "new_candidate", "score": 0}
 
@@ -107,13 +123,22 @@ class MasterList:
         self.confirmed.add(value)
 
     def to_dict(self) -> dict:
-        return {"confirmed": sorted(self.confirmed), "candidates": self.candidates}
+        cleaned_candidates = {
+            value: meta
+            for value, meta in self.candidates.items()
+            if _is_valid_candidate_value(value)
+        }
+        return {"confirmed": sorted(self.confirmed), "candidates": cleaned_candidates}
 
     @classmethod
     def from_dict(cls, name: str, data: dict, **kwargs) -> "MasterList":
         ml = cls(name=name, **kwargs)
         ml.confirmed = set(data.get("confirmed", []))
-        ml.candidates = data.get("candidates", {})
+        ml.candidates = {
+            value: meta
+            for value, meta in data.get("candidates", {}).items()
+            if _is_valid_candidate_value(value)
+        }
         return ml
 
 

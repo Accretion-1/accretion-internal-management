@@ -3,7 +3,7 @@ from routes.ocr import router
 
 
 app = FastAPI(
-    title="PaddleOCR-VL API"
+    title="Goods-Outward Slip OCR API"
 )
 
 
@@ -15,5 +15,5 @@ def home():
 
     return {
         "status":"running",
-        "engine":"PaddleOCR-VL-1.6"
+        "engine":"Slip OCR Pipeline (alignment + PaddleOCR-VL + parsing)"
     }

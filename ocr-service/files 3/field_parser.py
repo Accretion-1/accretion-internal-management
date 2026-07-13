@@ -10,6 +10,7 @@ as anchors -- the same principle as the label-anchoring approach used for
 image cropping earlier, just applied to text instead of pixels.
 """
 
+import html
 import re
 
 FIELD_PATTERNS = {
@@ -26,11 +27,17 @@ FIELD_PATTERNS = {
 # Placeholders PaddleOCR-VL emits for a visually blank field (dots/underscores
 # left on the printed line with no handwriting) -- normalize these to "".
 BLANK_PLACEHOLDER_RE = re.compile(r"^[_.\s]*$")
+HTML_TAG_RE = re.compile(r"<[^>]+>")
+HTML_ARTIFACT_RE = re.compile(r"</?(?:table|thead|tbody|tfoot|tr|td|th|div|span|p|br)\b", re.IGNORECASE)
 
 
 def _clean(value: str) -> str:
-    value = value.strip(" .")
-    return "" if BLANK_PLACEHOLDER_RE.match(value) else value
+    value = html.unescape(value or "")
+    value = HTML_TAG_RE.sub(" ", value)
+    value = re.sub(r"\s+", " ", value).strip(" .")
+    if not value or BLANK_PLACEHOLDER_RE.match(value) or HTML_ARTIFACT_RE.search(value):
+        return ""
+    return value
 
 # Block No. / Week No. share a line and both can be blank -- handle separately.
 BLOCK_WEEK_RE = re.compile(
@@ -39,7 +46,11 @@ BLOCK_WEEK_RE = re.compile(
 # Godown Name sometimes has the slip number merged onto the same line by the
 # reading-order dump (as in the sample) -- a long trailing digit run (6+
 # digits) glued onto the end is almost certainly that, not part of the name.
-GODOWN_RE = re.compile(r"Godown\s*Name\s*:?\s*(.+)", re.IGNORECASE)
+GODOWN_RE = re.compile(
+    r"Godown\s*Name\s*:?\s*(.*?)"
+    r"(?=\s*(?:Please\s*Load|Block\s*No\.?|Vehicle\s*No\.?|Supply\s*to|Validity\s*of\s*Loading\s*Slip|Material\s*Load\s*on|Signature|</tr>|</td>|$))",
+    re.IGNORECASE | re.DOTALL,
+)
 TRAILING_DIGITS_RE = re.compile(r"(.*?)\s*([0-9]{6,})\s*$")
 
 # The slip's own serial number after "No.:" -- distinct from the small fixed
