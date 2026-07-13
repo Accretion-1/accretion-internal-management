@@ -95,3 +95,4 @@ backend/keys/
 ocr-service/venv/*
 ocr-service/uploads/*
 ocr-service/routes/__pycache__/*
+ocr-service/__pycache__/*

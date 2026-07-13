@@ -1,0 +1,46 @@
+{
+  "godown_name": {
+    "confirmed": [
+      "Bv. Befu",
+      "Harsi Pump"
+    ],
+    "candidates": {}
+  },
+  "supply_to": {
+    "confirmed": [
+      "Patelsales",
+      "QUALITY HARDWARE"
+    ],
+    "candidates": {}
+  },
+  "material_type": {
+    "confirmed": [
+      "PPC",
+      "SUPER",
+      "WPC",
+      "p.p.c"
+    ],
+    "candidates": {
+      "WIP": {
+        "count": 1,
+        "first_seen": 1783931950.6535318,
+        "last_seen": 1783931950.6535318
+      }
+    }
+  },
+  "slip_no": {
+    "confirmed": [
+      "159301570",
+      "37681",
+      "400000"
+    ],
+    "candidates": {}
+  },
+  "vehicle_no": {
+    "confirmed": [
+      "MP05AJ3109",
+      "MP48AA0646"
+    ],
+    "candidates": {}
+  }
+}

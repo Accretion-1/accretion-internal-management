@@ -62,6 +62,10 @@ const USER_TODO_SELECT = `
   LEFT JOIN users u ON u.user_id = t.created_by
 `;
 
+const LOCAL_NOW_SQL = "CONVERT_TZ(NOW(), @@session.time_zone, '+05:30')";
+const LOCAL_DATE_SQL = `DATE(${LOCAL_NOW_SQL})`;
+const LOCAL_TIME_SQL = `TIME(${LOCAL_NOW_SQL})`;
+
 const USER_TODO_COMPLETION_JOIN = `
   LEFT JOIN (
     SELECT
@@ -69,7 +73,7 @@ const USER_TODO_COMPLETION_JOIN = `
       todo_id,
       todo_location_id,
       completed_by,
-      MAX(completion_date = CURDATE()) AS completed_today
+      MAX(completion_date = ${LOCAL_DATE_SQL}) AS completed_today
     FROM todo_completions
     GROUP BY todo_id, todo_location_id, completed_by
   ) tc ON tc.todo_id = t.todo_id
@@ -85,13 +89,17 @@ const USER_TODO_WHERE = `
   WHERE tl.location_id = ?
     AND tl.is_deleted = FALSE
     AND t.is_active = TRUE
-    AND t.start_date <= CURDATE()
-    AND (t.end_date IS NULL OR t.end_date >= CURDATE())
+    AND t.start_date <= ${LOCAL_DATE_SQL}
+    AND (t.end_date IS NULL OR t.end_date >= ${LOCAL_DATE_SQL})
+    AND (
+      t.due_time IS NULL
+      OR ${LOCAL_TIME_SQL} >= SUBTIME(t.due_time, '02:00:00')
+    )
     AND (
       t.schedule = 'daily'
-      OR (t.schedule = 'weekly' AND t.day_of_week = CASE WHEN DAYOFWEEK(CURDATE()) = 1 THEN 7 ELSE DAYOFWEEK(CURDATE()) - 1 END)
-      OR (t.schedule = 'monthly' AND t.day_of_month = DAY(CURDATE()))
-      OR (t.schedule = 'single' AND t.start_date <= CURDATE() AND (t.end_date IS NULL OR t.end_date >= CURDATE()))
+      OR (t.schedule = 'weekly' AND t.day_of_week = CASE WHEN DAYOFWEEK(${LOCAL_DATE_SQL}) = 1 THEN 7 ELSE DAYOFWEEK(${LOCAL_DATE_SQL}) - 1 END)
+      OR (t.schedule = 'monthly' AND t.day_of_month = DAY(${LOCAL_DATE_SQL}))
+      OR (t.schedule = 'single' AND t.start_date <= ${LOCAL_DATE_SQL} AND (t.end_date IS NULL OR t.end_date >= ${LOCAL_DATE_SQL}))
     )
 `;
 
@@ -107,6 +115,15 @@ const buildUserTodoStatusFilter = (status, values) => {
   }
 
   return "";
+};
+
+const sqlDateParam = (values, date) => {
+  if (date) {
+    values.push(date);
+    return "?";
+  }
+
+  return "CURDATE()";
 };
 
 export const createTodoModel = async ({
@@ -724,23 +741,25 @@ export const getAdminManagerTodayTodosModel = async ({
   location_id = null,
   todo_id = null,
   status = null,
+  date = null,
   page = 1,
   limit = 10,
 }) => {
   try {
     const offset = (page - 1) * limit;
     const values = [];
+    const targetDate = date || null;
 
     let whereSql = `
       WHERE tl.is_deleted = FALSE
         AND t.is_active = TRUE
-        AND t.start_date <= CURDATE()
-        AND (t.end_date IS NULL OR t.end_date >= CURDATE())
+        AND t.start_date <= ${sqlDateParam(values, targetDate)}
+        AND (t.end_date IS NULL OR t.end_date >= ${sqlDateParam(values, targetDate)})
         AND (
           t.schedule = 'daily'
-          OR (t.schedule = 'weekly' AND t.day_of_week = CASE WHEN DAYOFWEEK(CURDATE()) = 1 THEN 7 ELSE DAYOFWEEK(CURDATE()) - 1 END)
-          OR (t.schedule = 'monthly' AND t.day_of_month = DAY(CURDATE()))
-          OR (t.schedule = 'single' AND t.start_date <= CURDATE() AND (t.end_date IS NULL OR t.end_date >= CURDATE()))
+          OR (t.schedule = 'weekly' AND t.day_of_week = CASE WHEN DAYOFWEEK(${sqlDateParam(values, targetDate)}) = 1 THEN 7 ELSE DAYOFWEEK(${sqlDateParam(values, targetDate)}) - 1 END)
+          OR (t.schedule = 'monthly' AND t.day_of_month = DAY(${sqlDateParam(values, targetDate)}))
+          OR (t.schedule = 'single' AND t.start_date <= ${sqlDateParam(values, targetDate)} AND (t.end_date IS NULL OR t.end_date >= ${sqlDateParam(values, targetDate)}))
         )
     `;
 
@@ -819,7 +838,7 @@ export const getAdminManagerTodayTodosModel = async ({
             todo_location_id,
             MAX(completion_id) AS max_completion_id
           FROM todo_completions
-          WHERE completion_date = CURDATE()
+          WHERE completion_date = ${sqlDateParam(values, targetDate)}
              OR todo_id IN (SELECT todo_id FROM todos WHERE schedule = 'single')
           GROUP BY todo_id, todo_location_id
         ) latest ON tc_sub.completion_id = latest.max_completion_id
@@ -840,20 +859,22 @@ export const countAdminManagerTodayTodosModel = async ({
   location_id = null,
   todo_id = null,
   status = null,
+  date = null,
 }) => {
   try {
     const values = [];
+    const targetDate = date || null;
 
     let whereSql = `
       WHERE tl.is_deleted = FALSE
         AND t.is_active = TRUE
-        AND t.start_date <= CURDATE()
-        AND (t.end_date IS NULL OR t.end_date >= CURDATE())
+        AND t.start_date <= ${sqlDateParam(values, targetDate)}
+        AND (t.end_date IS NULL OR t.end_date >= ${sqlDateParam(values, targetDate)})
         AND (
           t.schedule = 'daily'
-          OR (t.schedule = 'weekly' AND t.day_of_week = CASE WHEN DAYOFWEEK(CURDATE()) = 1 THEN 7 ELSE DAYOFWEEK(CURDATE()) - 1 END)
-          OR (t.schedule = 'monthly' AND t.day_of_month = DAY(CURDATE()))
-          OR (t.schedule = 'single' AND t.start_date <= CURDATE() AND (t.end_date IS NULL OR t.end_date >= CURDATE()))
+          OR (t.schedule = 'weekly' AND t.day_of_week = CASE WHEN DAYOFWEEK(${sqlDateParam(values, targetDate)}) = 1 THEN 7 ELSE DAYOFWEEK(${sqlDateParam(values, targetDate)}) - 1 END)
+          OR (t.schedule = 'monthly' AND t.day_of_month = DAY(${sqlDateParam(values, targetDate)}))
+          OR (t.schedule = 'single' AND t.start_date <= ${sqlDateParam(values, targetDate)} AND (t.end_date IS NULL OR t.end_date >= ${sqlDateParam(values, targetDate)}))
         )
     `;
 
@@ -883,7 +904,7 @@ export const countAdminManagerTodayTodosModel = async ({
           todo_location_id,
           MAX(completion_id) AS completion_id
         FROM todo_completions
-        WHERE completion_date = CURDATE()
+        WHERE completion_date = ${sqlDateParam(values, targetDate)}
            OR todo_id IN (SELECT todo_id FROM todos WHERE schedule = 'single')
         GROUP BY todo_id, todo_location_id
       ) tc ON tc.todo_id = t.todo_id AND tc.todo_location_id = tl.todo_location_id
@@ -990,26 +1011,41 @@ export const updateTodoLastReminderSentAtModel = async (todoId) => {
   }
 };
 
-export const getAdminManagerTodayUniqueTodosModel = async () => {
+export const getAdminManagerTodayUniqueTodosModel = async ({
+  date = null,
+  location_id = null,
+} = {}) => {
   try {
+    const values = [];
+    const targetDate = date || null;
+    const locationFilterSql = location_id ? "AND tl.location_id = ?" : "";
+    if (location_id) {
+      values.push(location_id);
+    }
+
     const querySql = `
-      SELECT DISTINCT t.todo_id, t.title, t.start_date
+      SELECT
+        t.todo_id,
+        t.title,
+        MIN(t.start_date) AS start_date
       FROM todos t
       INNER JOIN todo_locations tl ON tl.todo_id = t.todo_id
       WHERE tl.is_deleted = FALSE
         AND t.is_active = TRUE
-        AND t.start_date <= CURDATE()
-        AND (t.end_date IS NULL OR t.end_date >= CURDATE())
+        ${locationFilterSql}
+        AND t.start_date <= ${sqlDateParam(values, targetDate)}
+        AND (t.end_date IS NULL OR t.end_date >= ${sqlDateParam(values, targetDate)})
         AND (
           t.schedule = 'daily'
-          OR (t.schedule = 'weekly' AND t.day_of_week = CASE WHEN DAYOFWEEK(CURDATE()) = 1 THEN 7 ELSE DAYOFWEEK(CURDATE()) - 1 END)
-          OR (t.schedule = 'monthly' AND t.day_of_month = DAY(CURDATE()))
-          OR (t.schedule = 'single' AND t.start_date <= CURDATE() AND (t.end_date IS NULL OR t.end_date >= CURDATE()))
+          OR (t.schedule = 'weekly' AND t.day_of_week = CASE WHEN DAYOFWEEK(${sqlDateParam(values, targetDate)}) = 1 THEN 7 ELSE DAYOFWEEK(${sqlDateParam(values, targetDate)}) - 1 END)
+          OR (t.schedule = 'monthly' AND t.day_of_month = DAY(${sqlDateParam(values, targetDate)}))
+          OR (t.schedule = 'single' AND t.start_date <= ${sqlDateParam(values, targetDate)} AND (t.end_date IS NULL OR t.end_date >= ${sqlDateParam(values, targetDate)}))
         )
-      ORDER BY t.start_date ASC, t.title ASC, t.todo_id ASC
+      GROUP BY t.todo_id, t.title
+      ORDER BY start_date ASC, t.title ASC, t.todo_id ASC
     `;
 
-    return await db.query(querySql);
+    return await db.query(querySql, values);
   } catch (error) {
     throw new ApiError(DB_ERROR, "Fetching Today Unique Todos", error, false);
   }

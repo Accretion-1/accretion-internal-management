@@ -170,8 +170,14 @@ export const getAdminManagerTodayTodosQuerySchema = Joi.object({
   location_id: Joi.number().integer().positive().optional(),
   todo_id: Joi.number().integer().positive().optional(),
   status: Joi.string().valid("active", "completed").optional(),
+  date: dateValidation.optional(),
   page: Joi.number().integer().positive().default(1).optional(),
   limit: Joi.number().integer().positive().max(100).default(10).optional(),
+}).messages(messages);
+
+export const getAdminManagerTodayUniqueTodosQuerySchema = Joi.object({
+  location_id: Joi.number().integer().positive().optional(),
+  date: dateValidation.optional(),
 }).messages(messages);
 
 export const getStockCompletionReportQuerySchema = Joi.object({

@@ -31,12 +31,20 @@ async def run_ocr(
         )
 
 
-    texts = ocr_service.extract_text(
-        file_path
-    )
+    record = ocr_service.process_image(file_path)
+    try:
+        ocr_service.save_master_data()
+    except Exception as error:
+        print(f"Warning: failed to save master data: {error}")
+    texts = [
+        line.strip()
+        for line in record.get("_raw_ocr_text", "").splitlines()
+        if line.strip()
+    ]
 
 
     return {
         "count": len(texts),
-        "texts": texts
+        "texts": texts,
+        "record": record
     }

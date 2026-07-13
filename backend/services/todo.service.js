@@ -1014,12 +1014,14 @@ export const getAdminManagerTodayTodosService = async (query = {}, user) => {
     const locationId = query.location_id ? Number(query.location_id) : null;
     const todoId = query.todo_id ? Number(query.todo_id) : null;
     const status = query.status || null;
+    const date = query.date || null;
 
     const [records, totalRecords, totalCount, completedCount, activeCount] = await Promise.all([
       todoModel.getAdminManagerTodayTodosModel({
         location_id: locationId,
         todo_id: todoId,
         status,
+        date,
         page,
         limit,
       }),
@@ -1027,21 +1029,25 @@ export const getAdminManagerTodayTodosService = async (query = {}, user) => {
         location_id: locationId,
         todo_id: todoId,
         status,
+        date,
       }),
       todoModel.countAdminManagerTodayTodosModel({
         location_id: locationId,
         todo_id: todoId,
         status: null,
+        date,
       }),
       todoModel.countAdminManagerTodayTodosModel({
         location_id: locationId,
         todo_id: todoId,
         status: 'completed',
+        date,
       }),
       todoModel.countAdminManagerTodayTodosModel({
         location_id: locationId,
         todo_id: todoId,
         status: 'active',
+        date,
       }),
     ]);
 
@@ -1169,10 +1175,13 @@ export const getAdminManagerTodayTodosService = async (query = {}, user) => {
   }
 };
 
-export const getAdminManagerTodayUniqueTodosService = async (user) => {
+export const getAdminManagerTodayUniqueTodosService = async (query = {}, user) => {
   try {
     ensureAdminOrManagerAccess(user);
-    return await todoModel.getAdminManagerTodayUniqueTodosModel();
+    return await todoModel.getAdminManagerTodayUniqueTodosModel({
+      date: query.date || null,
+      location_id: query.location_id ? Number(query.location_id) : null,
+    });
   } catch (error) {
     if (error instanceof ApiError) throw error;
     throw new ApiError(FETCH_ERROR, "Today Unique Todos", error, false);
