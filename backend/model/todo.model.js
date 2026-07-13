@@ -62,6 +62,10 @@ const USER_TODO_SELECT = `
   LEFT JOIN users u ON u.user_id = t.created_by
 `;
 
+const LOCAL_NOW_SQL = "CONVERT_TZ(NOW(), @@session.time_zone, '+05:30')";
+const LOCAL_DATE_SQL = `DATE(${LOCAL_NOW_SQL})`;
+const LOCAL_TIME_SQL = `TIME(${LOCAL_NOW_SQL})`;
+
 const USER_TODO_COMPLETION_JOIN = `
   LEFT JOIN (
     SELECT
@@ -69,7 +73,7 @@ const USER_TODO_COMPLETION_JOIN = `
       todo_id,
       todo_location_id,
       completed_by,
-      MAX(completion_date = CURDATE()) AS completed_today
+      MAX(completion_date = ${LOCAL_DATE_SQL}) AS completed_today
     FROM todo_completions
     GROUP BY todo_id, todo_location_id, completed_by
   ) tc ON tc.todo_id = t.todo_id
@@ -85,13 +89,17 @@ const USER_TODO_WHERE = `
   WHERE tl.location_id = ?
     AND tl.is_deleted = FALSE
     AND t.is_active = TRUE
-    AND t.start_date <= CURDATE()
-    AND (t.end_date IS NULL OR t.end_date >= CURDATE())
+    AND t.start_date <= ${LOCAL_DATE_SQL}
+    AND (t.end_date IS NULL OR t.end_date >= ${LOCAL_DATE_SQL})
+    AND (
+      t.due_time IS NULL
+      OR ${LOCAL_TIME_SQL} >= SUBTIME(t.due_time, '02:00:00')
+    )
     AND (
       t.schedule = 'daily'
-      OR (t.schedule = 'weekly' AND t.day_of_week = CASE WHEN DAYOFWEEK(CURDATE()) = 1 THEN 7 ELSE DAYOFWEEK(CURDATE()) - 1 END)
-      OR (t.schedule = 'monthly' AND t.day_of_month = DAY(CURDATE()))
-      OR (t.schedule = 'single' AND t.start_date <= CURDATE() AND (t.end_date IS NULL OR t.end_date >= CURDATE()))
+      OR (t.schedule = 'weekly' AND t.day_of_week = CASE WHEN DAYOFWEEK(${LOCAL_DATE_SQL}) = 1 THEN 7 ELSE DAYOFWEEK(${LOCAL_DATE_SQL}) - 1 END)
+      OR (t.schedule = 'monthly' AND t.day_of_month = DAY(${LOCAL_DATE_SQL}))
+      OR (t.schedule = 'single' AND t.start_date <= ${LOCAL_DATE_SQL} AND (t.end_date IS NULL OR t.end_date >= ${LOCAL_DATE_SQL}))
     )
 `;
 
