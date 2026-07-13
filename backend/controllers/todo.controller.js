@@ -72,7 +72,7 @@ export const getAdminManagerTodayTodosController = apiHandler(async (req, res) =
 });
 
 export const getAdminManagerTodayUniqueTodosController = apiHandler(async (req, res) => {
-  const result = await todoService.getAdminManagerTodayUniqueTodosService(req.user);
+  const result = await todoService.getAdminManagerTodayUniqueTodosService(req.query, req.user);
   return apiResponse(FETCH, "Today Unique Todos", result, res);
 });
 

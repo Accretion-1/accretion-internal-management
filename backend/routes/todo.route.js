@@ -26,6 +26,7 @@ import {
   todoLocationCompleteParamSchema,
   updateTodoSchema,
   getAdminManagerTodayTodosQuerySchema,
+  getAdminManagerTodayUniqueTodosQuerySchema,
   getStockCompletionReportQuerySchema,
 } from "../validations/todo.validation.js";
 
@@ -70,6 +71,7 @@ router.get(
 );
 router.get(
   "/today-unique-tasks",
+  validate(getAdminManagerTodayUniqueTodosQuerySchema, "query"),
   getAdminManagerTodayUniqueTodosController,
 );
 router.get(

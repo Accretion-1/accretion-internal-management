@@ -21,6 +21,24 @@ const STOCK_FIELDS = [
   ['damage_super', 'Damage Super'],
 ];
 
+const getLocalDateString = (date = new Date()) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const formatDisplayDate = (value) => {
+  if (!value) return '';
+  const [year, month, day] = String(value).split('-').map(Number);
+  if (!year || !month || !day) return value;
+  return new Date(year, month - 1, day).toLocaleDateString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
+};
+
 export const DashboardPage = () => {
   const { currentUser, users, stocks, reminders, activities, notifications } = useAppState();
   const [hoveredMetric, setHoveredMetric] = useState(null);
@@ -28,6 +46,7 @@ export const DashboardPage = () => {
   const [todayTasks, setTodayTasks] = useState([]);
   const [locationsList, setLocationsList] = useState([]);
   const [selectedLocationId, setSelectedLocationId] = useState('');
+  const [selectedDate, setSelectedDate] = useState(() => getLocalDateString());
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [selectedTodoId, setSelectedTodoId] = useState('');
   const [uniqueTodayTasks, setUniqueTodayTasks] = useState([]);
@@ -71,6 +90,7 @@ export const DashboardPage = () => {
       const params = {
         page: currentPage,
         limit: itemsPerPage,
+        date: selectedDate,
       };
       if (selectedLocationId) {
         params.location_id = selectedLocationId;
@@ -101,15 +121,19 @@ export const DashboardPage = () => {
   useEffect(() => {
     if (role === 'ADMIN' || role === 'MANAGER') {
       fetchLocations();
-      fetchUniqueTodayTasks();
     }
   }, [role]);
 
   const fetchUniqueTodayTasks = async () => {
     try {
+      const params = { date: selectedDate };
+      if (selectedLocationId) {
+        params.location_id = selectedLocationId;
+      }
       const response = await apiHandler({
         method: 'GET',
         url: API_ENDPOINTS.TODOS.TODAY_UNIQUE_TASKS,
+        params,
       });
       setUniqueTodayTasks(Array.isArray(response?.data) ? response.data : []);
     } catch (error) {
@@ -121,10 +145,23 @@ export const DashboardPage = () => {
     if (role === 'ADMIN' || role === 'MANAGER') {
       fetchTodayTasks();
     }
-  }, [role, selectedLocationId, selectedTodoId, selectedStatus, currentPage, itemsPerPage]);
+  }, [role, selectedLocationId, selectedTodoId, selectedStatus, currentPage, itemsPerPage, selectedDate]);
+
+  useEffect(() => {
+    if (role === 'ADMIN' || role === 'MANAGER') {
+      fetchUniqueTodayTasks();
+    }
+  }, [role, selectedLocationId, selectedDate]);
 
   const handleLocationChange = (e) => {
     setSelectedLocationId(e.target.value);
+    setSelectedTodoId('');
+    setCurrentPage(1);
+  };
+
+  const handleDateChange = (e) => {
+    setSelectedDate(e.target.value);
+    setSelectedTodoId('');
     setCurrentPage(1);
   };
 
@@ -183,6 +220,9 @@ export const DashboardPage = () => {
       fetchUniqueTodayTasks(),
     ]);
   };
+
+  const isViewingToday = selectedDate === getLocalDateString();
+  const selectedDateLabel = formatDisplayDate(selectedDate);
 
   if (!currentUser)
     return null;
@@ -246,7 +286,9 @@ export const DashboardPage = () => {
         >
           <div className="flex justify-between items-start">
             <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Total Today's Tasks</p>
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                {isViewingToday ? "Total Today's Tasks" : 'Total Tasks'}
+              </p>
               <h3 className="font-display text-3xl font-extrabold text-slate-900 mt-2">{taskStats.total}</h3>
             </div>
             <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition-all">
@@ -254,7 +296,7 @@ export const DashboardPage = () => {
             </div>
           </div>
           <div className="mt-4 flex items-center justify-between text-xs text-slate-500">
-            <span>Assigned for today</span>
+            <span>Assigned for {selectedDateLabel || 'selected day'}</span>
           </div>
         </button>
 
@@ -751,9 +793,11 @@ export const DashboardPage = () => {
               <ClipboardList className="h-6 w-6" />
             </div>
             <div>
-              <h3 className="font-display text-lg font-extrabold text-slate-900">Today's Tasks Status by Location</h3>
+              <h3 className="font-display text-lg font-extrabold text-slate-900">
+                {isViewingToday ? "Today's Tasks Status by Location" : `Tasks Status for ${selectedDateLabel}`}
+              </h3>
               <p className="text-xs text-slate-500 mt-0.5">
-                Monitor daily checklist performance, location coverage, and verification files uploaded by operators.
+                Monitor checklist performance, location coverage, and completion status for the selected day.
               </p>
             </div>
           </div>
@@ -768,7 +812,7 @@ export const DashboardPage = () => {
         </div>
 
         {/* Filter Bar */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-bold text-slate-600">Filter by Location</label>
             <div className="relative">
@@ -809,6 +853,18 @@ export const DashboardPage = () => {
           </div>
 
           <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-bold text-slate-600">Filter by Date</label>
+            <input
+              id="dashboard-date-filter"
+              type="date"
+              max={getLocalDateString()}
+              value={selectedDate}
+              onChange={handleDateChange}
+              className="w-full cursor-pointer rounded-xl border border-slate-200 bg-slate-50 py-2.5 px-3 text-xs font-bold text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
             <label className="text-xs font-bold text-slate-600">Filter by Status</label>
             <select
               id="dashboard-status-filter"
@@ -831,8 +887,10 @@ export const DashboardPage = () => {
         ) : todayTasks.length === 0 ? (
           <div className="py-12 text-center border border-dashed border-slate-200 rounded-2xl bg-slate-50/50">
             <CheckCircle2 className="mx-auto h-8 w-8 text-slate-300" />
-            <p className="mt-2 text-sm font-semibold text-slate-700">No tasks active today for the selected filters</p>
-            <p className="text-xs text-slate-400 mt-1">Try resetting the filters or check back later.</p>
+            <p className="mt-2 text-sm font-semibold text-slate-700">
+              No tasks active for {selectedDateLabel || 'the selected day'} and selected filters
+            </p>
+            <p className="text-xs text-slate-400 mt-1">Try resetting the filters or choose another date.</p>
           </div>
         ) : (
           <div className="flex flex-col gap-4">
