@@ -143,3 +143,76 @@ ALTER TABLE `todo_completions`
 ALTER TABLE `todo_completion_items` CHANGE `stock_name` `stock_name` ENUM('ppc','wp','super','cnt_ppc','cnt_wp','cnt_super','damage_ppc','damage_wp','damage_super') CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL;
 
 ALTER TABLE `users` ADD `is_deleted` BOOLEAN NOT NULL DEFAULT FALSE;
+
+CREATE TABLE godown_slips (
+    slip_id BIGINT PRIMARY KEY AUTO_INCREMENT,
+
+    slip_number VARCHAR(255),
+    slip_date DATE,
+
+    godown_name VARCHAR(255),
+
+    cement_type ENUM(
+        'PPC',
+        'WPC',
+        'SUPER',
+        'UNKNOWN'
+    ) DEFAULT 'UNKNOWN',
+
+    bag_count INT,
+
+    block_number VARCHAR(255),
+
+    vehicle_number VARCHAR(255),
+
+    dispatch_number VARCHAR(255),
+
+    customer_name TEXT,
+
+    destination TEXT,
+
+    material_load_type VARCHAR(255),
+
+    validity_date DATE NULL,
+
+    image_url TEXT,
+
+    ocr_confidence DECIMAL(5,2),
+
+    status ENUM(
+        'pending_review',
+        'verified',
+        'rejected'
+    ) DEFAULT 'pending_review',
+
+    reviewed_by BIGINT NULL,
+
+    reviewed_at DATETIME NULL,
+
+    remarks TEXT,
+
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    ON UPDATE CURRENT_TIMESTAMP
+);
+
+CREATE TABLE godown_slip_ocr (
+    ocr_id BIGINT PRIMARY KEY AUTO_INCREMENT,
+
+    slip_id BIGINT NOT NULL,
+
+    ocr_engine VARCHAR(255),
+
+    raw_text LONGTEXT,
+
+    raw_json JSON,
+
+    processing_time_ms INT,
+
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (slip_id)
+        REFERENCES godown_slips(slip_id)
+        ON DELETE CASCADE
+);
