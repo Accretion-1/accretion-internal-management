@@ -27,23 +27,28 @@ export const getGodownSlips = async (filters, pagination) => {
   const { limit, offset } = pagination;
   const { location_id, slip_date } = filters;
 
-  let query = `SELECT * FROM godown_slips WHERE 1=1`;
-  let countQuery = `SELECT COUNT(*) as total FROM godown_slips WHERE 1=1`;
+  let query = `
+    SELECT gs.*, l.district, l.godown, l.sloc
+    FROM godown_slips gs
+    LEFT JOIN locations l ON gs.location_id = l.location_id
+    WHERE 1=1
+  `;
+  let countQuery = `SELECT COUNT(*) as total FROM godown_slips gs WHERE 1=1`;
   const params = [];
 
   if (location_id) {
-    query += ` AND location_id = ?`;
-    countQuery += ` AND location_id = ?`;
+    query += ` AND gs.location_id = ?`;
+    countQuery += ` AND gs.location_id = ?`;
     params.push(location_id);
   }
 
   if (slip_date) {
-    query += ` AND slip_date = ?`;
-    countQuery += ` AND slip_date = ?`;
+    query += ` AND gs.slip_date = ?`;
+    countQuery += ` AND gs.slip_date = ?`;
     params.push(slip_date);
   }
 
-  query += ` ORDER BY created_at DESC LIMIT ? OFFSET ?`;
+  query += ` ORDER BY gs.created_at DESC LIMIT ? OFFSET ?`;
   
   const results = await db.query(query, [...params, limit, offset]);
   const countResult = await db.query(countQuery, params);
@@ -58,7 +63,13 @@ export const getGodownSlips = async (filters, pagination) => {
  * Get a single godown slip by ID
  */
 export const getGodownSlipById = async (slip_id) => {
-  const sql = `SELECT * FROM godown_slips WHERE slip_id = ? LIMIT 1`;
+  const sql = `
+    SELECT gs.*, l.district, l.godown, l.sloc
+    FROM godown_slips gs
+    LEFT JOIN locations l ON gs.location_id = l.location_id
+    WHERE gs.slip_id = ? 
+    LIMIT 1
+  `;
   const results = await db.query(sql, [slip_id]);
   return results[0] || null;
 };
