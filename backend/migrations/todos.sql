@@ -183,10 +183,11 @@ CREATE TABLE godown_slips (
     ocr_confidence DECIMAL(5,2),
 
     status ENUM(
-        'pending_review',
+        'pending',
+        'review',
         'verified',
         'rejected'
-    ) DEFAULT 'pending_review',
+    ) DEFAULT 'pending',
 
     reviewed_by BIGINT NULL,
 
