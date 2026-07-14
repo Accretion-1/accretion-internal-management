@@ -123,7 +123,7 @@ const sqlDateParam = (values, date) => {
     return "?";
   }
 
-  return "CURDATE()";
+  return "DATE(CONVERT_TZ(NOW(), @@session.time_zone, '+05:30'))";
 };
 
 export const createTodoModel = async ({
@@ -749,17 +749,20 @@ export const getAdminManagerTodayTodosModel = async ({
     const offset = (page - 1) * limit;
     const values = [];
     const targetDate = date || null;
+    const targetDateSql = targetDate
+      ? `'${targetDate}'`
+      : "DATE(CONVERT_TZ(NOW(), @@session.time_zone, '+05:30'))";
 
     let whereSql = `
       WHERE tl.is_deleted = FALSE
         AND t.is_active = TRUE
-        AND t.start_date <= ${sqlDateParam(values, targetDate)}
-        AND (t.end_date IS NULL OR t.end_date >= ${sqlDateParam(values, targetDate)})
+        AND t.start_date <= ${targetDateSql}
+        AND (t.end_date IS NULL OR t.end_date >= ${targetDateSql})
         AND (
           t.schedule = 'daily'
-          OR (t.schedule = 'weekly' AND t.day_of_week = CASE WHEN DAYOFWEEK(${sqlDateParam(values, targetDate)}) = 1 THEN 7 ELSE DAYOFWEEK(${sqlDateParam(values, targetDate)}) - 1 END)
-          OR (t.schedule = 'monthly' AND t.day_of_month = DAY(${sqlDateParam(values, targetDate)}))
-          OR (t.schedule = 'single' AND t.start_date <= ${sqlDateParam(values, targetDate)} AND (t.end_date IS NULL OR t.end_date >= ${sqlDateParam(values, targetDate)}))
+          OR (t.schedule = 'weekly' AND t.day_of_week = CASE WHEN DAYOFWEEK(${targetDateSql}) = 1 THEN 7 ELSE DAYOFWEEK(${targetDateSql}) - 1 END)
+          OR (t.schedule = 'monthly' AND t.day_of_month = DAY(${targetDateSql}))
+          OR (t.schedule = 'single' AND t.start_date <= ${targetDateSql} AND (t.end_date IS NULL OR t.end_date >= ${targetDateSql}))
         )
     `;
 
@@ -838,7 +841,7 @@ export const getAdminManagerTodayTodosModel = async ({
             todo_location_id,
             MAX(completion_id) AS max_completion_id
           FROM todo_completions
-          WHERE completion_date = ${sqlDateParam(values, targetDate)}
+          WHERE completion_date = ${targetDateSql}
              OR todo_id IN (SELECT todo_id FROM todos WHERE schedule = 'single')
           GROUP BY todo_id, todo_location_id
         ) latest ON tc_sub.completion_id = latest.max_completion_id
@@ -864,17 +867,20 @@ export const countAdminManagerTodayTodosModel = async ({
   try {
     const values = [];
     const targetDate = date || null;
+    const targetDateSql = targetDate
+      ? `'${targetDate}'`
+      : "DATE(CONVERT_TZ(NOW(), @@session.time_zone, '+05:30'))";
 
     let whereSql = `
       WHERE tl.is_deleted = FALSE
         AND t.is_active = TRUE
-        AND t.start_date <= ${sqlDateParam(values, targetDate)}
-        AND (t.end_date IS NULL OR t.end_date >= ${sqlDateParam(values, targetDate)})
+        AND t.start_date <= ${targetDateSql}
+        AND (t.end_date IS NULL OR t.end_date >= ${targetDateSql})
         AND (
           t.schedule = 'daily'
-          OR (t.schedule = 'weekly' AND t.day_of_week = CASE WHEN DAYOFWEEK(${sqlDateParam(values, targetDate)}) = 1 THEN 7 ELSE DAYOFWEEK(${sqlDateParam(values, targetDate)}) - 1 END)
-          OR (t.schedule = 'monthly' AND t.day_of_month = DAY(${sqlDateParam(values, targetDate)}))
-          OR (t.schedule = 'single' AND t.start_date <= ${sqlDateParam(values, targetDate)} AND (t.end_date IS NULL OR t.end_date >= ${sqlDateParam(values, targetDate)}))
+          OR (t.schedule = 'weekly' AND t.day_of_week = CASE WHEN DAYOFWEEK(${targetDateSql}) = 1 THEN 7 ELSE DAYOFWEEK(${targetDateSql}) - 1 END)
+          OR (t.schedule = 'monthly' AND t.day_of_month = DAY(${targetDateSql}))
+          OR (t.schedule = 'single' AND t.start_date <= ${targetDateSql} AND (t.end_date IS NULL OR t.end_date >= ${targetDateSql}))
         )
     `;
 
@@ -904,7 +910,7 @@ export const countAdminManagerTodayTodosModel = async ({
           todo_location_id,
           MAX(completion_id) AS completion_id
         FROM todo_completions
-        WHERE completion_date = ${sqlDateParam(values, targetDate)}
+        WHERE completion_date = ${targetDateSql}
            OR todo_id IN (SELECT todo_id FROM todos WHERE schedule = 'single')
         GROUP BY todo_id, todo_location_id
       ) tc ON tc.todo_id = t.todo_id AND tc.todo_location_id = tl.todo_location_id
