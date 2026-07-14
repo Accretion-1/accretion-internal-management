@@ -73,3 +73,61 @@ export const getGodownSlipById = async (slip_id) => {
   const results = await db.query(sql, [slip_id]);
   return results[0] || null;
 };
+
+/**
+ * Get all pending godown slips for OCR processing
+ */
+export const getPendingGodownSlips = async () => {
+  const sql = `SELECT * FROM godown_slips WHERE status = 'pending' ORDER BY created_at ASC`;
+  const results = await db.query(sql, []);
+  return results;
+};
+
+/**
+ * Update godown slip with OCR results and calculated status
+ */
+export const updateGodownSlipOcrResult = async (connection, slip_id, updateData) => {
+  const sql = `
+    UPDATE godown_slips SET 
+      cement_type = ?,
+      bag_count = ?,
+      slip_number = ?,
+      vehicle_number = ?,
+      customer_name = ?,
+      status = ?
+    WHERE slip_id = ?
+  `;
+  
+  const values = [
+    updateData.cement_type || 'UNKNOWN',
+    updateData.bag_count || null,
+    updateData.slip_number || null,
+    updateData.vehicle_number || null,
+    updateData.customer_name || null,
+    updateData.status || 'pending',
+    slip_id
+  ];
+
+  await connection.query(sql, values);
+};
+
+/**
+ * Insert raw OCR output into godown_slip_ocr table
+ */
+export const insertGodownSlipOcr = async (connection, ocrData) => {
+  const sql = `
+    INSERT INTO godown_slip_ocr (
+      slip_id, ocr_engine, raw_text, raw_json, processing_time_ms
+    ) VALUES (?, ?, ?, ?, ?)
+  `;
+  
+  const values = [
+    ocrData.slip_id,
+    ocrData.ocr_engine || 'default',
+    ocrData.raw_text || null,
+    JSON.stringify(ocrData.raw_json || {}),
+    ocrData.processing_time_ms || 0
+  ];
+
+  await connection.query(sql, values);
+};
