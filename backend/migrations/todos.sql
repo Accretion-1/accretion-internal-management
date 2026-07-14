@@ -147,6 +147,9 @@ ALTER TABLE `users` ADD `is_deleted` BOOLEAN NOT NULL DEFAULT FALSE;
 CREATE TABLE godown_slips (
     slip_id BIGINT PRIMARY KEY AUTO_INCREMENT,
 
+    user_id BIGINT NOT NULL,
+    location_id INT NULL,
+
     slip_number VARCHAR(255),
     slip_date DATE,
 
@@ -194,7 +197,14 @@ CREATE TABLE godown_slips (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    ON UPDATE CURRENT_TIMESTAMP
+        ON UPDATE CURRENT_TIMESTAMP,
+
+    INDEX idx_user (user_id),
+    INDEX idx_location (location_id),
+    INDEX idx_status (status),
+    INDEX idx_vehicle (vehicle_number),
+    INDEX idx_slip_number (slip_number),
+    INDEX idx_slip_date (slip_date)
 );
 
 CREATE TABLE godown_slip_ocr (
@@ -212,7 +222,10 @@ CREATE TABLE godown_slip_ocr (
 
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
-    FOREIGN KEY (slip_id)
+    CONSTRAINT fk_godown_slip_ocr_slip
+        FOREIGN KEY (slip_id)
         REFERENCES godown_slips(slip_id)
-        ON DELETE CASCADE
+        ON DELETE CASCADE,
+
+    INDEX idx_slip_id (slip_id)
 );
