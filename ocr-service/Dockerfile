@@ -2,10 +2,11 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# opencv-python-headless ko bhi ye system libs chahiye hoti hain
+# opencv-python-headless + paddlepaddle ko ye system libs chahiye hoti hain
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1 \
     libglib2.0-0 \
+    libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
