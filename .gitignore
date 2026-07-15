@@ -101,3 +101,4 @@ ocr-service/files 3/master_data.json
 ocr-service/**/__pycache__/
 *.pyc
 *.pyo
+ocr-service2/venv/*
