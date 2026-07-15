@@ -6,7 +6,9 @@ fields -> validated/corrected fields (with master-list auto-learning and
 date cross-checking) -> one JSON record ready for DB insert.
 """
 
+import logging
 import re
+import time
 from datetime import datetime
 
 from aligner import align_slip
@@ -14,6 +16,8 @@ from ocr_engine import run_ocr
 from field_parser import parse_ocr_text
 from master_data import MasterDataStore
 from date_utils import validate_date_field, cross_check_dates, normalize_date
+
+log = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Field-format validators, gating what's allowed to become a master-list
@@ -85,12 +89,22 @@ class SlipPipeline:
 
     def process_image(self, image_path: str) -> dict:
         record = {"_source_photo": image_path, "_flagged_fields": [], "_notes": []}
+        timing_ms = {}
+        stage_start = time.perf_counter()
+
+        def _mark(stage_name):
+            nonlocal stage_start
+            now = time.perf_counter()
+            timing_ms[stage_name] = round((now - stage_start) * 1000, 1)
+            stage_start = now
 
         warped, align_status = align_slip(image_path)
         record["_alignment_status"] = align_status
+        _mark("alignment")
         if warped is None:
             record["_status"] = "failed_alignment"
             record["_flagged_fields"] = ["*ALL* -- alignment failed, manual entry needed"]
+            record["_timing_ms"] = timing_ms
             return record
 
         import cv2
@@ -99,10 +113,12 @@ class SlipPipeline:
             aligned_path = os.path.join(tmp, "aligned.jpg")
             cv2.imwrite(aligned_path, warped)
             raw_text = run_ocr(aligned_path)
+        _mark("ocr_inference")
 
         raw_fields = parse_ocr_text(raw_text)
         record["_raw_ocr_text"] = raw_text
         record["_raw_fields"] = raw_fields
+        _mark("field_parsing")
 
         final_fields = {}
 
@@ -189,9 +205,14 @@ class SlipPipeline:
                 if name not in record["_flagged_fields"]:
                     record["_flagged_fields"].append(name)
             record["_notes"].append(f"date and material_load_on disagree: {detail}")
+        _mark("validation")
 
         record.update(final_fields)
         record["_status"] = "needs_review" if record["_flagged_fields"] else "ok"
+        record["_timing_ms"] = timing_ms
+        total_ms = sum(timing_ms.values())
+        log.info("process_image(%s) took %.0fms total -- breakdown: %s",
+                  image_path, total_ms, timing_ms)
         return record
 
     def save_master_data(self):
