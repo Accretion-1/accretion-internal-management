@@ -143,3 +143,90 @@ ALTER TABLE `todo_completions`
 ALTER TABLE `todo_completion_items` CHANGE `stock_name` `stock_name` ENUM('ppc','wp','super','cnt_ppc','cnt_wp','cnt_super','damage_ppc','damage_wp','damage_super') CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL;
 
 ALTER TABLE `users` ADD `is_deleted` BOOLEAN NOT NULL DEFAULT FALSE;
+
+CREATE TABLE godown_slips (
+    slip_id BIGINT PRIMARY KEY AUTO_INCREMENT,
+
+    user_id BIGINT NOT NULL,
+    location_id INT NULL,
+
+    slip_number VARCHAR(255),
+    slip_date DATE,
+
+    godown_name VARCHAR(255),
+
+    cement_type ENUM(
+        'PPC',
+        'WPC',
+        'SUPER',
+        'UNKNOWN'
+    ) DEFAULT 'UNKNOWN',
+
+    bag_count INT,
+
+    block_number VARCHAR(255),
+
+    vehicle_number VARCHAR(255),
+
+    dispatch_number VARCHAR(255),
+
+    customer_name TEXT,
+
+    destination TEXT,
+
+    material_load_type VARCHAR(255),
+
+    validity_date DATE NULL,
+
+    image_url TEXT,
+
+    ocr_confidence DECIMAL(5,2),
+
+    status ENUM(
+        'pending',
+        'review',
+        'verified',
+        'rejected'
+    ) DEFAULT 'pending',
+
+    reviewed_by BIGINT NULL,
+
+    reviewed_at DATETIME NULL,
+
+    remarks TEXT,
+
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        ON UPDATE CURRENT_TIMESTAMP,
+
+    INDEX idx_user (user_id),
+    INDEX idx_location (location_id),
+    INDEX idx_status (status),
+    INDEX idx_vehicle (vehicle_number),
+    INDEX idx_slip_number (slip_number),
+    INDEX idx_slip_date (slip_date)
+);
+
+CREATE TABLE godown_slip_ocr (
+    ocr_id BIGINT PRIMARY KEY AUTO_INCREMENT,
+
+    slip_id BIGINT NOT NULL,
+
+    ocr_engine VARCHAR(255),
+
+    raw_text LONGTEXT,
+
+    raw_json JSON,
+
+    processing_time_ms INT,
+
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_godown_slip_ocr_slip
+        FOREIGN KEY (slip_id)
+        REFERENCES godown_slips(slip_id)
+        ON DELETE CASCADE,
+
+    INDEX idx_slip_id (slip_id)
+);

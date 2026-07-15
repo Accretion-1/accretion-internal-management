@@ -22,6 +22,7 @@ import { TodoDetailPage } from './pages/TodoDetailPage';
 import { ActivityLogsPage } from './pages/ActivityLogsPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { LocationsPage } from './pages/LocationsPage';
+import { GodownSlipsPage } from './pages/GodownSlipsPage';
 const PANEL_ROUTE_BY_ID = {
     1: '/dashboard',
     2: '/users',
@@ -30,6 +31,7 @@ const PANEL_ROUTE_BY_ID = {
     5: '/locations',
     6: '/settings',
     7: '/reports',
+    8: '/godown-slips',
 };
 const PANEL_ROUTE_BY_NAME = {
     dashboard: '/dashboard',
@@ -41,6 +43,7 @@ const PANEL_ROUTE_BY_NAME = {
     settings: '/settings',
     'reports management': '/reports',
     reports: '/reports',
+    'godown slips': '/godown-slips',
 };
 const normalizePanelName = (panelName) => String(panelName || '').trim().toLowerCase();
 const getAuthenticatedHomePath = (authUser) => {
@@ -170,6 +173,7 @@ function AppContent() {
           <Route path="/locations" element={<LocationsPage />}/>
           <Route path="/activities" element={<ActivityLogsPage />}/>
           <Route path="/settings" element={<SettingsPage />}/>
+          <Route path="/godown-slips" element={<GodownSlipsPage />}/>
           
           <Route path="*" element={<HomeRedirect />}/>
         </Route>

@@ -61,6 +61,17 @@ jobs:
             skyrack2026/accretion-frontend:${{ env.ENV_TAG }}
             skyrack2026/accretion-frontend:${{ github.sha }}
 
+      - name: Build and Push OCR Service
+        if: github.ref_name == 'main'
+        uses: docker/build-push-action@v5
+        with:
+          context: ./ocr-service
+          push: true
+          no-cache: true
+          tags: |
+            skyrack2026/accretion-ocr-service:latest
+            skyrack2026/accretion-ocr-service:${{ github.sha }}
+
   deploy:
     needs: build-and-push
     runs-on: self-hosted
@@ -74,6 +85,7 @@ jobs:
             echo "DEPLOY_DIR=/root/Accretion"      >> $GITHUB_ENV
             echo "BACKEND_SVC=accretion-backend"   >> $GITHUB_ENV
             echo "FRONTEND_SVC=accretion-frontend" >> $GITHUB_ENV
+            echo "OCR_SVC=accretion-ocr-service"   >> $GITHUB_ENV
           else
             echo "ENV_TAG=dev"                         >> $GITHUB_ENV
             echo "DEPLOY_DIR=/root/Accretion-dev"      >> $GITHUB_ENV
@@ -87,7 +99,7 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          envs: ENV_TAG,DEPLOY_DIR,BACKEND_SVC,FRONTEND_SVC
+          envs: ENV_TAG,DEPLOY_DIR,BACKEND_SVC,FRONTEND_SVC,OCR_SVC
           script: |
             set -e
 
@@ -102,8 +114,15 @@ jobs:
             sed -i "s|skyrack2026/accretion-backend:.*|skyrack2026/accretion-backend:$ENV_TAG|" docker-compose.yml
             sed -i "s|skyrack2026/accretion-frontend:.*|skyrack2026/accretion-frontend:$ENV_TAG|" docker-compose.yml
 
-            docker compose pull $BACKEND_SVC $FRONTEND_SVC
-            docker compose up -d --no-deps --force-recreate $BACKEND_SVC $FRONTEND_SVC
+            if [ -n "$OCR_SVC" ]; then
+              sed -i "s|skyrack2026/accretion-ocr-service:.*|skyrack2026/accretion-ocr-service:$ENV_TAG|" docker-compose.yml
+              docker compose pull $BACKEND_SVC $FRONTEND_SVC $OCR_SVC
+              docker compose up -d --no-deps --force-recreate $BACKEND_SVC $FRONTEND_SVC $OCR_SVC
+            else
+              docker compose pull $BACKEND_SVC $FRONTEND_SVC
+              docker compose up -d --no-deps --force-recreate $BACKEND_SVC $FRONTEND_SVC
+            fi
+
             docker image prune -af
 
             echo "✅ Accretion [$ENV_TAG] deployed successfully"

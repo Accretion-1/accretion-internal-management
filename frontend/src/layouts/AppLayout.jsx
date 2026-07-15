@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate, Outlet, Navigate } from 'react-router-dom';
 import { useAppState } from '../contexts/StateContext';
-import { LayoutDashboard, Users, Package, BarChart4, ClipboardList, Settings, LogOut, ChevronLeft, ChevronRight, Menu, X, ShieldAlert, CheckSquare, BellRing, MapPin } from 'lucide-react';
+import { LayoutDashboard, Users, Package, BarChart4, ClipboardList, Settings, LogOut, ChevronLeft, ChevronRight, Menu, X, ShieldAlert, CheckSquare, BellRing, MapPin, FileImage } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAppDispatch, useAppSelector } from '../store/hooks/reduxHooks';
 import { selectAuthUser, selectIsAuthenticated } from '../store/selectors/authSelectors';
@@ -13,6 +13,7 @@ const SIDEBAR_ITEMS = [
     { id: 'todos', label: 'To-Dos Management', icon: CheckSquare, allowedRoles: ['Admin', 'Manager', 'User'] },
     { id: 'reminder-schedule', label: 'Reminder Schedule Management', icon: BellRing, allowedRoles: ['Admin', 'Manager', 'User'] },
     { id: 'locations', label: 'Locations', icon: MapPin, allowedRoles: ['Admin', 'Manager', 'User'] },
+    { id: 'godown-slips', label: 'Godown Slips', icon: FileImage, allowedRoles: ['Admin', 'Manager', 'User'] },
     { id: 'reports', label: 'Reports Management', icon: BarChart4, allowedRoles: ['Admin', 'Manager'] },
     { id: 'settings', label: 'Settings', icon: Settings, allowedRoles: ['Admin', 'Manager', 'User'] }
 ];
@@ -30,6 +31,7 @@ const PANEL_ROUTE_BY_ID = {
     5: 'locations',
     6: 'settings',
     7: 'reports',
+    8: 'godown-slips',
 };
 const PANEL_ROUTE_BY_NAME = {
     dashboard: 'dashboard',
@@ -41,6 +43,7 @@ const PANEL_ROUTE_BY_NAME = {
     settings: 'settings',
     'reports management': 'reports',
     reports: 'reports',
+    'godown slips': 'godown-slips',
 };
 const normalizePanelName = (panelName) => String(panelName || '').trim().toLowerCase();
 const getUserPanelRouteIds = (panels = []) => new Set(
