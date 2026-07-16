@@ -1,4 +1,6 @@
 import db from "../config/db.js";
+import { ApiError } from "../utils/api.util.js";
+import { DB_ERROR } from "../utils/message.util.js";
 
 /**
  * Insert a new godown slip record into the database
@@ -72,6 +74,49 @@ export const getGodownSlipById = async (slip_id) => {
   `;
   const results = await db.query(sql, [slip_id]);
   return results[0] || null;
+};
+
+export const updateGodownSlipManualReview = async (connection, slipId, payload) => {
+  try {
+    const allowedColumns = [
+      "slip_number",
+      "slip_date",
+      "godown_name",
+      "cement_type",
+      "bag_count",
+      "block_number",
+      "vehicle_number",
+      "dispatch_number",
+      "customer_name",
+      "destination",
+      "material_load_type",
+      "validity_date",
+      "ocr_confidence",
+      "status",
+      "remarks",
+    ];
+
+    const updates = allowedColumns.filter((column) =>
+      Object.prototype.hasOwnProperty.call(payload, column),
+    );
+
+    const setClauses = updates.map((column) => `${column} = ?`);
+    const values = updates.map((column) => payload[column]);
+
+    setClauses.push("reviewed_by = ?");
+    values.push(payload.reviewed_by);
+
+    setClauses.push("reviewed_at = CURRENT_TIMESTAMP");
+
+    await connection.query(
+      `UPDATE godown_slips
+       SET ${setClauses.join(", ")}
+       WHERE slip_id = ?`,
+      [...values, slipId],
+    );
+  } catch (error) {
+    throw new ApiError(DB_ERROR, "Updating Godown Slip Manual Review", error, false);
+  }
 };
 
 /**
