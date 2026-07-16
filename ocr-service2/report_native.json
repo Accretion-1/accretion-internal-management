@@ -1,0 +1,76 @@
+{
+  "backend": "native",
+  "threads": 10,
+  "pipeline_init_seconds": 18.41,
+  "image_count": 3,
+  "succeeded": 3,
+  "failed": 0,
+  "avg_ocr_seconds": 146.52,
+  "min_ocr_seconds": 30.12,
+  "max_ocr_seconds": 342.91,
+  "results": [
+    {
+      "photo": "002d9ceb-9266-47e2-8abf-be67e788df33_aligned_1783664353187_rb0lqwreb6.jpg",
+      "alignment_status": "ok (method=paper_edge)",
+      "alignment_seconds": 0.284,
+      "ocr_seconds": 342.91,
+      "raw_text": "\n<table border=1 style='margin: auto; word-wrap: break-word;'><tr><td style='text-align: center; word-wrap: break-word;'>TEL: 8731 408000</td><td style='text-align: center; word-wrap: break-word;'>2324</td></tr><tr><td colspan=\"2\">Date: 06/07/26 ACCRETION Loading 81e 37676</td></tr><tr><td colspan=\"2\">Godown Name: Pudhi Durno</td></tr><tr><td colspan=\"2\">Please Load: 150... Bags of PPGV380PER 114.</td></tr><tr><td colspan=\"2\">Block No.: 400000 Week No. 27</td></tr><tr><td colspan=\"2\">Vehicle No.: 404480057 01 665118751</td></tr><tr><td colspan=\"2\">Supply to M:</td></tr><tr><td colspan=\"2\">Velocity of Loading 81p: 06/07/66 (TUGARKO)</td></tr><tr><td colspan=\"2\">Material Load on</td></tr><tr><td style='text-align: center; word-wrap: break-word;'>000000</td><td style='text-align: center; word-wrap: break-word;'>Reserved by</td></tr></table>",
+      "fields": {
+        "slip_no": "400000",
+        "date": "06/07/26",
+        "godown_name": "Pudhi Durno",
+        "bags_qty": "",
+        "material_type": "",
+        "block_no": "400000",
+        "week_no": "",
+        "vehicle_no": "404480057",
+        "di_no": "",
+        "supply_to": "",
+        "validity": "",
+        "material_load_on": ""
+      }
+    },
+    {
+      "photo": "083f6211-6c6f-48d8-a327-bd787db34140_aligned_1783601294863_n0gwb3etmrp.jpg",
+      "alignment_status": "ok (method=paper_edge)",
+      "alignment_seconds": 0.12,
+      "ocr_seconds": 66.54,
+      "raw_text": "\n<table border=1 style='margin: auto; word-wrap: break-word;'><tr><td style='text-align: center; word-wrap: break-word;'>TEL: 8731 408000</td><td style='text-align: center; word-wrap: break-word;'>2324</td></tr><tr><td colspan=\"2\">Date: 06/07/26 ACCRETION Loading 81e 37676</td></tr><tr><td colspan=\"2\">Godown Name: Pudhi Durno</td></tr><tr><td colspan=\"2\">Please Load: 150... Bags of PPGV380PER 114.</td></tr><tr><td colspan=\"2\">Block No.: 400000 Week No. 27</td></tr><tr><td colspan=\"2\">Vehicle No.: 404480057 01 665118751</td></tr><tr><td colspan=\"2\">Supply to M:</td></tr><tr><td colspan=\"2\">Velocity of Loading 81p: 06/07/66 (TUGARKO)</td></tr><tr><td colspan=\"2\">Material Load on</td></tr><tr><td style='text-align: center; word-wrap: break-word;'>000000</td><td style='text-align: center; word-wrap: break-word;'>Reserved by</td></tr></table>",
+      "fields": {
+        "slip_no": "400000",
+        "date": "06/07/26",
+        "godown_name": "Pudhi Durno",
+        "bags_qty": "",
+        "material_type": "",
+        "block_no": "400000",
+        "week_no": "",
+        "vehicle_no": "404480057",
+        "di_no": "",
+        "supply_to": "",
+        "validity": "",
+        "material_load_on": ""
+      }
+    },
+    {
+      "photo": "0b14e090-56d7-4cc5-9ff5-c958edc0c07a_aligned_1783931672190_yi24g6i870a.jpg",
+      "alignment_status": "ok (method=border_box)",
+      "alignment_seconds": 0.033,
+      "ocr_seconds": 30.12,
+      "raw_text": "Tel.: 0731-4006026\n\n2526\n\nDate: 08/07/21 ACCRETION\n\nGodown Name: Bv. Befu 159301570\n\nPlease Load.....70 Bags of PPC/NPC/SUPER.\n\nBlock No.: ___ Week No.....\n\nVehicle No.: MP48AA0646 DI: 88536\n\nSupply to M/s.....QUALITY HARDWARE\n\nValidity of Loading Slip.....Bedful.....\n\nMaterial Load on 08/07/20",
+      "fields": {
+        "slip_no": "159301570",
+        "date": "08/07/21",
+        "godown_name": "Bv. Befu",
+        "bags_qty": "70",
+        "material_type": "",
+        "block_no": "",
+        "week_no": "",
+        "vehicle_no": "MP48AA0646",
+        "di_no": "88536",
+        "supply_to": "QUALITY HARDWARE",
+        "validity": "Bedful",
+        "material_load_on": "08/07/20"
+      }
+    }
+  ]
+}

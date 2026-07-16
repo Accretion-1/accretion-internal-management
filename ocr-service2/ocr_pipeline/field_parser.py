@@ -51,7 +51,12 @@ GODOWN_RE = re.compile(
     r"(?=\s*(?:Please\s*Load|Block\s*No\.?|Vehicle\s*No\.?|Supply\s*to|Validity\s*of\s*Loading\s*Slip|Material\s*Load\s*on|Signature|</tr>|</td>|$))",
     re.IGNORECASE | re.DOTALL,
 )
-TRAILING_DIGITS_RE = re.compile(r"(.*?)\s*([0-9]{6,})\s*$")
+# Allow one stray trailing letter after the digit run (e.g. a final "0"
+# misread as "C") so a single-character OCR slip doesn't leave the whole
+# digit run stuck inside godown_name -- observed on real llama-cpp-server
+# backend output ("...15930157C"). The digit group itself may still carry
+# that OCR error (this only fixes the SPLIT, not the misread digit).
+TRAILING_DIGITS_RE = re.compile(r"(.*?)\s*([0-9]{6,})[A-Za-z]?\s*$")
 
 # The slip's own serial number after "No.:" -- distinct from the small fixed
 # 4-digit form code (e.g. "2526") that also appears near the top.

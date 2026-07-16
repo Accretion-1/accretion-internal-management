@@ -94,5 +94,21 @@ backend/keys/
 **/*service-account*.json
 ocr-service/venv/*
 ocr-service/uploads/*
-ocr-service/routes/__pycache__/*
-ocr-service/__pycache__/*
+ocr-service/files 3/master_data.json
+
+# Python bytecode cache -- any __pycache__ folder anywhere under ocr-service,
+# not just the specific ones that existed when this was first written
+ocr-service/**/__pycache__/
+*.pyc
+*.pyo
+ocr-service2/venv/*
+ocr-service2/uploads/*
+ocr-service2/llama.cpp/
+ocr-service2/models/
+ocr-service2/llama_server.pid
+ocr-service2/llama_server.log
+ocr-service2/*.pid
+ocr-service2/*.log
+ocr-service2/report_*.json
+ocr-service2/ocr_pipeline/master_data.json
+ocr-service2/**/__pycache__/

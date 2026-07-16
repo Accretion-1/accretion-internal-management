@@ -1,10 +1,19 @@
+"""
+ocr_service.py
+
+Mirrors ocr-service/services/ocr_service.py exactly, pointed at this
+service's own ocr_pipeline/ directory (forked from ocr-service/files 3/,
+see ocr_pipeline/ocr_engine.py for the one intentional difference: the
+llama-cpp-server backend instead of in-process fp32 weights).
+"""
+
 from pathlib import Path
 import sys
 
 
-FILES3_DIR = Path(__file__).resolve().parents[1] / "files 3"
-if str(FILES3_DIR) not in sys.path:
-    sys.path.insert(0, str(FILES3_DIR))
+PIPELINE_DIR = Path(__file__).resolve().parents[1] / "ocr_pipeline"
+if str(PIPELINE_DIR) not in sys.path:
+    sys.path.insert(0, str(PIPELINE_DIR))
 
 from pipeline import SlipPipeline  # noqa: E402
 
@@ -15,7 +24,7 @@ class OCRService:
         print("Loading slip OCR pipeline...")
 
         self.pipeline = SlipPipeline(
-            master_data_path=str(FILES3_DIR / "master_data.json")
+            master_data_path=str(PIPELINE_DIR / "master_data.json")
         )
 
         print("Slip OCR pipeline ready")
