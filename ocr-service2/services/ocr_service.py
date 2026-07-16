@@ -44,8 +44,8 @@ class OCRService:
         record = self.process_image(image_path)
         return self._text_lines(record.get("_raw_ocr_text", ""))
 
-    def save_master_data(self):
-        self.pipeline.save_master_data()
+    def replace_master_data(self, payload: dict, trusted_only: bool = True):
+        self.pipeline.replace_master_data(payload, trusted_only=trusted_only)
 
 
 ocr_service = OCRService()

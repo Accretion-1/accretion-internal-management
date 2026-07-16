@@ -1,5 +1,7 @@
 import db from "../config/db.js";
-import { insertGodownSlip, getGodownSlips, getGodownSlipById } from "../model/godown-slip.model.js";
+import { ApiError } from "../utils/api.util.js";
+import { CUSTOM_ERROR, FORBIDDEN, NOT_FOUND } from "../utils/message.util.js";
+import { insertGodownSlip, getGodownSlips, getGodownSlipById, updateGodownSlipManualReview } from "../model/godown-slip.model.js";
 import { CustomImagePath } from "../utils/misc.util.js";
 
 /**
@@ -81,4 +83,51 @@ export const fetchUserSlips = async (user, query) => {
 export const fetchSlipById = async (id) => {
   const slip = await getGodownSlipById(id);
   return formatImageUrl(slip);
+};
+
+const ensureAdminOrManagerAccess = (user) => {
+  const role = String(user?.role || "").toUpperCase();
+  if (role !== "ADMIN" && role !== "MANAGER") {
+    throw new ApiError(FORBIDDEN, "User");
+  }
+};
+
+const normalizeManualReviewPayload = (payload, reviewerId) => {
+  const normalizedPayload = {
+    ...payload,
+    reviewed_by: reviewerId,
+  };
+
+  if (Object.prototype.hasOwnProperty.call(payload, "remarks")) {
+    normalizedPayload.remarks = payload.remarks || null;
+  }
+
+  return normalizedPayload;
+};
+
+export const reviewGodownSlipService = async (user, slipId, payload) => {
+  ensureAdminOrManagerAccess(user);
+
+  const existingSlip = await getGodownSlipById(slipId);
+  if (!existingSlip) {
+    throw new ApiError(NOT_FOUND, "Slip");
+  }
+
+  const connection = await db.begin();
+  try {
+    await updateGodownSlipManualReview(
+      connection,
+      slipId,
+      normalizeManualReviewPayload(payload, user.user_id),
+    );
+
+    await db.commit(connection);
+  } catch (error) {
+    await db.rollback(connection);
+    if (error instanceof ApiError) throw error;
+    throw new ApiError(CUSTOM_ERROR, "Unable to review slip", error, false);
+  }
+
+  const updatedSlip = await getGodownSlipById(slipId);
+  return formatImageUrl(updatedSlip);
 };

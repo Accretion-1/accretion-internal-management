@@ -1,6 +1,6 @@
-import { processAndSaveGodownSlips, fetchAdminSlips, fetchUserSlips, fetchSlipById } from "../services/godown-slip.service.js";
+import { processAndSaveGodownSlips, fetchAdminSlips, fetchUserSlips, fetchSlipById, reviewGodownSlipService } from "../services/godown-slip.service.js";
 import { apiError, apiResponse } from "../utils/api.util.js";
-import { CUSTOM_ERROR, SUCCESS } from "../utils/message.util.js";
+import { CUSTOM_ERROR, SUCCESS, UPDATE_SUCCESS } from "../utils/message.util.js";
 
 /**
  * Upload multiple godown slips and save them to the database
@@ -59,5 +59,21 @@ export const getSlipById = async (req, res) => {
   } catch (error) {
     console.error("Error fetching slip by ID:", error);
     return apiError(CUSTOM_ERROR, "Failed to fetch slip", error.message, res);
+  }
+};
+
+export const reviewGodownSlip = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const slip = await reviewGodownSlipService(req.user, id, req.body);
+    return apiResponse(UPDATE_SUCCESS, "Godown slip", slip, res, "object");
+  } catch (error) {
+    console.error("Error reviewing godown slip:", error);
+    return apiError(
+      [error.statusCode || CUSTOM_ERROR[0], error.message || "Failed to review slip"],
+      null,
+      error.internal || null,
+      res,
+    );
   }
 };

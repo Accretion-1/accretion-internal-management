@@ -1,4 +1,6 @@
 import db from "../config/db.js";
+import { ApiError } from "../utils/api.util.js";
+import { DB_ERROR } from "../utils/message.util.js";
 
 /**
  * Insert a new godown slip record into the database
@@ -74,6 +76,49 @@ export const getGodownSlipById = async (slip_id) => {
   return results[0] || null;
 };
 
+export const updateGodownSlipManualReview = async (connection, slipId, payload) => {
+  try {
+    const allowedColumns = [
+      "slip_number",
+      "slip_date",
+      "godown_name",
+      "cement_type",
+      "bag_count",
+      "block_number",
+      "vehicle_number",
+      "dispatch_number",
+      "customer_name",
+      "destination",
+      "material_load_type",
+      "validity_date",
+      "ocr_confidence",
+      "status",
+      "remarks",
+    ];
+
+    const updates = allowedColumns.filter((column) =>
+      Object.prototype.hasOwnProperty.call(payload, column),
+    );
+
+    const setClauses = updates.map((column) => `${column} = ?`);
+    const values = updates.map((column) => payload[column]);
+
+    setClauses.push("reviewed_by = ?");
+    values.push(payload.reviewed_by);
+
+    setClauses.push("reviewed_at = CURRENT_TIMESTAMP");
+
+    await connection.query(
+      `UPDATE godown_slips
+       SET ${setClauses.join(", ")}
+       WHERE slip_id = ?`,
+      [...values, slipId],
+    );
+  } catch (error) {
+    throw new ApiError(DB_ERROR, "Updating Godown Slip Manual Review", error, false);
+  }
+};
+
 /**
  * Get all pending godown slips for OCR processing
  */
@@ -81,6 +126,37 @@ export const getPendingGodownSlips = async () => {
   const sql = `SELECT * FROM godown_slips WHERE status = 'pending' ORDER BY created_at ASC`;
   const results = await db.query(sql, []);
   return results;
+};
+
+export const getVerifiedGodownSlipsForMasterDataSync = async (reviewedAfter = null) => {
+  try {
+    let sql = `
+      SELECT
+        slip_id,
+        reviewed_by,
+        reviewed_at,
+        godown_name,
+        customer_name,
+        cement_type,
+        vehicle_number,
+        slip_number
+      FROM godown_slips
+      WHERE status = 'verified'
+        AND reviewed_at IS NOT NULL
+    `;
+    const params = [];
+
+    if (reviewedAfter) {
+      sql += ` AND reviewed_at > ?`;
+      params.push(reviewedAfter);
+    }
+
+    sql += ` ORDER BY reviewed_at ASC, slip_id ASC`;
+
+    return await db.query(sql, params);
+  } catch (error) {
+    throw new ApiError(DB_ERROR, "Fetching Verified Godown Slips For Master Data Sync", error, false);
+  }
 };
 
 /**
