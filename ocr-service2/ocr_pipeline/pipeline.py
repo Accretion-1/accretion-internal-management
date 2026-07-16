@@ -122,16 +122,17 @@ class SlipPipeline:
 
         final_fields = {}
 
-        # -- master-list fields (fuzzy-corrected + auto-learned) --
+        # -- master-list fields (fuzzy-corrected against trusted master data only) --
         for name, cfg in MASTER_FIELD_CONFIG.items():
-            result = self.store.resolve(name, raw_fields.get(name, ""))
+            result = self.store.resolve(name, raw_fields.get(name, ""), mutate=False)
             final_fields[name] = result["value"]
             if result["status"] in ("new_candidate", "rejected_invalid_format", "empty",
                                      "candidate_incremented"):
                 record["_flagged_fields"].append(name)
             if result["status"] == "new_candidate":
-                record["_notes"].append(f"'{result['value']}' is new for {name} -- "
-                                         f"will auto-confirm after it's seen again")
+                record["_notes"].append(
+                    f"'{result['value']}' is not in trusted master data for {name} -- manual review needed"
+                )
             record[f"_{name}_status"] = result["status"]
 
         # -- vehicle_no: exact-match tracking + format validation, NOT fuzzy
@@ -146,13 +147,11 @@ class SlipPipeline:
             final_fields["vehicle_no"] = raw_vehicle
             record["_vehicle_no_status"] = "known_vehicle"
         elif is_valid_vehicle_no(raw_vehicle):
-            # correctly formatted and not a fuzzy guess -- trust it as a new
-            # real plate rather than trying to merge it into a similar one
-            vehicle_list.confirmed.add(raw_vehicle)
             final_fields["vehicle_no"] = raw_vehicle
             record["_vehicle_no_status"] = "new_vehicle_format_ok"
-            record["_notes"].append(f"'{raw_vehicle}' is a new vehicle number (not fuzzy-matched "
-                                     f"against similar ones -- see module note on why)")
+            record["_notes"].append(
+                f"'{raw_vehicle}' is a new vehicle number outside trusted master data"
+            )
         else:
             final_fields["vehicle_no"] = raw_vehicle
             record["_flagged_fields"].append("vehicle_no")
@@ -172,7 +171,6 @@ class SlipPipeline:
             record["_notes"].append(f"slip_no '{raw_slip_no}' was already processed before -- "
                                      f"check this isn't the same slip uploaded twice")
         else:
-            slip_list.confirmed.add(raw_slip_no)
             final_fields["slip_no"] = raw_slip_no
             record["_slip_no_status"] = "new_slip_no"
 
@@ -215,5 +213,6 @@ class SlipPipeline:
                   image_path, total_ms, timing_ms)
         return record
 
-    def save_master_data(self):
-        self.store.save()
+    def replace_master_data(self, payload: dict, trusted_only: bool = True):
+        self.store.replace_confirmed(payload, clear_candidates=trusted_only)
+        self.store.save(trusted_only=trusted_only)

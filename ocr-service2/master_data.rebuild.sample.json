@@ -1,0 +1,40 @@
+{
+  "master_data": {
+    "godown_name": {
+      "confirmed": [
+        "Bhopal Godown",
+        "Indore Main Yard"
+      ],
+      "candidates": {}
+    },
+    "supply_to": {
+      "confirmed": [
+        "ABC Traders",
+        "Sharma Distributors"
+      ],
+      "candidates": {}
+    },
+    "material_type": {
+      "confirmed": [
+        "PPC",
+        "WPC",
+        "SUPER"
+      ],
+      "candidates": {}
+    },
+    "vehicle_no": {
+      "confirmed": [
+        "MP48AA0646",
+        "MP09HG1234"
+      ],
+      "candidates": {}
+    },
+    "slip_no": {
+      "confirmed": [
+        "159301",
+        "159305"
+      ],
+      "candidates": {}
+    }
+  }
+}

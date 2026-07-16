@@ -81,7 +81,7 @@ class MasterList:
     promote_after: int = 2           # times a candidate must recur before becoming trusted
     validator: Optional[Callable[[str], bool]] = None  # gate before tracking as a candidate
 
-    def resolve(self, raw: str) -> dict:
+    def resolve(self, raw: str, mutate: bool = True) -> dict:
         """Look up/learn from a raw OCR value. Returns a result dict with
         keys: value, status, score. Mutates candidate/confirmed state --
         call MasterDataStore.save() after a batch of these to persist."""
@@ -92,6 +92,13 @@ class MasterList:
         matched, score = _best_match(raw, list(self.confirmed))
         if matched and score >= self.high_threshold:
             return {"value": matched, "status": "corrected" if matched != raw else "confirmed", "score": score}
+
+        if not mutate:
+            if self.validator is not None and not self.validator(raw):
+                return {"value": raw, "status": "rejected_invalid_format", "score": 0}
+            if not _is_valid_candidate_value(raw):
+                return {"value": raw, "status": "rejected_invalid_format", "score": 0}
+            return {"value": raw, "status": "new_candidate", "score": 0}
 
         cand_matched, cand_score = _best_match(raw, list(self.candidates.keys()))
         if cand_matched and cand_score >= self.candidate_threshold:
@@ -122,8 +129,23 @@ class MasterList:
         self.candidates.pop(value, None)
         self.confirmed.add(value)
 
-    def to_dict(self) -> dict:
-        cleaned_candidates = {
+    def confirm_many(self, values: list[str]) -> int:
+        added_count = 0
+        for value in values:
+            text = (value or "").strip()
+            if not text:
+                continue
+            if self.validator is not None and not self.validator(text):
+                continue
+            if not _is_valid_candidate_value(text):
+                continue
+            if text not in self.confirmed:
+                added_count += 1
+            self.confirm(text)
+        return added_count
+
+    def to_dict(self, trusted_only: bool = False) -> dict:
+        cleaned_candidates = {} if trusted_only else {
             value: meta
             for value, meta in self.candidates.items()
             if _is_valid_candidate_value(value)
@@ -167,9 +189,9 @@ class MasterDataStore:
             if not data and cfg.get("seed"):
                 self.lists[name].confirmed = set(cfg["seed"])
 
-    def save(self):
+    def save(self, trusted_only: bool = False):
         tmp_path = self.path + ".tmp"
-        payload = {name: ml.to_dict() for name, ml in self.lists.items()}
+        payload = {name: ml.to_dict(trusted_only=trusted_only) for name, ml in self.lists.items()}
         with open(tmp_path, "w", encoding="utf-8") as f:
             json.dump(payload, f, indent=2, ensure_ascii=False)
         shutil.move(tmp_path, self.path)  # atomic on POSIX
@@ -177,5 +199,30 @@ class MasterDataStore:
     def get(self, field_name: str) -> MasterList:
         return self.lists[field_name]
 
-    def resolve(self, field_name: str, raw: str) -> dict:
-        return self.lists[field_name].resolve(raw)
+    def resolve(self, field_name: str, raw: str, mutate: bool = True) -> dict:
+        return self.lists[field_name].resolve(raw, mutate=mutate)
+
+    def confirm(self, field_name: str, value: str):
+        if field_name not in self.lists:
+            raise KeyError(f"Unknown master-data field: {field_name}")
+        self.lists[field_name].confirm(value)
+
+    def confirm_many(self, field_name: str, values: list[str]) -> int:
+        if field_name not in self.lists:
+            raise KeyError(f"Unknown master-data field: {field_name}")
+        return self.lists[field_name].confirm_many(values)
+
+    def export(self, trusted_only: bool = False) -> dict:
+        return {
+            name: master_list.to_dict(trusted_only=trusted_only)
+            for name, master_list in self.lists.items()
+        }
+
+    def replace_confirmed(self, payload: dict, clear_candidates: bool = True):
+        for field_name, master_list in self.lists.items():
+            field_payload = payload.get(field_name, {}) if isinstance(payload, dict) else {}
+            confirmed_values = field_payload.get("confirmed", []) if isinstance(field_payload, dict) else []
+            master_list.confirmed = set()
+            if clear_candidates:
+                master_list.candidates = {}
+            master_list.confirm_many(confirmed_values)

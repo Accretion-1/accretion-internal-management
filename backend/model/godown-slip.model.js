@@ -128,6 +128,37 @@ export const getPendingGodownSlips = async () => {
   return results;
 };
 
+export const getVerifiedGodownSlipsForMasterDataSync = async (reviewedAfter = null) => {
+  try {
+    let sql = `
+      SELECT
+        slip_id,
+        reviewed_by,
+        reviewed_at,
+        godown_name,
+        customer_name,
+        cement_type,
+        vehicle_number,
+        slip_number
+      FROM godown_slips
+      WHERE status = 'verified'
+        AND reviewed_at IS NOT NULL
+    `;
+    const params = [];
+
+    if (reviewedAfter) {
+      sql += ` AND reviewed_at > ?`;
+      params.push(reviewedAfter);
+    }
+
+    sql += ` ORDER BY reviewed_at ASC, slip_id ASC`;
+
+    return await db.query(sql, params);
+  } catch (error) {
+    throw new ApiError(DB_ERROR, "Fetching Verified Godown Slips For Master Data Sync", error, false);
+  }
+};
+
 /**
  * Update godown slip with OCR results and calculated status
  */

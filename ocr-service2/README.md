@@ -43,6 +43,28 @@ Response shape is `{count, texts, record}` -- identical to `ocr-service`'s
 changes** to point at this service instead (only `OCR_API_ROUTE` in
 `backend/.env` changes, when you're ready to cut over).
 
+For trusted master-data rebuilds, the service exposes `POST /master-data/upload`.
+The backend can rebuild a full trusted `master_data.json` document from
+verified slips and upload it over API. If the caller sends a different
+`X-OCR-SYNC-TOKEN` value than the static token defined in `routes/ocr.py`,
+the request is rejected.
+
+Sample upload payload:
+
+```json
+{
+  "master_data": {
+    "godown_name": { "confirmed": ["Bhopal Godown"], "candidates": {} },
+    "supply_to": { "confirmed": ["ABC Traders"], "candidates": {} },
+    "material_type": { "confirmed": ["PPC"], "candidates": {} },
+    "vehicle_no": { "confirmed": ["MP48AA0646"], "candidates": {} },
+    "slip_no": { "confirmed": ["159301570"], "candidates": {} }
+  }
+}
+```
+
+There is also a ready-to-use example at `ocr-service2/master_data.rebuild.sample.json`.
+
 **Order matters:** if `llama-server` gets restarted while `app.py` is still
 running, restart `app.py` too -- a stale connection can return a mismatched
 result. (The test-harness `api.py` below echoes `image_sha256` specifically
