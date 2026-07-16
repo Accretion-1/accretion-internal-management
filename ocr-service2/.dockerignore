@@ -1,0 +1,7 @@
+__pycache__
+*.pyc
+*.ipynb
+benchmark.py
+compare_reports.py
+api.py
+report_*.json

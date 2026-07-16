@@ -1,0 +1,21 @@
+services:
+  llama-server:
+    build: ./llama-server
+    ports:
+      - "8081:8081"
+    volumes:
+      - llama-models:/app/models
+
+  ocr-service2:
+    build: .
+    environment:
+      OCR_BACKEND: llama-cpp-server
+      OCR_SERVER_URL: http://llama-server:8081/v1
+      OCR_CPU_THREADS: "1"
+    ports:
+      - "8002:8000"
+    depends_on:
+      - llama-server
+
+volumes:
+  llama-models:
