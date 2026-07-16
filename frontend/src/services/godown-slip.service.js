@@ -32,3 +32,13 @@ export const fetchUserGodownSlips = (params = {}) => {
         showNotification: false,
     });
 };
+
+export const reviewGodownSlip = (slipId, payload) => {
+    return apiHandler({
+        method: 'PATCH',
+        url: `${BASE_URL}/${slipId}/review`,
+        data: payload,
+        successMessage: 'Slip review saved successfully!',
+        errorMessage: 'Failed to save slip review',
+    });
+};

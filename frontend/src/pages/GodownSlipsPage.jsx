@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAppState } from '../contexts/StateContext';
-import { fetchAdminGodownSlips, fetchUserGodownSlips, uploadGodownSlips } from '../services/godown-slip.service';
+import { fetchAdminGodownSlips, fetchUserGodownSlips, reviewGodownSlip, uploadGodownSlips } from '../services/godown-slip.service';
 import { UploadCloud, FileImage, Search, Filter, Loader2, Calendar, MapPin, CheckCircle, Clock, X, Plus, Eye, AlignLeft } from 'lucide-react';
 import { motion } from 'motion/react';
 import toast from 'react-hot-toast';
@@ -9,6 +9,32 @@ import apiHandler from '../store/api/apiHandler';
 import { API_ENDPOINTS } from '../store/api/endpoints';
 
 const FALLBACK_IMAGE = 'data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22400%22%20height%3D%22300%22%20viewBox%3D%220%200%20400%20300%22%3E%3Crect%20fill%3D%22%23f1f5f9%22%20width%3D%22400%22%20height%3D%22300%22%2F%3E%3Ctext%20fill%3D%22%2394a3b8%22%20font-family%3D%22sans-serif%22%20font-size%3D%2216%22%20dy%3D%2210.5%22%20font-weight%3D%22bold%22%20x%3D%2250%25%22%20y%3D%2250%25%22%20text-anchor%3D%22middle%22%3EImage%20Not%20Found%3C%2Ftext%3E%3C%2Fsvg%3E';
+const REVIEWABLE_CEMENT_TYPES = ['UNKNOWN', 'PPC', 'WPC', 'SUPER'];
+const REVIEWABLE_STATUSES = ['review', 'verified', 'rejected'];
+const buildReviewFormFromSlip = (slip) => ({
+    slip_number: slip?.slip_number || '',
+    godown_name: slip?.godown_name || '',
+    cement_type: slip?.cement_type || 'UNKNOWN',
+    bag_count: slip?.bag_count ?? '',
+    vehicle_number: slip?.vehicle_number || '',
+    dispatch_number: slip?.dispatch_number || '',
+    customer_name: slip?.customer_name || '',
+    destination: slip?.destination || '',
+    status: slip?.status || 'review',
+    remarks: slip?.remarks || '',
+});
+const normalizeReviewPayload = (form) => ({
+    slip_number: form.slip_number.trim() || null,
+    godown_name: form.godown_name.trim() || null,
+    cement_type: form.cement_type || 'UNKNOWN',
+    bag_count: form.bag_count === '' ? null : Number(form.bag_count),
+    vehicle_number: form.vehicle_number.trim() || null,
+    dispatch_number: form.dispatch_number.trim() || null,
+    customer_name: form.customer_name.trim() || null,
+    destination: form.destination.trim() || null,
+    status: form.status,
+    remarks: form.remarks.trim() || null,
+});
 
 
 export const GodownSlipsPage = () => {
@@ -25,6 +51,9 @@ export const GodownSlipsPage = () => {
     // New states for enhanced UI
     const [selectedFiles, setSelectedFiles] = useState([]);
     const [previewSlip, setPreviewSlip] = useState(null);
+    const [reviewForm, setReviewForm] = useState(buildReviewFormFromSlip(null));
+    const [isSavingReview, setIsSavingReview] = useState(false);
+    const [isEditingReview, setIsEditingReview] = useState(false);
 
     // Upload ref for User view
     const fileInputRef = useRef(null);
@@ -42,6 +71,11 @@ export const GodownSlipsPage = () => {
             fetchLocations();
         }
     }, [isPrivileged]);
+
+    useEffect(() => {
+        setReviewForm(buildReviewFormFromSlip(previewSlip));
+        setIsEditingReview(false);
+    }, [previewSlip]);
 
     const fetchLocations = async () => {
         try {
@@ -124,10 +158,45 @@ export const GodownSlipsPage = () => {
         }
     };
 
+    const handleReviewFieldChange = (field, value) => {
+        setReviewForm(prev => ({
+            ...prev,
+            [field]: value,
+        }));
+    };
+
+    const handleSubmitReview = async () => {
+        if (!previewSlip?.slip_id || !isPrivileged) return;
+
+        setIsSavingReview(true);
+        try {
+            const response = await reviewGodownSlip(
+                previewSlip.slip_id,
+                normalizeReviewPayload(reviewForm),
+            );
+            const updatedSlip = response?.data || null;
+
+            if (updatedSlip) {
+                setSlips(prev => prev.map((slip) => (
+                    slip.slip_id === updatedSlip.slip_id ? { ...slip, ...updatedSlip } : slip
+                )));
+                setPreviewSlip(null);
+            } else {
+                await loadSlips();
+                setPreviewSlip(null);
+            }
+        } catch (error) {
+            console.error('Review save failed', error);
+        } finally {
+            setIsSavingReview(false);
+        }
+    };
+
     const StatusBadge = ({ status }) => {
         if (status === 'verified') return <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider font-bold bg-emerald-100 text-emerald-700 px-2 py-1 rounded-md"><CheckCircle className="w-3 h-3" /> Verified</span>;
         if (status === 'rejected') return <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider font-bold bg-rose-100 text-rose-700 px-2 py-1 rounded-md">Rejected</span>;
-        return <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider font-bold bg-amber-100 text-amber-700 px-2 py-1 rounded-md"><Clock className="w-3 h-3" /> Pending</span>;
+        if (status === 'review') return <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider font-bold bg-amber-100 text-amber-700 px-2 py-1 rounded-md"><Clock className="w-3 h-3" /> Review</span>;
+        return <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider font-bold bg-slate-100 text-slate-700 px-2 py-1 rounded-md"><Clock className="w-3 h-3" /> Pending</span>;
     };
 
     return (
@@ -394,6 +463,37 @@ export const GodownSlipsPage = () => {
                 onClose={() => setPreviewSlip(null)}
                 title="Slip Details"
                 maxWidthClass="max-w-5xl"
+                footerButtons={isPrivileged && previewSlip ? [
+                    {
+                        id: 'close-slip-preview-btn',
+                        label: 'Close',
+                        onClick: () => setPreviewSlip(null),
+                    },
+                    ...(isEditingReview ? [
+                        {
+                            id: 'cancel-slip-review-btn',
+                            label: 'Cancel Edit',
+                            onClick: () => {
+                                setReviewForm(buildReviewFormFromSlip(previewSlip));
+                                setIsEditingReview(false);
+                            },
+                        },
+                        {
+                            id: 'save-slip-review-btn',
+                            label: 'Save Review',
+                            onClick: handleSubmitReview,
+                            variant: 'primary',
+                            isLoading: isSavingReview,
+                        },
+                    ] : [
+                        {
+                            id: 'start-slip-review-btn',
+                            label: 'Manual Review',
+                            onClick: () => setIsEditingReview(true),
+                            variant: 'primary',
+                        },
+                    ]),
+                ] : undefined}
             >
                 {previewSlip && (
                     <div className="flex flex-col md:flex-row gap-6">
@@ -471,6 +571,116 @@ export const GodownSlipsPage = () => {
                                     </div>
                                 </div>
                             </div>
+
+                            {isPrivileged && isEditingReview && (
+                                <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                                    <h5 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                                        Manual Review
+                                    </h5>
+                                    <div className="grid grid-cols-2 gap-3 text-sm">
+                                        <label className="col-span-2">
+                                            <span className="mb-1 block text-xs text-slate-500">Slip Number</span>
+                                            <input
+                                                type="text"
+                                                value={reviewForm.slip_number}
+                                                onChange={(event) => handleReviewFieldChange('slip_number', event.target.value)}
+                                                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-800 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+                                            />
+                                        </label>
+                                        <label className="col-span-2">
+                                            <span className="mb-1 block text-xs text-slate-500">Godown Name</span>
+                                            <input
+                                                type="text"
+                                                value={reviewForm.godown_name}
+                                                onChange={(event) => handleReviewFieldChange('godown_name', event.target.value)}
+                                                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-800 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+                                            />
+                                        </label>
+                                        <label>
+                                            <span className="mb-1 block text-xs text-slate-500">Cement Type</span>
+                                            <select
+                                                value={reviewForm.cement_type}
+                                                onChange={(event) => handleReviewFieldChange('cement_type', event.target.value)}
+                                                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-800 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+                                            >
+                                                {REVIEWABLE_CEMENT_TYPES.map((option) => (
+                                                    <option key={option} value={option}>{option}</option>
+                                                ))}
+                                            </select>
+                                        </label>
+                                        <label>
+                                            <span className="mb-1 block text-xs text-slate-500">Bag Count</span>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                value={reviewForm.bag_count}
+                                                onChange={(event) => handleReviewFieldChange('bag_count', event.target.value)}
+                                                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-800 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+                                            />
+                                        </label>
+                                        <label>
+                                            <span className="mb-1 block text-xs text-slate-500">Vehicle Number</span>
+                                            <input
+                                                type="text"
+                                                value={reviewForm.vehicle_number}
+                                                onChange={(event) => handleReviewFieldChange('vehicle_number', event.target.value)}
+                                                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-800 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+                                            />
+                                        </label>
+                                        <label>
+                                            <span className="mb-1 block text-xs text-slate-500">Dispatch Number</span>
+                                            <input
+                                                type="text"
+                                                value={reviewForm.dispatch_number}
+                                                onChange={(event) => handleReviewFieldChange('dispatch_number', event.target.value)}
+                                                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-800 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+                                            />
+                                        </label>
+                                        <label className="col-span-2">
+                                            <span className="mb-1 block text-xs text-slate-500">Customer Name</span>
+                                            <input
+                                                type="text"
+                                                value={reviewForm.customer_name}
+                                                onChange={(event) => handleReviewFieldChange('customer_name', event.target.value)}
+                                                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-800 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+                                            />
+                                        </label>
+                                        <label className="col-span-2">
+                                            <span className="mb-1 block text-xs text-slate-500">Destination</span>
+                                            <input
+                                                type="text"
+                                                value={reviewForm.destination}
+                                                onChange={(event) => handleReviewFieldChange('destination', event.target.value)}
+                                                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-800 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+                                            />
+                                        </label>
+                                        <label>
+                                            <span className="mb-1 block text-xs text-slate-500">Status</span>
+                                            <select
+                                                value={reviewForm.status}
+                                                onChange={(event) => handleReviewFieldChange('status', event.target.value)}
+                                                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-800 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+                                            >
+                                                {REVIEWABLE_STATUSES.map((option) => (
+                                                    <option key={option} value={option}>
+                                                        {option.charAt(0).toUpperCase() + option.slice(1)}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </label>
+                                        <label className="col-span-2">
+                                            <span className="mb-1 block text-xs text-slate-500">Remarks</span>
+                                            <textarea
+                                                rows={3}
+                                                value={reviewForm.remarks}
+                                                onChange={(event) => handleReviewFieldChange('remarks', event.target.value)}
+                                                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-800 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+                                                placeholder="Add review notes"
+                                            />
+                                        </label>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
                 )}
