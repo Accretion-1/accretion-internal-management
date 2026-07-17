@@ -165,21 +165,33 @@ export const getVerifiedGodownSlipsForMasterDataSync = async (reviewedAfter = nu
 export const updateGodownSlipOcrResult = async (connection, slip_id, updateData) => {
   const sql = `
     UPDATE godown_slips SET 
+      slip_date = ?,
+      godown_name = ?,
       cement_type = ?,
       bag_count = ?,
+      block_number = ?,
       slip_number = ?,
       vehicle_number = ?,
+      dispatch_number = ?,
       customer_name = ?,
+      destination = ?,
+      validity_date = ?,
       status = ?
     WHERE slip_id = ?
   `;
   
   const values = [
+    updateData.slip_date || null,
+    updateData.godown_name || null,
     updateData.cement_type || 'UNKNOWN',
     updateData.bag_count || null,
+    updateData.block_number || null,
     updateData.slip_number || null,
     updateData.vehicle_number || null,
+    updateData.dispatch_number || null,
     updateData.customer_name || null,
+    updateData.destination || null,
+    updateData.validity_date || null,
     updateData.status || 'pending',
     slip_id
   ];

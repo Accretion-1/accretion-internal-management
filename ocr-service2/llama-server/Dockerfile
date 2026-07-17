@@ -5,6 +5,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /build
 RUN git clone --depth 1 https://github.com/ggml-org/llama.cpp.git
 RUN cmake -B llama.cpp/build -S llama.cpp -DCMAKE_BUILD_TYPE=Release \
+    -DGGML_NATIVE=OFF \
+    -DGGML_AMX_TILE=OFF \
+    -DGGML_AMX_INT8=OFF \
+    -DGGML_AMX_BF16=OFF \
     && cmake --build llama.cpp/build -j"$(nproc)" --target llama-server
 
 FROM python:3.11-slim

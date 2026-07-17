@@ -222,7 +222,8 @@ class MasterDataStore:
         for field_name, master_list in self.lists.items():
             field_payload = payload.get(field_name, {}) if isinstance(payload, dict) else {}
             confirmed_values = field_payload.get("confirmed", []) if isinstance(field_payload, dict) else []
-            master_list.confirmed = set()
+            seed_values = self.field_configs.get(field_name, {}).get("seed", [])
+            master_list.confirmed = set(seed_values)
             if clear_candidates:
                 master_list.candidates = {}
             master_list.confirm_many(confirmed_values)

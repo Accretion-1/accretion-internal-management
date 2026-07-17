@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAppState } from '../contexts/StateContext';
 import { fetchAdminGodownSlips, fetchUserGodownSlips, reviewGodownSlip, uploadGodownSlips } from '../services/godown-slip.service';
-import { UploadCloud, FileImage, Search, Filter, Loader2, Calendar, MapPin, CheckCircle, Clock, X, Plus, Eye, AlignLeft } from 'lucide-react';
+import { UploadCloud, FileImage, Search, Filter, Loader2, Calendar, MapPin, CheckCircle, Clock, X, Plus, Eye, AlignLeft, RotateCw } from 'lucide-react';
 import { motion } from 'motion/react';
 import toast from 'react-hot-toast';
 import { Modal } from '../components/Modal';
@@ -11,8 +11,15 @@ import { API_ENDPOINTS } from '../store/api/endpoints';
 const FALLBACK_IMAGE = 'data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22400%22%20height%3D%22300%22%20viewBox%3D%220%200%20400%20300%22%3E%3Crect%20fill%3D%22%23f1f5f9%22%20width%3D%22400%22%20height%3D%22300%22%2F%3E%3Ctext%20fill%3D%22%2394a3b8%22%20font-family%3D%22sans-serif%22%20font-size%3D%2216%22%20dy%3D%2210.5%22%20font-weight%3D%22bold%22%20x%3D%2250%25%22%20y%3D%2250%25%22%20text-anchor%3D%22middle%22%3EImage%20Not%20Found%3C%2Ftext%3E%3C%2Fsvg%3E';
 const REVIEWABLE_CEMENT_TYPES = ['UNKNOWN', 'PPC', 'WPC', 'SUPER'];
 const REVIEWABLE_STATUSES = ['review', 'verified', 'rejected'];
+const NORMALIZED_IMAGE_TYPE = 'image/jpeg';
+const NORMALIZED_IMAGE_EXTENSION = '.jpg';
+const UPLOAD_MAX_IMAGE_SIDE = 1800;
+const UPLOAD_TARGET_BYTES = 900 * 1024;
+const UPLOAD_IMAGE_QUALITIES = [0.9, 0.86, 0.82, 0.78];
+
 const buildReviewFormFromSlip = (slip) => ({
     slip_number: slip?.slip_number || '',
+    slip_date: slip?.slip_date || '',
     godown_name: slip?.godown_name || '',
     cement_type: slip?.cement_type || 'UNKNOWN',
     bag_count: slip?.bag_count ?? '',
@@ -25,6 +32,7 @@ const buildReviewFormFromSlip = (slip) => ({
 });
 const normalizeReviewPayload = (form) => ({
     slip_number: form.slip_number.trim() || null,
+    slip_date: form.slip_date || null,
     godown_name: form.godown_name.trim() || null,
     cement_type: form.cement_type || 'UNKNOWN',
     bag_count: form.bag_count === '' ? null : Number(form.bag_count),
@@ -35,6 +43,103 @@ const normalizeReviewPayload = (form) => ({
     status: form.status,
     remarks: form.remarks.trim() || null,
 });
+
+const formatSlipDate = (value) => {
+    if (!value) return '-';
+    const text = String(value).trim();
+    const directDateMatch = text.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (directDateMatch) {
+        return `${directDateMatch[3]}/${directDateMatch[2]}/${directDateMatch[1]}`;
+    }
+
+    const parsed = new Date(text);
+    if (Number.isNaN(parsed.getTime())) {
+        return text;
+    }
+
+    return parsed.toLocaleDateString('en-GB');
+};
+
+const createImageElementFromFile = (file) => new Promise((resolve, reject) => {
+    const image = new Image();
+    const objectUrl = URL.createObjectURL(file);
+
+    image.onload = () => {
+        URL.revokeObjectURL(objectUrl);
+        resolve(image);
+    };
+
+    image.onerror = () => {
+        URL.revokeObjectURL(objectUrl);
+        reject(new Error('Selected image format is not supported on this device.'));
+    };
+
+    image.src = objectUrl;
+});
+
+const canvasToJpegFile = (canvas, fileName, quality) => new Promise((resolve) => {
+    canvas.toBlob((blob) => {
+        resolve(
+            blob
+                ? new File([blob], fileName, { type: NORMALIZED_IMAGE_TYPE, lastModified: Date.now() })
+                : null,
+        );
+    }, NORMALIZED_IMAGE_TYPE, quality);
+});
+
+const normalizeSlipImage = async (file) => {
+    if (!file?.type?.startsWith('image/')) {
+        throw new Error('Only image files can be uploaded.');
+    }
+
+    const canKeepOriginal =
+        file.type === NORMALIZED_IMAGE_TYPE &&
+        file.size <= UPLOAD_TARGET_BYTES;
+
+    try {
+        const image = await createImageElementFromFile(file);
+        const longestSide = Math.max(image.naturalWidth || 0, image.naturalHeight || 0);
+        const scale = longestSide > 0 ? Math.min(1, UPLOAD_MAX_IMAGE_SIDE / longestSide) : 1;
+
+        if (canKeepOriginal && scale >= 1) {
+            return file;
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round((image.naturalWidth || 1) * scale));
+        canvas.height = Math.max(1, Math.round((image.naturalHeight || 1) * scale));
+
+        const context = canvas.getContext('2d', { willReadFrequently: true });
+        if (!context) {
+            return file;
+        }
+
+        context.imageSmoothingEnabled = true;
+        context.imageSmoothingQuality = 'high';
+        context.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+        const normalizedBaseName = (file.name?.replace(/\.[^.]+$/, '') || `slip-${Date.now()}`).trim();
+        let bestFile = file;
+
+        for (const quality of UPLOAD_IMAGE_QUALITIES) {
+            const normalizedFile = await canvasToJpegFile(
+                canvas,
+                `${normalizedBaseName}${NORMALIZED_IMAGE_EXTENSION}`,
+                quality,
+            );
+            if (!normalizedFile) continue;
+
+            bestFile = normalizedFile;
+            if (normalizedFile.size <= UPLOAD_TARGET_BYTES) {
+                break;
+            }
+        }
+
+        return bestFile;
+    } catch (error) {
+        throw new Error(error?.message || 'Unable to prepare the selected image.');
+    }
+};
 
 
 export const GodownSlipsPage = () => {
@@ -54,6 +159,7 @@ export const GodownSlipsPage = () => {
     const [reviewForm, setReviewForm] = useState(buildReviewFormFromSlip(null));
     const [isSavingReview, setIsSavingReview] = useState(false);
     const [isEditingReview, setIsEditingReview] = useState(false);
+    const [imageRotation, setImageRotation] = useState(0);
 
     // Upload ref for User view
     const fileInputRef = useRef(null);
@@ -75,6 +181,7 @@ export const GodownSlipsPage = () => {
     useEffect(() => {
         setReviewForm(buildReviewFormFromSlip(previewSlip));
         setIsEditingReview(false);
+        setImageRotation(0);
     }, [previewSlip]);
 
     const fetchLocations = async () => {
@@ -109,21 +216,44 @@ export const GodownSlipsPage = () => {
         }
     };
 
-    const handleFileChange = (e) => {
+    const handleFileChange = async (e) => {
         const files = Array.from(e.target.files);
         if (files.length === 0) return;
         
         if (selectedFiles.length + files.length > 10) {
             toast.error('You can only upload up to 10 slips at a time.');
+            if (fileInputRef.current) fileInputRef.current.value = '';
             return;
         }
 
-        const newFiles = files.map(file => ({
-            file,
-            previewUrl: URL.createObjectURL(file)
-        }));
+        const preparedFiles = [];
+        let unsupportedCount = 0;
 
-        setSelectedFiles(prev => [...prev, ...newFiles]);
+        for (const file of files) {
+            try {
+                const normalizedFile = await normalizeSlipImage(file);
+                preparedFiles.push({
+                    file: normalizedFile,
+                    originalName: file.name,
+                    previewUrl: URL.createObjectURL(normalizedFile),
+                });
+            } catch (error) {
+                unsupportedCount += 1;
+                toast.error(`${file.name}: ${error.message}`);
+            }
+        }
+
+        if (preparedFiles.length === 0) {
+            if (fileInputRef.current) fileInputRef.current.value = '';
+            return;
+        }
+
+        setSelectedFiles(prev => [...prev, ...preparedFiles].slice(0, 10));
+        if (unsupportedCount > 0) {
+            toast(`${unsupportedCount} image${unsupportedCount > 1 ? 's were' : ' was'} skipped.`, {
+                icon: '⚠️',
+            });
+        }
         if (fileInputRef.current) fileInputRef.current.value = '';
     };
 
@@ -498,17 +628,28 @@ export const GodownSlipsPage = () => {
                 {previewSlip && (
                     <div className="flex flex-col md:flex-row gap-6">
                         {/* Image Section */}
-                        <div className="flex-1 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-center p-4 min-h-[400px]">
+                        <div className="relative flex-1 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-center p-4 min-h-[400px] overflow-hidden">
                             {previewSlip.image_url ? (
-                                <img 
-                                    src={previewSlip.image_url} 
-                                    alt="Slip Full View" 
-                                    className="w-full h-auto max-h-[75vh] object-contain rounded-lg shadow-sm"
-                                    onError={(e) => {
-                                        e.target.onerror = null;
-                                        e.target.src = FALLBACK_IMAGE;
-                                    }}
-                                />
+                                <>
+                                    <button
+                                        type="button"
+                                        onClick={() => setImageRotation((prev) => (prev + 90) % 360)}
+                                        className="absolute right-6 top-6 z-10 inline-flex items-center gap-2 rounded-xl bg-white/95 px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 transition hover:bg-white"
+                                    >
+                                        <RotateCw className="h-4 w-4" />
+                                        Rotate
+                                    </button>
+                                    <img 
+                                        src={previewSlip.image_url} 
+                                        alt="Slip Full View" 
+                                        className="w-full h-auto max-h-[75vh] object-contain rounded-lg shadow-sm transition-transform duration-200"
+                                        style={{ transform: `rotate(${imageRotation}deg)` }}
+                                        onError={(e) => {
+                                            e.target.onerror = null;
+                                            e.target.src = FALLBACK_IMAGE;
+                                        }}
+                                    />
+                                </>
                             ) : (
                                 <div className="flex flex-col items-center gap-2 text-slate-400">
                                     <FileImage className="w-16 h-16" />
@@ -521,7 +662,10 @@ export const GodownSlipsPage = () => {
                         <div className="w-full md:w-[380px] shrink-0 flex flex-col gap-6 overflow-y-auto max-h-[75vh] pr-2">
                             <div className="flex items-center justify-between border-b border-slate-100 pb-4">
                                 <div>
-                                    <h4 className="font-bold text-slate-900 text-lg">Slip #{previewSlip.slip_id}</h4>
+                                    <h4 className="font-bold text-slate-900 text-lg">
+                                        Slip No. {previewSlip.slip_number || '-'}
+                                    </h4>
+                                    <p className="text-xs text-slate-500 mt-1">Record ID: {previewSlip.slip_id}</p>
                                     <p className="text-xs text-slate-500 mt-1">{new Date(previewSlip.created_at).toLocaleString()}</p>
                                 </div>
                                 <StatusBadge status={previewSlip.status} />
@@ -533,6 +677,14 @@ export const GodownSlipsPage = () => {
                                 </h5>
 
                                 <div className="grid grid-cols-2 gap-y-4 gap-x-2 text-sm">
+                                    <div>
+                                        <span className="block text-xs text-slate-500 mb-1">Slip Number</span>
+                                        <span className="font-semibold text-slate-900">{previewSlip.slip_number || '-'}</span>
+                                    </div>
+                                    <div>
+                                        <span className="block text-xs text-slate-500 mb-1">Slip Date</span>
+                                        <span className="font-semibold text-slate-900">{formatSlipDate(previewSlip.slip_date)}</span>
+                                    </div>
                                     <div>
                                         <span className="block text-xs text-slate-500 mb-1">Location details</span>
                                         <span className="font-semibold text-slate-900">
@@ -584,6 +736,15 @@ export const GodownSlipsPage = () => {
                                                 type="text"
                                                 value={reviewForm.slip_number}
                                                 onChange={(event) => handleReviewFieldChange('slip_number', event.target.value)}
+                                                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-800 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+                                            />
+                                        </label>
+                                        <label className="col-span-2">
+                                            <span className="mb-1 block text-xs text-slate-500">Slip Date</span>
+                                            <input
+                                                type="date"
+                                                value={reviewForm.slip_date}
+                                                onChange={(event) => handleReviewFieldChange('slip_date', event.target.value)}
                                                 className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-800 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
                                             />
                                         </label>
