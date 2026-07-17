@@ -148,7 +148,6 @@ const processPendingSlips = async () => {
                                 ? String(record.vehicle_no).trim().toUpperCase()
                                 : null;
                             const dispatchNumber = record.di_no ? String(record.di_no).trim() : null;
-                            const vehicleNumberValid = !vehicleNumberRaw || isValidVehicleNo(vehicleNumberRaw);
                             const customerName = record.supply_to ? String(record.supply_to).trim() : null;
                             const destination = record.validity ? String(record.validity).trim() : null;
                             const validityDate = record.material_load_on ? String(record.material_load_on).trim() : null;
@@ -168,11 +167,9 @@ const processPendingSlips = async () => {
                             };
 
                             // Boundary validation: never let an out-of-range bag count or
-                            // malformed plate silently become "verified", even if the
                             // upstream pipeline's own _status didn't flag it.
                             const extraFlags = [];
                             if (!bagCountValid) extraFlags.push('bag_count_out_of_range');
-                            if (!vehicleNumberValid) extraFlags.push('vehicle_number_invalid_format');
 
                             status = deriveStatus(record, extraFlags);
 
