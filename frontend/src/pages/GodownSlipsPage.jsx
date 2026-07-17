@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAppState } from '../contexts/StateContext';
 import { fetchAdminGodownSlips, fetchUserGodownSlips, reviewGodownSlip, uploadGodownSlips } from '../services/godown-slip.service';
-import { UploadCloud, FileImage, Search, Filter, Loader2, Calendar, MapPin, CheckCircle, Clock, X, Plus, Eye, AlignLeft } from 'lucide-react';
+import { UploadCloud, FileImage, Search, Filter, Loader2, Calendar, MapPin, CheckCircle, Clock, X, Plus, Eye, AlignLeft, RotateCw } from 'lucide-react';
 import { motion } from 'motion/react';
 import toast from 'react-hot-toast';
 import { Modal } from '../components/Modal';
@@ -43,6 +43,22 @@ const normalizeReviewPayload = (form) => ({
     status: form.status,
     remarks: form.remarks.trim() || null,
 });
+
+const formatSlipDate = (value) => {
+    if (!value) return '-';
+    const text = String(value).trim();
+    const directDateMatch = text.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (directDateMatch) {
+        return `${directDateMatch[3]}/${directDateMatch[2]}/${directDateMatch[1]}`;
+    }
+
+    const parsed = new Date(text);
+    if (Number.isNaN(parsed.getTime())) {
+        return text;
+    }
+
+    return parsed.toLocaleDateString('en-GB');
+};
 
 const createImageElementFromFile = (file) => new Promise((resolve, reject) => {
     const image = new Image();
@@ -143,6 +159,7 @@ export const GodownSlipsPage = () => {
     const [reviewForm, setReviewForm] = useState(buildReviewFormFromSlip(null));
     const [isSavingReview, setIsSavingReview] = useState(false);
     const [isEditingReview, setIsEditingReview] = useState(false);
+    const [imageRotation, setImageRotation] = useState(0);
 
     // Upload ref for User view
     const fileInputRef = useRef(null);
@@ -164,6 +181,7 @@ export const GodownSlipsPage = () => {
     useEffect(() => {
         setReviewForm(buildReviewFormFromSlip(previewSlip));
         setIsEditingReview(false);
+        setImageRotation(0);
     }, [previewSlip]);
 
     const fetchLocations = async () => {
@@ -610,17 +628,28 @@ export const GodownSlipsPage = () => {
                 {previewSlip && (
                     <div className="flex flex-col md:flex-row gap-6">
                         {/* Image Section */}
-                        <div className="flex-1 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-center p-4 min-h-[400px]">
+                        <div className="relative flex-1 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-center p-4 min-h-[400px] overflow-hidden">
                             {previewSlip.image_url ? (
-                                <img 
-                                    src={previewSlip.image_url} 
-                                    alt="Slip Full View" 
-                                    className="w-full h-auto max-h-[75vh] object-contain rounded-lg shadow-sm"
-                                    onError={(e) => {
-                                        e.target.onerror = null;
-                                        e.target.src = FALLBACK_IMAGE;
-                                    }}
-                                />
+                                <>
+                                    <button
+                                        type="button"
+                                        onClick={() => setImageRotation((prev) => (prev + 90) % 360)}
+                                        className="absolute right-6 top-6 z-10 inline-flex items-center gap-2 rounded-xl bg-white/95 px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 transition hover:bg-white"
+                                    >
+                                        <RotateCw className="h-4 w-4" />
+                                        Rotate
+                                    </button>
+                                    <img 
+                                        src={previewSlip.image_url} 
+                                        alt="Slip Full View" 
+                                        className="w-full h-auto max-h-[75vh] object-contain rounded-lg shadow-sm transition-transform duration-200"
+                                        style={{ transform: `rotate(${imageRotation}deg)` }}
+                                        onError={(e) => {
+                                            e.target.onerror = null;
+                                            e.target.src = FALLBACK_IMAGE;
+                                        }}
+                                    />
+                                </>
                             ) : (
                                 <div className="flex flex-col items-center gap-2 text-slate-400">
                                     <FileImage className="w-16 h-16" />
@@ -654,7 +683,7 @@ export const GodownSlipsPage = () => {
                                     </div>
                                     <div>
                                         <span className="block text-xs text-slate-500 mb-1">Slip Date</span>
-                                        <span className="font-semibold text-slate-900">{previewSlip.slip_date || '-'}</span>
+                                        <span className="font-semibold text-slate-900">{formatSlipDate(previewSlip.slip_date)}</span>
                                     </div>
                                     <div>
                                         <span className="block text-xs text-slate-500 mb-1">Location details</span>
