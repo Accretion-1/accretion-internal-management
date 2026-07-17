@@ -11,6 +11,12 @@ import { API_ENDPOINTS } from '../store/api/endpoints';
 const FALLBACK_IMAGE = 'data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22400%22%20height%3D%22300%22%20viewBox%3D%220%200%20400%20300%22%3E%3Crect%20fill%3D%22%23f1f5f9%22%20width%3D%22400%22%20height%3D%22300%22%2F%3E%3Ctext%20fill%3D%22%2394a3b8%22%20font-family%3D%22sans-serif%22%20font-size%3D%2216%22%20dy%3D%2210.5%22%20font-weight%3D%22bold%22%20x%3D%2250%25%22%20y%3D%2250%25%22%20text-anchor%3D%22middle%22%3EImage%20Not%20Found%3C%2Ftext%3E%3C%2Fsvg%3E';
 const REVIEWABLE_CEMENT_TYPES = ['UNKNOWN', 'PPC', 'WPC', 'SUPER'];
 const REVIEWABLE_STATUSES = ['review', 'verified', 'rejected'];
+const NORMALIZED_IMAGE_TYPE = 'image/jpeg';
+const NORMALIZED_IMAGE_EXTENSION = '.jpg';
+const UPLOAD_MAX_IMAGE_SIDE = 1800;
+const UPLOAD_TARGET_BYTES = 900 * 1024;
+const UPLOAD_IMAGE_QUALITIES = [0.9, 0.86, 0.82, 0.78];
+
 const buildReviewFormFromSlip = (slip) => ({
     slip_number: slip?.slip_number || '',
     godown_name: slip?.godown_name || '',
@@ -35,6 +41,87 @@ const normalizeReviewPayload = (form) => ({
     status: form.status,
     remarks: form.remarks.trim() || null,
 });
+
+const createImageElementFromFile = (file) => new Promise((resolve, reject) => {
+    const image = new Image();
+    const objectUrl = URL.createObjectURL(file);
+
+    image.onload = () => {
+        URL.revokeObjectURL(objectUrl);
+        resolve(image);
+    };
+
+    image.onerror = () => {
+        URL.revokeObjectURL(objectUrl);
+        reject(new Error('Selected image format is not supported on this device.'));
+    };
+
+    image.src = objectUrl;
+});
+
+const canvasToJpegFile = (canvas, fileName, quality) => new Promise((resolve) => {
+    canvas.toBlob((blob) => {
+        resolve(
+            blob
+                ? new File([blob], fileName, { type: NORMALIZED_IMAGE_TYPE, lastModified: Date.now() })
+                : null,
+        );
+    }, NORMALIZED_IMAGE_TYPE, quality);
+});
+
+const normalizeSlipImage = async (file) => {
+    if (!file?.type?.startsWith('image/')) {
+        throw new Error('Only image files can be uploaded.');
+    }
+
+    const canKeepOriginal =
+        file.type === NORMALIZED_IMAGE_TYPE &&
+        file.size <= UPLOAD_TARGET_BYTES;
+
+    try {
+        const image = await createImageElementFromFile(file);
+        const longestSide = Math.max(image.naturalWidth || 0, image.naturalHeight || 0);
+        const scale = longestSide > 0 ? Math.min(1, UPLOAD_MAX_IMAGE_SIDE / longestSide) : 1;
+
+        if (canKeepOriginal && scale >= 1) {
+            return file;
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round((image.naturalWidth || 1) * scale));
+        canvas.height = Math.max(1, Math.round((image.naturalHeight || 1) * scale));
+
+        const context = canvas.getContext('2d', { willReadFrequently: true });
+        if (!context) {
+            return file;
+        }
+
+        context.imageSmoothingEnabled = true;
+        context.imageSmoothingQuality = 'high';
+        context.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+        const normalizedBaseName = (file.name?.replace(/\.[^.]+$/, '') || `slip-${Date.now()}`).trim();
+        let bestFile = file;
+
+        for (const quality of UPLOAD_IMAGE_QUALITIES) {
+            const normalizedFile = await canvasToJpegFile(
+                canvas,
+                `${normalizedBaseName}${NORMALIZED_IMAGE_EXTENSION}`,
+                quality,
+            );
+            if (!normalizedFile) continue;
+
+            bestFile = normalizedFile;
+            if (normalizedFile.size <= UPLOAD_TARGET_BYTES) {
+                break;
+            }
+        }
+
+        return bestFile;
+    } catch (error) {
+        throw new Error(error?.message || 'Unable to prepare the selected image.');
+    }
+};
 
 
 export const GodownSlipsPage = () => {
@@ -109,21 +196,44 @@ export const GodownSlipsPage = () => {
         }
     };
 
-    const handleFileChange = (e) => {
+    const handleFileChange = async (e) => {
         const files = Array.from(e.target.files);
         if (files.length === 0) return;
         
         if (selectedFiles.length + files.length > 10) {
             toast.error('You can only upload up to 10 slips at a time.');
+            if (fileInputRef.current) fileInputRef.current.value = '';
             return;
         }
 
-        const newFiles = files.map(file => ({
-            file,
-            previewUrl: URL.createObjectURL(file)
-        }));
+        const preparedFiles = [];
+        let unsupportedCount = 0;
 
-        setSelectedFiles(prev => [...prev, ...newFiles]);
+        for (const file of files) {
+            try {
+                const normalizedFile = await normalizeSlipImage(file);
+                preparedFiles.push({
+                    file: normalizedFile,
+                    originalName: file.name,
+                    previewUrl: URL.createObjectURL(normalizedFile),
+                });
+            } catch (error) {
+                unsupportedCount += 1;
+                toast.error(`${file.name}: ${error.message}`);
+            }
+        }
+
+        if (preparedFiles.length === 0) {
+            if (fileInputRef.current) fileInputRef.current.value = '';
+            return;
+        }
+
+        setSelectedFiles(prev => [...prev, ...preparedFiles].slice(0, 10));
+        if (unsupportedCount > 0) {
+            toast(`${unsupportedCount} image${unsupportedCount > 1 ? 's were' : ' was'} skipped.`, {
+                icon: '⚠️',
+            });
+        }
         if (fileInputRef.current) fileInputRef.current.value = '';
     };
 
