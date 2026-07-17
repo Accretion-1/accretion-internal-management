@@ -7,8 +7,33 @@ on:
       - dev
 
 jobs:
-  build-and-push:
+  changes:
     runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+      ocr_service2: ${{ steps.filter.outputs.ocr_service2 }}
+      llama_server: ${{ steps.filter.outputs.llama_server }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+            frontend:
+              - 'frontend/**'
+            ocr_service2:
+              - 'ocr-service2/**'
+              - '!ocr-service2/llama-server/**'
+            llama_server:
+              - 'ocr-service2/llama-server/**'
+
+  build-and-push:
+    needs: changes
+    runs-on: ubuntu-latest
+    if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.frontend == 'true' || needs.changes.outputs.ocr_service2 == 'true' || needs.changes.outputs.llama_server == 'true'
     environment: ${{ github.ref_name == 'main' && 'production' || 'development' }}
 
     steps:
@@ -33,6 +58,7 @@ jobs:
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
 
       - name: Build and Push Backend
+        if: needs.changes.outputs.backend == 'true'
         uses: docker/build-push-action@v5
         with:
           context: ./backend
@@ -43,6 +69,7 @@ jobs:
             skyrack2026/accretion-backend:${{ github.sha }}
 
       - name: Build and Push Frontend
+        if: needs.changes.outputs.frontend == 'true'
         uses: docker/build-push-action@v5
         with:
           context: ./frontend
@@ -62,6 +89,7 @@ jobs:
             skyrack2026/accretion-frontend:${{ github.sha }}
 
       - name: Build and Push OCR Service v2 (App)
+        if: needs.changes.outputs.ocr_service2 == 'true'
         uses: docker/build-push-action@v5
         with:
           context: ./ocr-service2
@@ -72,6 +100,7 @@ jobs:
             skyrack2026/accretion-ocr-service2:${{ github.sha }}
 
       - name: Build and Push Llama Server
+        if: needs.changes.outputs.llama_server == 'true'
         uses: docker/build-push-action@v5
         with:
           context: ./ocr-service2/llama-server
@@ -82,28 +111,33 @@ jobs:
             skyrack2026/accretion-llama-server:${{ github.sha }}
 
   deploy:
-    needs: build-and-push
+    needs: [changes, build-and-push]
     runs-on: self-hosted
+    if: always() && needs.build-and-push.result == 'success'
     environment: ${{ github.ref_name == 'main' && 'production' || 'development' }}
 
     steps:
       - name: Set Environment
         run: |
           if [ "${{ github.ref_name }}" == "main" ]; then
-            echo "ENV_TAG=latest"                       >> $GITHUB_ENV
-            echo "DEPLOY_DIR=/root/Accretion"           >> $GITHUB_ENV
-            echo "BACKEND_SVC=accretion-backend"        >> $GITHUB_ENV
-            echo "FRONTEND_SVC=accretion-frontend"      >> $GITHUB_ENV
-            echo "OCR2_SVC=accretion-ocr-service2"      >> $GITHUB_ENV
-            echo "LLAMA_SVC=accretion-llama-server"     >> $GITHUB_ENV
+            echo "ENV_TAG=latest"                  >> $GITHUB_ENV
+            echo "DEPLOY_DIR=/root/Accretion"       >> $GITHUB_ENV
+            echo "BACKEND_SVC=accretion-backend"    >> $GITHUB_ENV
+            echo "FRONTEND_SVC=accretion-frontend"  >> $GITHUB_ENV
+            echo "OCR2_SVC=accretion-ocr-service2"  >> $GITHUB_ENV
+            echo "LLAMA_SVC=accretion-llama-server" >> $GITHUB_ENV
           else
-            echo "ENV_TAG=dev"                            >> $GITHUB_ENV
-            echo "DEPLOY_DIR=/root/Accretion-dev"         >> $GITHUB_ENV
-            echo "BACKEND_SVC=accretion-backend-dev"      >> $GITHUB_ENV
-            echo "FRONTEND_SVC=accretion-frontend-dev"    >> $GITHUB_ENV
-            echo "OCR2_SVC=accretion-ocr-service2-dev"    >> $GITHUB_ENV
-            echo "LLAMA_SVC=accretion-llama-server-dev"   >> $GITHUB_ENV
+            echo "ENV_TAG=dev"                             >> $GITHUB_ENV
+            echo "DEPLOY_DIR=/root/Accretion-dev"           >> $GITHUB_ENV
+            echo "BACKEND_SVC=accretion-backend-dev"        >> $GITHUB_ENV
+            echo "FRONTEND_SVC=accretion-frontend-dev"      >> $GITHUB_ENV
+            echo "OCR2_SVC=accretion-ocr-service2-dev"      >> $GITHUB_ENV
+            echo "LLAMA_SVC=accretion-llama-server-dev"     >> $GITHUB_ENV
           fi
+          echo "CHANGED_BACKEND=${{ needs.changes.outputs.backend }}"         >> $GITHUB_ENV
+          echo "CHANGED_FRONTEND=${{ needs.changes.outputs.frontend }}"       >> $GITHUB_ENV
+          echo "CHANGED_OCR2=${{ needs.changes.outputs.ocr_service2 }}"       >> $GITHUB_ENV
+          echo "CHANGED_LLAMA=${{ needs.changes.outputs.llama_server }}"      >> $GITHUB_ENV
 
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1
@@ -111,7 +145,7 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          envs: ENV_TAG,DEPLOY_DIR,BACKEND_SVC,FRONTEND_SVC,OCR2_SVC,LLAMA_SVC
+          envs: ENV_TAG,DEPLOY_DIR,BACKEND_SVC,FRONTEND_SVC,OCR2_SVC,LLAMA_SVC,CHANGED_BACKEND,CHANGED_FRONTEND,CHANGED_OCR2,CHANGED_LLAMA
           script: |
             set -e
 
@@ -119,17 +153,39 @@ jobs:
             echo "Branch  : ${{ github.ref_name }}"
             echo "Tag     : $ENV_TAG"
             echo "Dir     : $DEPLOY_DIR"
+            echo "Changed : backend=$CHANGED_BACKEND frontend=$CHANGED_FRONTEND ocr2=$CHANGED_OCR2 llama=$CHANGED_LLAMA"
             echo "=============================="
 
             cd $DEPLOY_DIR
 
-            sed -i "s|skyrack2026/accretion-backend:.*|skyrack2026/accretion-backend:$ENV_TAG|" docker-compose.yml
-            sed -i "s|skyrack2026/accretion-frontend:.*|skyrack2026/accretion-frontend:$ENV_TAG|" docker-compose.yml
-            sed -i "s|skyrack2026/accretion-ocr-service2:.*|skyrack2026/accretion-ocr-service2:$ENV_TAG|" docker-compose.yml
-            sed -i "s|skyrack2026/accretion-llama-server:.*|skyrack2026/accretion-llama-server:$ENV_TAG|" docker-compose.yml
+            SVCS=""
 
-            docker compose pull $BACKEND_SVC $FRONTEND_SVC $OCR2_SVC $LLAMA_SVC
-            docker compose up -d --no-deps --force-recreate $BACKEND_SVC $FRONTEND_SVC $OCR2_SVC $LLAMA_SVC
+            if [ "$CHANGED_BACKEND" == "true" ]; then
+              sed -i "s|skyrack2026/accretion-backend:.*|skyrack2026/accretion-backend:$ENV_TAG|" docker-compose.yml
+              SVCS="$SVCS $BACKEND_SVC"
+            fi
+
+            if [ "$CHANGED_FRONTEND" == "true" ]; then
+              sed -i "s|skyrack2026/accretion-frontend:.*|skyrack2026/accretion-frontend:$ENV_TAG|" docker-compose.yml
+              SVCS="$SVCS $FRONTEND_SVC"
+            fi
+
+            if [ "$CHANGED_LLAMA" == "true" ]; then
+              sed -i "s|skyrack2026/accretion-llama-server:.*|skyrack2026/accretion-llama-server:$ENV_TAG|" docker-compose.yml
+              SVCS="$SVCS $LLAMA_SVC"
+            fi
+
+            if [ "$CHANGED_OCR2" == "true" ]; then
+              sed -i "s|skyrack2026/accretion-ocr-service2:.*|skyrack2026/accretion-ocr-service2:$ENV_TAG|" docker-compose.yml
+              SVCS="$SVCS $OCR2_SVC"
+            fi
+
+            if [ -n "$SVCS" ]; then
+              docker compose pull $SVCS
+              docker compose up -d --no-deps --force-recreate $SVCS
+            else
+              echo "No services changed, nothing to deploy."
+            fi
 
             docker image prune -af
 
