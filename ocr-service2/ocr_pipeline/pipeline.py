@@ -19,6 +19,30 @@ from date_utils import validate_date_field, cross_check_dates, normalize_date
 
 log = logging.getLogger(__name__)
 
+KEY_OCR_LABELS = (
+    "date",
+    "godown name",
+    "please load",
+    "vehicle no",
+    "supply to",
+    "material load on",
+    "loading slip",
+)
+
+QUALITY_FIELDS = (
+    "slip_no",
+    "date",
+    "godown_name",
+    "bags_qty",
+    "material_type",
+    "block_no",
+    "week_no",
+    "vehicle_no",
+    "di_no",
+    "supply_to",
+    "material_load_on",
+)
+
 # ---------------------------------------------------------------------------
 # Field-format validators, gating what's allowed to become a master-list
 # candidate at all (keeps obviously-garbled OCR reads out of the master file)
@@ -42,6 +66,23 @@ def is_nonempty_text(v: str) -> bool:
 
 def is_numeric(v: str) -> bool:
     return v.strip().isdigit()
+
+
+def _score_ocr_candidate(raw_text: str, raw_fields: dict) -> int:
+    nonempty_fields = sum(1 for name in QUALITY_FIELDS if (raw_fields.get(name) or "").strip())
+    numeric_bonus = sum(
+        1
+        for name in ("slip_no", "bags_qty", "block_no", "week_no", "di_no")
+        if (raw_fields.get(name) or "").strip()
+    )
+    label_hits = sum(1 for label in KEY_OCR_LABELS if label in raw_text.lower())
+    return (nonempty_fields * 10) + (numeric_bonus * 2) + label_hits
+
+
+def _needs_rotation_retry(raw_text: str, raw_fields: dict) -> bool:
+    nonempty_fields = sum(1 for name in QUALITY_FIELDS if (raw_fields.get(name) or "").strip())
+    label_hits = sum(1 for label in KEY_OCR_LABELS if label in raw_text.lower())
+    return nonempty_fields < 4 or label_hits < 3
 
 
 # Fields that get FUZZY master-list validation/correction/auto-learning.
@@ -113,9 +154,42 @@ class SlipPipeline:
             aligned_path = os.path.join(tmp, "aligned.jpg")
             cv2.imwrite(aligned_path, warped)
             raw_text = run_ocr(aligned_path)
-        _mark("ocr_inference")
+            raw_fields = parse_ocr_text(raw_text)
+            best_candidate = {
+                "rotation": 0,
+                "raw_text": raw_text,
+                "raw_fields": raw_fields,
+                "score": _score_ocr_candidate(raw_text, raw_fields),
+            }
 
-        raw_fields = parse_ocr_text(raw_text)
+            if _needs_rotation_retry(raw_text, raw_fields):
+                rotation_attempts = (
+                    ("clockwise_90", cv2.ROTATE_90_CLOCKWISE),
+                    ("counterclockwise_90", cv2.ROTATE_90_COUNTERCLOCKWISE),
+                    ("180", cv2.ROTATE_180),
+                )
+                for rotation_name, rotation_code in rotation_attempts:
+                    rotated = cv2.rotate(warped, rotation_code)
+                    rotated_path = os.path.join(tmp, f"aligned_{rotation_name}.jpg")
+                    cv2.imwrite(rotated_path, rotated)
+                    rotated_text = run_ocr(rotated_path)
+                    rotated_fields = parse_ocr_text(rotated_text)
+                    rotated_score = _score_ocr_candidate(rotated_text, rotated_fields)
+                    if rotated_score > best_candidate["score"]:
+                        best_candidate = {
+                            "rotation": rotation_name,
+                            "raw_text": rotated_text,
+                            "raw_fields": rotated_fields,
+                            "score": rotated_score,
+                        }
+                    if rotated_score >= 45:
+                        break
+
+            raw_text = best_candidate["raw_text"]
+            raw_fields = best_candidate["raw_fields"]
+            record["_ocr_rotation"] = best_candidate["rotation"]
+            record["_ocr_quality_score"] = best_candidate["score"]
+        _mark("ocr_inference")
         record["_raw_ocr_text"] = raw_text
         record["_raw_fields"] = raw_fields
         _mark("field_parsing")
