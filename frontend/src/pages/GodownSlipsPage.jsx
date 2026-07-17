@@ -631,7 +631,10 @@ export const GodownSlipsPage = () => {
                         <div className="w-full md:w-[380px] shrink-0 flex flex-col gap-6 overflow-y-auto max-h-[75vh] pr-2">
                             <div className="flex items-center justify-between border-b border-slate-100 pb-4">
                                 <div>
-                                    <h4 className="font-bold text-slate-900 text-lg">Slip #{previewSlip.slip_id}</h4>
+                                    <h4 className="font-bold text-slate-900 text-lg">
+                                        Slip No. {previewSlip.slip_number || '-'}
+                                    </h4>
+                                    <p className="text-xs text-slate-500 mt-1">Record ID: {previewSlip.slip_id}</p>
                                     <p className="text-xs text-slate-500 mt-1">{new Date(previewSlip.created_at).toLocaleString()}</p>
                                 </div>
                                 <StatusBadge status={previewSlip.status} />
@@ -643,6 +646,10 @@ export const GodownSlipsPage = () => {
                                 </h5>
 
                                 <div className="grid grid-cols-2 gap-y-4 gap-x-2 text-sm">
+                                    <div>
+                                        <span className="block text-xs text-slate-500 mb-1">Slip Number</span>
+                                        <span className="font-semibold text-slate-900">{previewSlip.slip_number || '-'}</span>
+                                    </div>
                                     <div>
                                         <span className="block text-xs text-slate-500 mb-1">Location details</span>
                                         <span className="font-semibold text-slate-900">

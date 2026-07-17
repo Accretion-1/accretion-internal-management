@@ -90,11 +90,17 @@ const processPendingSlips = async () => {
                 let processingTimeMs = 0;
                 let status = 'pending';
                 let extractedData = {
+                    slip_date: null,
+                    godown_name: null,
                     cement_type: 'UNKNOWN',
                     bag_count: null,
+                    block_number: null,
                     slip_number: null,
                     vehicle_number: null,
-                    customer_name: null
+                    dispatch_number: null,
+                    customer_name: null,
+                    destination: null,
+                    validity_date: null,
                 };
 
                 if (!fs.existsSync(imagePath)) {
@@ -134,19 +140,31 @@ const processPendingSlips = async () => {
 
                             const cementType = parseCementType(record.material_type);
                             const { value: bagCount, valid: bagCountValid } = sanitizeBagCount(record.bags_qty);
+                            const slipDate = record.date ? String(record.date).trim() : null;
+                            const godownName = record.godown_name ? String(record.godown_name).trim() : null;
+                            const blockNumber = record.block_no ? String(record.block_no).trim() : null;
                             const slipNumber = record.slip_no ? String(record.slip_no).trim() : null;
                             const vehicleNumberRaw = record.vehicle_no
                                 ? String(record.vehicle_no).trim().toUpperCase()
                                 : null;
+                            const dispatchNumber = record.di_no ? String(record.di_no).trim() : null;
                             const vehicleNumberValid = !vehicleNumberRaw || isValidVehicleNo(vehicleNumberRaw);
                             const customerName = record.supply_to ? String(record.supply_to).trim() : null;
+                            const destination = record.validity ? String(record.validity).trim() : null;
+                            const validityDate = record.material_load_on ? String(record.material_load_on).trim() : null;
 
                             extractedData = {
+                                slip_date: slipDate,
+                                godown_name: godownName,
                                 cement_type: cementType,
                                 bag_count: bagCount,
+                                block_number: blockNumber,
                                 slip_number: slipNumber,
                                 vehicle_number: vehicleNumberRaw,
-                                customer_name: customerName
+                                dispatch_number: dispatchNumber,
+                                customer_name: customerName,
+                                destination,
+                                validity_date: validityDate,
                             };
 
                             // Boundary validation: never let an out-of-range bag count or
