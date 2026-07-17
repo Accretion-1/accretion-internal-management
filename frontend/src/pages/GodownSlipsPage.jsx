@@ -19,6 +19,7 @@ const UPLOAD_IMAGE_QUALITIES = [0.9, 0.86, 0.82, 0.78];
 
 const buildReviewFormFromSlip = (slip) => ({
     slip_number: slip?.slip_number || '',
+    slip_date: slip?.slip_date || '',
     godown_name: slip?.godown_name || '',
     cement_type: slip?.cement_type || 'UNKNOWN',
     bag_count: slip?.bag_count ?? '',
@@ -31,6 +32,7 @@ const buildReviewFormFromSlip = (slip) => ({
 });
 const normalizeReviewPayload = (form) => ({
     slip_number: form.slip_number.trim() || null,
+    slip_date: form.slip_date || null,
     godown_name: form.godown_name.trim() || null,
     cement_type: form.cement_type || 'UNKNOWN',
     bag_count: form.bag_count === '' ? null : Number(form.bag_count),
@@ -651,6 +653,10 @@ export const GodownSlipsPage = () => {
                                         <span className="font-semibold text-slate-900">{previewSlip.slip_number || '-'}</span>
                                     </div>
                                     <div>
+                                        <span className="block text-xs text-slate-500 mb-1">Slip Date</span>
+                                        <span className="font-semibold text-slate-900">{previewSlip.slip_date || '-'}</span>
+                                    </div>
+                                    <div>
                                         <span className="block text-xs text-slate-500 mb-1">Location details</span>
                                         <span className="font-semibold text-slate-900">
                                             {previewSlip.district 
@@ -701,6 +707,15 @@ export const GodownSlipsPage = () => {
                                                 type="text"
                                                 value={reviewForm.slip_number}
                                                 onChange={(event) => handleReviewFieldChange('slip_number', event.target.value)}
+                                                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-800 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+                                            />
+                                        </label>
+                                        <label className="col-span-2">
+                                            <span className="mb-1 block text-xs text-slate-500">Slip Date</span>
+                                            <input
+                                                type="date"
+                                                value={reviewForm.slip_date}
+                                                onChange={(event) => handleReviewFieldChange('slip_date', event.target.value)}
                                                 className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-800 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
                                             />
                                         </label>
