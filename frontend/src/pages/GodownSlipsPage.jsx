@@ -17,9 +17,28 @@ const UPLOAD_MAX_IMAGE_SIDE = 1800;
 const UPLOAD_TARGET_BYTES = 900 * 1024;
 const UPLOAD_IMAGE_QUALITIES = [0.9, 0.86, 0.82, 0.78];
 
+const normalizeDateInputValue = (value) => {
+    if (!value) return '';
+    const text = String(value).trim();
+    const directDateMatch = text.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (directDateMatch) {
+        return `${directDateMatch[1]}-${directDateMatch[2]}-${directDateMatch[3]}`;
+    }
+
+    const parsed = new Date(text);
+    if (Number.isNaN(parsed.getTime())) {
+        return text;
+    }
+
+    const year = parsed.getUTCFullYear();
+    const month = String(parsed.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(parsed.getUTCDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
 const buildReviewFormFromSlip = (slip) => ({
     slip_number: slip?.slip_number || '',
-    slip_date: slip?.slip_date || '',
+    slip_date: normalizeDateInputValue(slip?.slip_date),
     godown_name: slip?.godown_name || '',
     cement_type: slip?.cement_type || 'UNKNOWN',
     bag_count: slip?.bag_count ?? '',
@@ -32,7 +51,7 @@ const buildReviewFormFromSlip = (slip) => ({
 });
 const normalizeReviewPayload = (form) => ({
     slip_number: form.slip_number.trim() || null,
-    slip_date: form.slip_date || null,
+    slip_date: normalizeDateInputValue(form.slip_date) || null,
     godown_name: form.godown_name.trim() || null,
     cement_type: form.cement_type || 'UNKNOWN',
     bag_count: form.bag_count === '' ? null : Number(form.bag_count),

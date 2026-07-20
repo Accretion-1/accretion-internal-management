@@ -17,7 +17,7 @@ FIELD_PATTERNS = {
     "date":             r"Date\s*:?\s*([0-9]{1,2}[/.\-][0-9]{1,2}[/.\-][0-9]{2,4})",
     "bags_qty":         r"Please\s*Load\s*:?\s*[ \t.]*([0-9]+)",
     "material_type":    r"PPC[\s/]*WPC[\s/]*SUPER\.?[ \t]*([A-Za-z.]*)",
-    "vehicle_no":       r"Vehicle\s*No\.?\s*:?\s*([A-Z0-9]+)",
+    "vehicle_no":       r"Vehicle\s*No\.?\s*:?\s*([A-Z0-9: ]+?)(?:\n|$)",
     "di_no":            r"\bDI\s*:?\s*([0-9]+)",
     "supply_to":        r"Supply\s*to\s*M/?s\.?\s*:?\s*[ \t.]*([A-Za-z0-9 .&/-]*?)(?:\n|$)",
     "validity":         r"Validity\s*of\s*Loading\s*Slip\s*:?\s*[ \t.]*([A-Za-z0-9 .&/-]*?)(?:\n|$)",

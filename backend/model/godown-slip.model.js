@@ -50,6 +50,9 @@ export const getGodownSlips = async (filters, pagination) => {
     params.push(slip_date);
   }
 
+query += ` AND DATE(gs.created_at) = CURDATE()`;
+countQuery += ` AND DATE(gs.created_at) = CURDATE()`;
+
   query += ` ORDER BY gs.created_at DESC LIMIT ? OFFSET ?`;
   
   const results = await db.query(query, [...params, limit, offset]);
