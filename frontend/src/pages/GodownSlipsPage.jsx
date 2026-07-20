@@ -166,6 +166,9 @@ export const GodownSlipsPage = () => {
     const { currentUser } = useAppState();
     const navigate = useNavigate();
     const isPrivileged = currentUser?.role === 'Admin' || currentUser?.role === 'Manager';
+    const userPanelIds = new Set((currentUser?.panels || []).map((panel) => Number(panel.panel_id)));
+    const canAccessTodos = isPrivileged || userPanelIds.has(3);
+    const canAccessGodownSlips = isPrivileged || userPanelIds.has(8);
 
     const [slips, setSlips] = useState([]);
     const [locations, setLocations] = useState([]);
@@ -360,22 +363,26 @@ export const GodownSlipsPage = () => {
 
                 {!isPrivileged && (
                     <div className="flex flex-wrap items-center gap-2">
-                        <button
-                            type="button"
-                            onClick={() => navigate('/todos')}
-                            className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
-                        >
-                            <ArrowLeftRight className="w-4 h-4" />
-                            Go to To-Dos
-                        </button>
-                        <button 
-                            onClick={() => fileInputRef.current?.click()}
-                            disabled={isUploading}
-                            className="inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-sm font-semibold transition-colors disabled:opacity-50"
-                        >
-                            {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <UploadCloud className="w-4 h-4" />}
-                            Upload Slips
-                        </button>
+                        {canAccessTodos && (
+                            <button
+                                type="button"
+                                onClick={() => navigate('/todos')}
+                                className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+                            >
+                                <ArrowLeftRight className="w-4 h-4" />
+                                Go to To-Dos
+                            </button>
+                        )}
+                        {canAccessGodownSlips && (
+                            <button 
+                                onClick={() => fileInputRef.current?.click()}
+                                disabled={isUploading}
+                                className="inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-sm font-semibold transition-colors disabled:opacity-50"
+                            >
+                                {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <UploadCloud className="w-4 h-4" />}
+                                Upload Slips
+                            </button>
+                        )}
                     </div>
                 )}
             </div>

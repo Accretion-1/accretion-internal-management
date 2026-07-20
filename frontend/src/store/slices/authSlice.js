@@ -62,6 +62,16 @@ const authSlice = createSlice({
       state.otpVerified = false;
       state.error = null;
     },
+    syncAuthenticatedUser(state, action) {
+      const user = action.payload || null;
+      state.user = user;
+      state.isAuthenticated = Boolean(user && state.token);
+      if (state.isAuthenticated) {
+        persistAuth(user, state.token);
+      } else {
+        clearStoredAuth();
+      }
+    },
     logout(state) {
       Object.assign(state, initialState, {
         user: null,
@@ -122,5 +132,5 @@ const authSlice = createSlice({
   },
 });
 
-export const { clearAuthError, logout, resetOtpState } = authSlice.actions;
+export const { clearAuthError, logout, resetOtpState, syncAuthenticatedUser } = authSlice.actions;
 export default authSlice.reducer;

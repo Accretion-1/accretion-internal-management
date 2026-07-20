@@ -217,6 +217,8 @@ export const TodoPage = () => {
 
     const isAdminOrManager = currentUser?.role === 'Admin' || currentUser?.role === 'Manager';
     const isUserRole = currentUser?.role === 'User';
+    const userPanelIds = new Set((currentUser?.panels || []).map((panel) => Number(panel.panel_id)));
+    const canAccessGodownSlips = isAdminOrManager || userPanelIds.has(8);
     const isEditMode = Boolean(editingTodo);
 
     const fetchTodos = async () => {
@@ -532,7 +534,7 @@ export const TodoPage = () => {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
-                    {isUserRole && (
+                    {isUserRole && canAccessGodownSlips && (
                         <button
                             id="go-godown-slips-btn"
                             onClick={() => navigate('/godown-slips')}
