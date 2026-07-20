@@ -9,8 +9,12 @@ import { ActivityLoadingBar } from './components/loading/ActivityLoadingBar';
 import { GlobalLoadingOverlay } from './components/loading/GlobalLoadingOverlay';
 import { InstallBanner } from './components/InstallBanner';
 import { useAppSelector } from './store/hooks/reduxHooks';
+import { useAppDispatch } from './store/hooks/reduxHooks';
 import { selectAuthUser, selectIsAuthenticated } from './store/selectors/authSelectors';
+import { syncAuthenticatedUser } from './store/slices/authSlice';
 import { listenForForegroundNotifications, refreshAndSyncFcmToken } from './services/notification.service';
+import apiHandler from './store/api/apiHandler';
+import { API_ENDPOINTS } from './store/api/endpoints';
 // Individual application modules pages
 import { DashboardPage } from './pages/DashboardPage';
 import { UserManagementPage } from './pages/UserManagementPage';
@@ -78,6 +82,13 @@ const AuthStateBridge = () => {
     const authUser = useAppSelector(selectAuthUser);
     const isAuthenticated = useAppSelector(selectIsAuthenticated);
     const { currentUser, setCurrentUser, users } = useAppState();
+    const dispatch = useAppDispatch();
+    const panelsSignature = JSON.stringify(
+        (authUser?.panels || []).map((panel) => ({
+            panel_id: Number(panel.panel_id),
+            panel_name: panel.panel_name || '',
+        })),
+    );
     useEffect(() => {
         if (!isAuthenticated || !authUser) {
             if (currentUser)
@@ -85,13 +96,11 @@ const AuthStateBridge = () => {
             return;
         }
         const authPanels = Array.isArray(authUser.panels) ? authUser.panels : [];
-        if (currentUser?.id === String(authUser.user_id) && (currentUser.panels?.length || 0) === authPanels.length)
-            return;
         const normalizedPhone = String(authUser.phone_number || '').replace(/\D/g, '');
         const existingUser = users.find((user) => user.phone.replace(/\D/g, '') === normalizedPhone);
         const role = `${String(authUser.role || 'USER').charAt(0)}${String(authUser.role || 'USER').slice(1).toLowerCase()}`;
         const panelModules = authPanels.map((panel) => panel.panel_name || String(panel.panel_id));
-        setCurrentUser(existingUser ? {
+        const nextCurrentUser = existingUser ? {
             ...existingUser,
             panels: authPanels,
             assignedModules: panelModules,
@@ -106,8 +115,74 @@ const AuthStateBridge = () => {
             assignedModules: panelModules,
             createdDate: authUser.created_at || new Date().toISOString(),
             lastLogin: new Date().toISOString(),
+        };
+
+        const currentSignature = JSON.stringify({
+            id: currentUser?.id || null,
+            panels: (currentUser?.panels || []).map((panel) => ({
+                panel_id: Number(panel.panel_id),
+                panel_name: panel.panel_name || '',
+            })),
         });
-    }, [authUser, currentUser, isAuthenticated, setCurrentUser, users]);
+        const nextSignature = JSON.stringify({
+            id: nextCurrentUser.id,
+            panels: (nextCurrentUser.panels || []).map((panel) => ({
+                panel_id: Number(panel.panel_id),
+                panel_name: panel.panel_name || '',
+            })),
+        });
+
+        if (currentSignature !== nextSignature) {
+            setCurrentUser(nextCurrentUser);
+        }
+    }, [authUser, currentUser, dispatch, isAuthenticated, panelsSignature, setCurrentUser, users]);
+
+    useEffect(() => {
+        if (!isAuthenticated) return undefined;
+
+        let isMounted = true;
+        let isRefreshing = false;
+
+        const refreshProfile = async () => {
+            if (isRefreshing) return;
+            isRefreshing = true;
+            try {
+                const response = await apiHandler({
+                    method: 'GET',
+                    url: API_ENDPOINTS.USER.PROFILE,
+                    showNotification: false,
+                });
+                const refreshedUser = response?.data || null;
+                if (isMounted && refreshedUser) {
+                    dispatch(syncAuthenticatedUser(refreshedUser));
+                }
+            } catch (error) {
+                if (Number(error?.status) !== 401 && Number(error?.code) !== 401) {
+                    console.warn('Unable to refresh user profile:', error);
+                }
+            } finally {
+                isRefreshing = false;
+            }
+        };
+
+        refreshProfile();
+
+        const handleFocus = () => refreshProfile();
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                refreshProfile();
+            }
+        };
+
+        window.addEventListener('focus', handleFocus);
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        return () => {
+            isMounted = false;
+            window.removeEventListener('focus', handleFocus);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
+    }, [dispatch, isAuthenticated]);
     return null;
 };
 function AppContent() {

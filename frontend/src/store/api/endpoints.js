@@ -6,6 +6,7 @@ export const API_ENDPOINTS = Object.freeze({
   }),
   USER: Object.freeze({
     BASE: "/user",
+    PROFILE: "/user/profile",
     ADD: "/user/add",
     BY_ID: (userId) => `/user/${userId}`,
     UPDATE: (userId) => `/user/update/${userId}`,
