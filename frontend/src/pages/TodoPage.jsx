@@ -11,6 +11,7 @@ import {
     Pencil,
     Plus,
     RefreshCw,
+    ArrowRight,
     Trash2,
     UserRound,
 } from 'lucide-react';
@@ -531,6 +532,17 @@ export const TodoPage = () => {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
+                    {isUserRole && (
+                        <button
+                            id="go-godown-slips-btn"
+                            onClick={() => navigate('/godown-slips')}
+                            className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-blue-700 shadow-xs transition-all hover:bg-blue-100"
+                        >
+                            <ClipboardList className="h-4 w-4" />
+                            Upload Slips
+                            <ArrowRight className="h-4 w-4" />
+                        </button>
+                    )}
                     <button
                         id="refresh-todos-btn"
                         onClick={fetchTodos}
@@ -585,7 +597,6 @@ export const TodoPage = () => {
                     )}
                 </div>
             </div>
-
             <div className="flex flex-col gap-4">
                 {isLoading ? (
                     <div className="flex items-center justify-center rounded-2xl border border-slate-200 bg-white py-16 text-sm font-semibold text-slate-400">
