@@ -208,6 +208,8 @@ class SlipPipeline:
 
         # -- master-list fields (fuzzy-corrected against trusted master data only) --
         for name, cfg in MASTER_FIELD_CONFIG.items():
+            if name == "vehicle_no":
+                continue
             result = self.store.resolve(name, raw_fields.get(name, ""), mutate=False)
             final_fields[name] = result["value"]
             if result["status"] in ("new_candidate", "rejected_invalid_format", "empty",
@@ -239,11 +241,9 @@ class SlipPipeline:
         slip_list = self.store.get("slip_no")
         if not raw_slip_no:
             final_fields["slip_no"] = ""
-            record["_flagged_fields"].append("slip_no")
             record["_slip_no_status"] = "empty"
         elif raw_slip_no in slip_list.confirmed:
             final_fields["slip_no"] = raw_slip_no
-            record["_flagged_fields"].append("slip_no")
             record["_slip_no_status"] = "possible_duplicate_slip"
             record["_notes"].append(f"slip_no '{raw_slip_no}' was already processed before -- "
                                      f"check this isn't the same slip uploaded twice")
@@ -256,10 +256,12 @@ class SlipPipeline:
             raw = raw_fields.get(name, "").strip()
             final_fields[name] = raw
             if not raw:
-                record["_flagged_fields"].append(name)
+                if name != "di_no":
+                    record["_flagged_fields"].append(name)
                 record[f"_{name}_status"] = "empty"
             elif not is_numeric(raw):
-                record["_flagged_fields"].append(name)
+                if name != "di_no":
+                    record["_flagged_fields"].append(name)
                 record[f"_{name}_status"] = "invalid_format"
             else:
                 record[f"_{name}_status"] = "valid"
