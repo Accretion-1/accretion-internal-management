@@ -49,10 +49,30 @@ QUALITY_FIELDS = (
 # ---------------------------------------------------------------------------
 
 VEHICLE_NO_RE = re.compile(r"^[A-Z]{2}\d{1,2}[A-Z]{1,3}\d{3,4}$")
+VEHICLE_NO_EMBEDDED_RE = re.compile(r"[A-Z]{2}\d{1,2}[A-Z]{1,3}\d{3,4}")
 
 
 def is_valid_vehicle_no(v: str) -> bool:
     return bool(VEHICLE_NO_RE.match(v.replace(" ", "").upper()))
+
+
+def normalize_vehicle_no(raw_value: str) -> str:
+    compact = re.sub(r"[^A-Z0-9]", "", (raw_value or "").upper())
+    if not compact:
+        return ""
+    if VEHICLE_NO_RE.match(compact):
+        return compact
+
+    match = VEHICLE_NO_EMBEDDED_RE.search(compact)
+    if match:
+        return match.group(0)
+
+    for end in range(len(compact), 0, -1):
+        candidate = compact[:end]
+        if VEHICLE_NO_RE.match(candidate):
+            return candidate
+
+    return compact
 
 
 def is_nonempty_text(v: str) -> bool:
@@ -211,7 +231,7 @@ class SlipPipeline:
 
         # -- vehicle_no: exact-match tracking + format validation, NOT fuzzy
         # correction (see module-level note on why) --
-        raw_vehicle = raw_fields.get("vehicle_no", "").strip().replace(" ", "").upper()
+        raw_vehicle = normalize_vehicle_no(raw_fields.get("vehicle_no", ""))
         vehicle_list = self.store.get("vehicle_no")
         if not raw_vehicle:
             final_fields["vehicle_no"] = ""
