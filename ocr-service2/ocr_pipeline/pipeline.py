@@ -106,11 +106,11 @@ def _needs_rotation_retry(raw_text: str, raw_fields: dict) -> bool:
 
 
 # Fields that get FUZZY master-list validation/correction/auto-learning.
-# vehicle_no is deliberately NOT here -- see the note above EXACT_MATCH_FIELD_CONFIG.
 MASTER_FIELD_CONFIG = {
     "godown_name":   {"seed": [], "validator": is_nonempty_text},
     "supply_to":     {"seed": [], "validator": is_nonempty_text},
     "material_type": {"seed": ["PPC", "WPC", "SUPER"], "validator": is_nonempty_text},
+    "vehicle_no":    {"seed": [], "validator": is_valid_vehicle_no, "high_threshold": 80.0, "candidate_threshold": 80.0},
 }
 
 # Fields that just need "is this a number" validation, no master list.
@@ -122,20 +122,10 @@ DATE_FIELDS = ["date", "material_load_on"]
 # field_configs so MasterDataStore loads/persists them across restarts,
 # just kept out of MASTER_FIELD_CONFIG so they never enter the fuzzy loop.
 #
-# vehicle_no specifically: tested against real data from this conversation
-# and found that two genuinely DIFFERENT plates from different slips
-# ("MP28GO117" vs "MP28GO717") scored a HIGHER fuzzy-similarity (88.9) than
-# a confirmed real OCR error needing correction ("MP480A0646" ->
-# "MP42AA0646", 80.0). Since a plate's characters are all individually
-# meaningful (unlike a name, where minor spelling noise is expected), fuzzy
-# similarity can't reliably tell "same plate, OCR noise" from "different
-# plate, coincidence" -- and getting this wrong silently misattributes a
-# dispatch to the wrong vehicle. So vehicle_no gets exact-match tracking
-# (like slip_no) plus format validation; anything not an exact match goes
-# to review rather than being auto-corrected.
+# slip_no stays exact-match tracking, while vehicle_no is now fuzzy-matched
+# through MASTER_FIELD_CONFIG after OCR normalization.
 EXACT_MATCH_FIELD_CONFIG = {
     "slip_no":    {"high_threshold": 101},  # >100 = fuzzy match can never fire
-    "vehicle_no": {"high_threshold": 101},
 }
 
 
@@ -229,27 +219,20 @@ class SlipPipeline:
                 )
             record[f"_{name}_status"] = result["status"]
 
-        # -- vehicle_no: exact-match tracking + format validation, NOT fuzzy
-        # correction (see module-level note on why) --
+        # -- vehicle_no: normalized first, then matched against trusted master
+        # data with the configured threshold --
         raw_vehicle = normalize_vehicle_no(raw_fields.get("vehicle_no", ""))
-        vehicle_list = self.store.get("vehicle_no")
+        vehicle_result = self.store.resolve("vehicle_no", raw_vehicle, mutate=False)
+        final_fields["vehicle_no"] = vehicle_result["value"]
+        if vehicle_result["status"] in ("new_candidate", "rejected_invalid_format", "empty", "candidate_incremented"):
+            record["_flagged_fields"].append("vehicle_no")
+        if vehicle_result["status"] == "new_candidate":
+            record["_notes"].append(
+                f"'{vehicle_result['value']}' is not in trusted master data for vehicle_no -- manual review needed"
+            )
         if not raw_vehicle:
             final_fields["vehicle_no"] = ""
-            record["_flagged_fields"].append("vehicle_no")
-            record["_vehicle_no_status"] = "empty"
-        elif raw_vehicle in vehicle_list.confirmed:
-            final_fields["vehicle_no"] = raw_vehicle
-            record["_vehicle_no_status"] = "known_vehicle"
-        elif is_valid_vehicle_no(raw_vehicle):
-            final_fields["vehicle_no"] = raw_vehicle
-            record["_vehicle_no_status"] = "new_vehicle_format_ok"
-            record["_notes"].append(
-                f"'{raw_vehicle}' is a new vehicle number outside trusted master data"
-            )
-        else:
-            final_fields["vehicle_no"] = raw_vehicle
-            record["_flagged_fields"].append("vehicle_no")
-            record["_vehicle_no_status"] = "invalid_format"
+        record["_vehicle_no_status"] = vehicle_result["status"]
 
         # -- slip_no: exact-match duplicate detection --
         raw_slip_no = raw_fields.get("slip_no", "").strip()
