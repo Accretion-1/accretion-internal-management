@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useAppState } from '../contexts/StateContext';
 import {
   Users, UserCheck, Shield, ClipboardList, Package, Bell, TrendingUp, Activity, CheckSquare, Layers, Clock, AlertTriangle, ArrowUpRight, Calendar,
-  MapPin, ChevronLeft, ChevronRight, Image as ImageIcon, Video as VideoIcon, FileText, CheckCircle2, HelpCircle, ExternalLink, RefreshCw, Download
+  MapPin, ChevronLeft, ChevronRight, Image as ImageIcon, Video as VideoIcon, FileText, CheckCircle2, HelpCircle, ExternalLink, RefreshCw, Download,
+  ChevronDown, ChevronUp
 } from 'lucide-react';
 import apiHandler from '../store/api/apiHandler';
 import { API_ENDPOINTS } from '../store/api/endpoints';
@@ -59,6 +60,14 @@ export const DashboardPage = () => {
   const [activeTodoToComplete, setActiveTodoToComplete] = useState(null);
   const [taskStats, setTaskStats] = useState({ total: 0, completed: 0, pending: 0 });
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [expandedTasks, setExpandedTasks] = useState({});
+
+  const toggleTaskExpansion = (taskKey) => {
+    setExpandedTasks((prev) => ({
+      ...prev,
+      [taskKey]: !prev[taskKey],
+    }));
+  };
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -960,118 +969,145 @@ export const DashboardPage = () => {
                     </div>
 
                     {/* Completion Metadata & Files */}
-                    {isCompleted && task.completion && (
-                      <div className="mt-2 pt-3 border-t border-slate-200/60 flex flex-col gap-3">
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
-                          <div className="text-slate-600 font-medium">
-                            Completed by <span className="font-bold text-slate-800">{task.completion.completed_by_user?.full_name || `User #${task.completion.completed_by}`}</span>
-                            {task.completion.completed_by_user?.phone_number && ` (${task.completion.completed_by_user.phone_number})`}
-                          </div>
-                          <div className="text-slate-400 font-mono text-[11px]">
-                            {formatDateTime(task.completion.completed_at)}
-                          </div>
-                        </div>
+                    {isCompleted && task.completion && (() => {
+                      const taskKey = `${task.todo_id}-${task.todo_location_id}`;
+                      const isExpanded = !!expandedTasks[taskKey];
+                      return (
+                        <div className="mt-2 pt-3 border-t border-slate-200/60 flex flex-col gap-3">
+                          {/* Collapsible Header */}
+                          <div
+                            onClick={() => toggleTaskExpansion(taskKey)}
+                            className="flex items-center justify-between gap-4 p-2.5 -mx-2.5 rounded-xl hover:bg-slate-100/80 cursor-pointer select-none transition-all group/toggle border border-transparent hover:border-slate-200/60"
+                          >
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-x-2.5 gap-y-1 text-xs">
+                              <span className="text-slate-600 font-medium">
+                                Completed by <span className="font-bold text-slate-800">{task.completion.completed_by_user?.full_name || `User #${task.completion.completed_by}`}</span>
+                                {task.completion.completed_by_user?.phone_number && ` (${task.completion.completed_by_user.phone_number})`}
+                              </span>
+                              <span className="hidden sm:inline text-slate-300">•</span>
+                              <span className="text-slate-400 font-mono text-[11px]">
+                                {formatDateTime(task.completion.completed_at)}
+                              </span>
+                            </div>
 
-                        {/* Remarks */}
-                        {task.completion.remarks && (
-                          <div className="bg-white p-3 rounded-xl border border-slate-200/60 text-xs">
-                            <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Worker Remarks</p>
-                            <p className="text-slate-700 italic mt-1 font-medium">"{task.completion.remarks}"</p>
-                          </div>
-                        )}
-
-                        {/* Metrics data for Stock or Checkbox type */}
-                        {(task.type === 'stock' || task.type === 'checkbox') && (
-                          <div className="grid gap-2 text-center">
-                            {task.type === 'stock' && (
-                              (task.completion.stock_item_sections || []).map((section) => {
-                                const stockLabel = STOCK_FIELDS.find(([field]) => field === section.stock_name)?.[1] || section.stock_name;
-
-                                return (
-                                <div key={`stock-section-${task.completion.completion_id}-${section.stock_name}`} className="rounded-xl border border-slate-200/60 bg-white p-2 text-left">
-                                  <p className="mb-2 inline-flex rounded-lg bg-blue-50 px-2 py-1 text-[9px] font-extrabold uppercase tracking-wider text-blue-700">
-                                    {stockLabel}
-                                  </p>
-                                  <div className="grid gap-1.5">
-                                    {section.items.map((item, itemIndex) => (
-                                      <div key={item.todo_completion_item_id || `${section.stock_name}-${itemIndex}`} className="flex items-center justify-between rounded-lg bg-slate-50 px-2 py-1.5">
-                                        <p className="text-[8px] font-bold uppercase text-slate-400">Week {Number(item.stock_value || 0) > 0 ? item.week : '-'}</p>
-                                        <p className="text-[11px] font-extrabold text-slate-800">{Number(item.stock_value || 0).toFixed(2)}</p>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                                );
-                              })
-                            )}
-                            {task.type === 'checkbox' && (
-                              <div className="col-span-3 bg-white p-2 rounded-xl border border-slate-200/60">
-                                <p className="text-[9px] font-bold text-slate-400 uppercase">Checklist Responses</p>
-                                <div className="mt-2 grid gap-1.5">
-                                  {(task.completion.checkbox_items_response || []).map((item) => (
-                                    <div key={item.key} className="flex items-center justify-between rounded-lg bg-slate-50 px-2 py-1.5 text-[11px] font-bold text-slate-700">
-                                      <span>{item.label}</span>
-                                      <span className={item.response ? 'text-emerald-600' : 'text-rose-600'}>
-                                        {item.response ? 'Yes' : 'No'}
-                                      </span>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        )}
-
-                        {/* Media attachments */}
-                        {Array.isArray(task.completion.files) && task.completion.files.length > 0 && (
-                          <div className="flex flex-col gap-1.5">
-                            <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Attached Media Files</p>
-                            <div className="flex flex-wrap gap-3">
-                              {task.completion.files.map((file) => {
-                                const fileUrl = getBackendFileUrl(file.file_url);
-                                const isPhoto = file.file_type === 'photo';
-                                const fileName = file.file_name || (isPhoto ? 'photo-attachment' : 'video-attachment');
-
-                                return (
-                                  <div key={file.file_id || file.file_url} className="relative group overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs">
-                                    {isPhoto ? (
-                                      <button
-                                        type="button"
-                                        className="relative block h-20 w-20 cursor-pointer overflow-hidden"
-                                        onClick={() => setActiveAttachment({ url: fileUrl, type: 'photo', name: fileName })}
-                                      >
-                                        <img src={fileUrl} alt={fileName} className="h-full w-full object-cover transition-transform group-hover:scale-105" />
-                                        <div className="absolute inset-0 bg-slate-900/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                          <ImageIcon className="w-5 h-5 text-white filter drop-shadow-md" />
-                                        </div>
-                                      </button>
-                                    ) : (
-                                      <button
-                                        type="button"
-                                        onClick={() => setActiveAttachment({ url: fileUrl, type: 'video', name: fileName })}
-                                        className="flex h-20 w-20 flex-col items-center justify-center p-2 text-center hover:bg-slate-50 transition-colors"
-                                      >
-                                        <VideoIcon className="w-6 h-6 text-violet-500 mb-1" />
-                                        <span className="text-[9px] font-bold text-slate-500 line-clamp-1 w-full px-1">{fileName}</span>
-                                        <ExternalLink className="w-2.5 h-2.5 text-slate-400 mt-0.5" />
-                                      </button>
-                                    )}
-                                    <button
-                                      type="button"
-                                      onClick={() => downloadAttachment(fileUrl, fileName)}
-                                      className="absolute bottom-1 right-1 flex h-7 w-7 items-center justify-center rounded-lg bg-white/95 text-slate-700 shadow-sm ring-1 ring-slate-200 transition-all hover:bg-blue-600 hover:text-white"
-                                      title="Download attachment"
-                                    >
-                                      <Download className="h-3.5 w-3.5" />
-                                    </button>
-                                  </div>
-                                );
-                              })}
+                            <div className="flex items-center gap-1.5 text-slate-400 group-hover/toggle:text-blue-600 transition-colors shrink-0">
+                              <span className="text-[10px] font-extrabold uppercase tracking-wider hidden sm:inline">
+                                {isExpanded ? 'Hide Details' : 'Show Details'}
+                              </span>
+                              {isExpanded ? (
+                                <ChevronUp className="w-4 h-4" />
+                              ) : (
+                                <ChevronDown className="w-4 h-4" />
+                              )}
                             </div>
                           </div>
-                        )}
-                      </div>
-                    )}
+
+                          {/* Collapsible Body */}
+                          {isExpanded && (
+                            <div className="flex flex-col gap-3 pt-1">
+                              {/* Remarks */}
+                              {task.completion.remarks && (
+                                <div className="bg-white p-3 rounded-xl border border-slate-200/60 text-xs">
+                                  <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Worker Remarks</p>
+                                  <p className="text-slate-700 italic mt-1 font-medium">"{task.completion.remarks}"</p>
+                                </div>
+                              )}
+
+                              {/* Metrics data for Stock or Checkbox type */}
+                              {(task.type === 'stock' || task.type === 'checkbox') && (
+                                <div className="grid gap-2 text-center">
+                                  {task.type === 'stock' && (
+                                    (task.completion.stock_item_sections || []).map((section) => {
+                                      const stockLabel = STOCK_FIELDS.find(([field]) => field === section.stock_name)?.[1] || section.stock_name;
+
+                                      return (
+                                        <div key={`stock-section-${task.completion.completion_id}-${section.stock_name}`} className="rounded-xl border border-slate-200/60 bg-white p-2 text-left">
+                                          <p className="mb-2 inline-flex rounded-lg bg-blue-50 px-2 py-1 text-[9px] font-extrabold uppercase tracking-wider text-blue-700">
+                                            {stockLabel}
+                                          </p>
+                                          <div className="grid gap-1.5">
+                                            {section.items.map((item, itemIndex) => (
+                                              <div key={item.todo_completion_item_id || `${section.stock_name}-${itemIndex}`} className="flex items-center justify-between rounded-lg bg-slate-50 px-2 py-1.5">
+                                                <p className="text-[8px] font-bold uppercase text-slate-400">Week {Number(item.stock_value || 0) > 0 ? item.week : '-'}</p>
+                                                <p className="text-[11px] font-extrabold text-slate-800">{Number(item.stock_value || 0).toFixed(2)}</p>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      );
+                                    })
+                                  )}
+                                  {task.type === 'checkbox' && (
+                                    <div className="col-span-3 bg-white p-2 rounded-xl border border-slate-200/60">
+                                      <p className="text-[9px] font-bold text-slate-400 uppercase">Checklist Responses</p>
+                                      <div className="mt-2 grid gap-1.5">
+                                        {(task.completion.checkbox_items_response || []).map((item) => (
+                                          <div key={item.key} className="flex items-center justify-between rounded-lg bg-slate-50 px-2 py-1.5 text-[11px] font-bold text-slate-700">
+                                            <span>{item.label}</span>
+                                            <span className={item.response ? 'text-emerald-600' : 'text-rose-600'}>
+                                              {item.response ? 'Yes' : 'No'}
+                                            </span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* Media attachments */}
+                              {Array.isArray(task.completion.files) && task.completion.files.length > 0 && (
+                                <div className="flex flex-col gap-1.5">
+                                  <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Attached Media Files</p>
+                                  <div className="flex flex-wrap gap-3">
+                                    {task.completion.files.map((file) => {
+                                      const fileUrl = getBackendFileUrl(file.file_url);
+                                      const isPhoto = file.file_type === 'photo';
+                                      const fileName = file.file_name || (isPhoto ? 'photo-attachment' : 'video-attachment');
+
+                                      return (
+                                        <div key={file.file_id || file.file_url} className="relative group overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs">
+                                          {isPhoto ? (
+                                            <button
+                                              type="button"
+                                              className="relative block h-20 w-20 cursor-pointer overflow-hidden"
+                                              onClick={() => setActiveAttachment({ url: fileUrl, type: 'photo', name: fileName })}
+                                            >
+                                              <img src={fileUrl} alt={fileName} className="h-full w-full object-cover transition-transform group-hover:scale-105" />
+                                              <div className="absolute inset-0 bg-slate-900/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                <ImageIcon className="w-5 h-5 text-white filter drop-shadow-md" />
+                                              </div>
+                                            </button>
+                                          ) : (
+                                            <button
+                                              type="button"
+                                              onClick={() => setActiveAttachment({ url: fileUrl, type: 'video', name: fileName })}
+                                              className="flex h-20 w-20 flex-col items-center justify-center p-2 text-center hover:bg-slate-50 transition-colors"
+                                            >
+                                              <VideoIcon className="w-6 h-6 text-violet-500 mb-1" />
+                                              <span className="text-[9px] font-bold text-slate-500 line-clamp-1 w-full px-1">{fileName}</span>
+                                              <ExternalLink className="w-2.5 h-2.5 text-slate-400 mt-0.5" />
+                                            </button>
+                                          )}
+                                          <button
+                                            type="button"
+                                            onClick={() => downloadAttachment(fileUrl, fileName)}
+                                            className="absolute bottom-1 right-1 flex h-7 w-7 items-center justify-center rounded-lg bg-white/95 text-slate-700 shadow-sm ring-1 ring-slate-200 transition-all hover:bg-blue-600 hover:text-white"
+                                            title="Download attachment"
+                                          >
+                                            <Download className="h-3.5 w-3.5" />
+                                          </button>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
                 );
               })}
