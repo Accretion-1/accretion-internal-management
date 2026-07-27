@@ -848,7 +848,7 @@ export const getAdminManagerTodayTodosModel = async ({
       ) tc ON tc.todo_id = t.todo_id AND tc.todo_location_id = tl.todo_location_id
       LEFT JOIN users u_completer ON u_completer.user_id = tc.completed_by
       ${whereSql}
-      ORDER BY t.start_date ASC, t.todo_id ASC, tl.location_id ASC
+      ORDER BY l.district ASC, l.godown ASC, tl.location_id ASC, t.start_date ASC, t.todo_id ASC
       LIMIT ? OFFSET ?
     `;
 
