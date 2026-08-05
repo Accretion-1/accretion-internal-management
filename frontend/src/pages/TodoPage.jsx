@@ -171,6 +171,7 @@ const normalizeTodoUpdatePayload = (form) => {
         is_ocr: form.type === 'photo' ? Boolean(form.is_ocr) : null,
         schedule: form.schedule,
         location_ids: form.location_ids.map((locationId) => Number(locationId)),
+        due_time: form.due_time || null,
         start_date: localDateToUtcISOString(form.start_date),
         is_active: Boolean(form.is_active),
     };
@@ -343,7 +344,7 @@ export const TodoPage = () => {
             nextErrors.start_date = 'Start date cannot be a previous date.';
         }
 
-        if (!isEditMode && !form.due_time) {
+        if (!form.due_time) {
             nextErrors.due_time = 'Due time is required.';
         }
 
@@ -937,21 +938,19 @@ export const TodoPage = () => {
                         {errors.start_date && <span className="text-xs text-rose-600">{errors.start_date}</span>}
                     </div>
 
-                    {!isEditMode && (
-                        <div className="flex flex-col gap-1.5">
-                            <label className="text-xs font-bold text-slate-600">Due Time</label>
-                            <input
-                                type="time"
-                                value={form.due_time}
-                                onChange={(event) => handleChange('due_time', event.target.value)}
-                                className={`rounded-xl border bg-slate-50 px-3.5 py-2.5 text-sm font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-2 ${errors.due_time ? 'border-rose-300 focus:ring-rose-100' : 'border-slate-200 focus:ring-blue-100'}`}
-                            />
-                            {errors.due_time && <span className="text-xs text-rose-600">{errors.due_time}</span>}
-                        </div>
-                    )}
+                    <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-bold text-slate-600">Due Time</label>
+                        <input
+                            type="time"
+                            value={form.due_time}
+                            onChange={(event) => handleChange('due_time', event.target.value)}
+                            className={`rounded-xl border bg-slate-50 px-3.5 py-2.5 text-sm font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-2 ${errors.due_time ? 'border-rose-300 focus:ring-rose-100' : 'border-slate-200 focus:ring-blue-100'}`}
+                        />
+                        {errors.due_time && <span className="text-xs text-rose-600">{errors.due_time}</span>}
+                    </div>
 
                     {isEditMode && (
-                        <label className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5">
+                        <label className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 sm:col-span-2">
                             <span>
                                 <span className="block text-xs font-bold text-slate-600">Todo Status</span>
                                 <span className="block text-xs font-semibold text-slate-400">Toggle active or inactive</span>

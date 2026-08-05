@@ -151,8 +151,13 @@ const normalizeUpdateUserPayload = (payload, existingUser) => {
     normalizedPayload.is_active = payload.is_active === false ? 0 : 1;
   }
 
-  if (existingUser.role === "USER" && Object.prototype.hasOwnProperty.call(payload, "panel_ids")) {
-    normalizedPayload.panel_ids = [...new Set(payload.panel_ids || [])];
+  if (existingUser.role === "USER") {
+    if (Object.prototype.hasOwnProperty.call(payload, "location_id")) {
+      normalizedPayload.location_id = payload.location_id ? Number(payload.location_id) : null;
+    }
+    if (Object.prototype.hasOwnProperty.call(payload, "panel_ids")) {
+      normalizedPayload.panel_ids = [...new Set(payload.panel_ids || [])];
+    }
   }
 
   return normalizedPayload;
@@ -337,6 +342,13 @@ export const updateUserService = async (userId, payload, actorUser) => {
 
       if (phoneNumberExists) {
         throw new ApiError(EXISTS, "Phone number");
+      }
+    }
+
+    if (userPayload.location_id) {
+      const location = await locationModel.getLocationByIdModel(userPayload.location_id);
+      if (isEmpty(location)) {
+        throw new ApiError(NOT_FOUND, "Location");
       }
     }
 

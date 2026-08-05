@@ -30,7 +30,7 @@ const EMPTY_FORM = {
     title: '',
     description: '',
     checkbox_items: [{ key: 'checkbox_1', label: '' }],
-    location_ids: [],
+    due_time: '09:00',
     start_date: '',
     day_of_week: '',
     day_of_month: '',
@@ -187,6 +187,7 @@ const normalizeTodoUpdatePayload = (form) => {
         is_ocr: form.type === 'photo' ? Boolean(form.is_ocr) : null,
         schedule: form.schedule,
         location_ids: form.location_ids.map((locationId) => Number(locationId)),
+        due_time: form.due_time || null,
         start_date: localDateToUtcISOString(form.start_date),
         is_active: Boolean(form.is_active),
     };
@@ -522,6 +523,10 @@ export const TodoDetailPage = () => {
             nextErrors.start_date = 'Start date cannot be a previous date.';
         }
 
+        if (!form.due_time) {
+            nextErrors.due_time = 'Due time is required.';
+        }
+
         if (form.schedule === 'weekly' && !form.day_of_week) {
             nextErrors.day_of_week = 'Day of week is required for weekly tasks.';
         }
@@ -617,6 +622,7 @@ export const TodoDetailPage = () => {
                 }))
                 : [{ key: 'checkbox_1', label: '' }],
             location_ids: todoLocations.map((location) => String(location.location_id)).filter(Boolean),
+            due_time: todo.due_time ? String(todo.due_time).slice(0, 5) : '09:00',
             start_date: getDateInputValue(todo.start_date),
             day_of_week: todo.day_of_week ? String(todo.day_of_week) : '',
             day_of_month: todo.day_of_month ? String(todo.day_of_month) : '',
@@ -1143,6 +1149,17 @@ export const TodoDetailPage = () => {
                             className={`rounded-xl border bg-slate-50 px-3.5 py-2.5 text-sm font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-2 ${errors.start_date ? 'border-rose-300 focus:ring-rose-100' : 'border-slate-200 focus:ring-blue-100'}`}
                         />
                         {errors.start_date && <span className="text-xs text-rose-600">{errors.start_date}</span>}
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-bold text-slate-600">Due Time</label>
+                        <input
+                            type="time"
+                            value={form.due_time}
+                            onChange={(event) => handleChange('due_time', event.target.value)}
+                            className={`rounded-xl border bg-slate-50 px-3.5 py-2.5 text-sm font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-2 ${errors.due_time ? 'border-rose-300 focus:ring-rose-100' : 'border-slate-200 focus:ring-blue-100'}`}
+                        />
+                        {errors.due_time && <span className="text-xs text-rose-600">{errors.due_time}</span>}
                     </div>
 
                     <label className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5">

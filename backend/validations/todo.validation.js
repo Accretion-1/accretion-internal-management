@@ -253,6 +253,7 @@ export const updateTodoSchema = Joi.object({
     .min(1)
     .unique()
     .optional(),
+  due_time: dueTimeValidation.optional(),
   start_date: startDateValidation.optional(),
   day_of_week: Joi.when("schedule", {
     is: "weekly",
@@ -274,6 +275,7 @@ export const updateTodoSchema = Joi.object({
     "schedule",
     "location_id",
     "location_ids",
+    "due_time",
     "start_date",
     "day_of_week",
     "day_of_month",

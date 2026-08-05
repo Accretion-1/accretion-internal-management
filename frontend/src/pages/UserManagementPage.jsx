@@ -142,8 +142,14 @@ export const UserManagementPage = () => {
             }
         }
 
-        if (mode === 'edit' && activeUser?.roleValue === 'USER' && !form.panel_ids.length) {
-            nextErrors.panel_ids = 'Assign at least one panel for user role.';
+        const isUserRole = String(activeUser?.roleValue || activeUser?.role || form.role || '').toUpperCase() === 'USER';
+        if (mode === 'edit' && isUserRole) {
+            if (!form.location_id) {
+                nextErrors.location_id = 'Location is required for user role.';
+            }
+            if (!form.panel_ids.length) {
+                nextErrors.panel_ids = 'Assign at least one panel for user role.';
+            }
         }
 
         setErrors(nextErrors);
@@ -179,7 +185,7 @@ export const UserManagementPage = () => {
             full_name: user.full_name || '',
             phone_number: normalizePhoneNumber(user.phone_number),
             role: user.roleValue,
-            location_id: user.location_id || '',
+            location_id: user.location_id || user.location?.location_id || '',
             panel_ids: user.assignedPanels.map((panel) => panel.panel_id),
             is_active: Boolean(user.is_active),
         });
@@ -244,11 +250,14 @@ export const UserManagementPage = () => {
 
         setIsSaving(true);
         try {
+            const isUserRole = String(activeUser?.roleValue || activeUser?.role || form.role || '').toUpperCase() === 'USER';
             const payload = {
                 full_name: form.full_name.trim(),
                 phone_number: normalizePhoneNumber(form.phone_number),
                 is_active: form.is_active,
-                ...(activeUser.roleValue === 'USER' ? { panel_ids: form.panel_ids } : {}),
+                ...(isUserRole
+                    ? { location_id: form.location_id ? Number(form.location_id) : null, panel_ids: form.panel_ids }
+                    : {}),
             };
 
             const response = await apiHandler({
@@ -588,7 +597,21 @@ export const UserManagementPage = () => {
                         </div>
                     </div>
 
-                    {activeUser?.roleValue === 'USER' && renderPanelPicker()}
+                    {(String(activeUser?.roleValue || activeUser?.role || form.role || '').toUpperCase() === 'USER') && (
+                        <>
+                            <div className="flex flex-col gap-1.5 text-left">
+                                <label className="text-xs font-semibold text-slate-750">Location</label>
+                                <select id="edit-form-location" value={form.location_id} onChange={(event) => setField('location_id', event.target.value)} className="cursor-pointer rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-semibold text-slate-800 focus:outline-none">
+                                    <option value="">Select location</option>
+                                    {locations.map((location) => (
+                                        <option key={location.location_id} value={location.location_id}>{location.district || 'Unnamed'}{location.godown ? ` • ${location.godown}` : ''}</option>
+                                    ))}
+                                </select>
+                                {errors.location_id && <span className="text-[10px] font-semibold text-rose-600">{errors.location_id}</span>}
+                            </div>
+                            {renderPanelPicker()}
+                        </>
+                    )}
                 </div>
             </Modal>
 

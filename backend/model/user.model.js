@@ -151,7 +151,7 @@ export const updateUserDetailsModel = async (userId, payload) => {
   const connection = await db.begin();
 
   try {
-    const userColumns = ["phone_number", "full_name", "is_active"];
+    const userColumns = ["phone_number", "full_name", "is_active", "location_id"];
     const updates = userColumns.filter((column) => Object.prototype.hasOwnProperty.call(payload, column));
 
     if (updates.length) {
