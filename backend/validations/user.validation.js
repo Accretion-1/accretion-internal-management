@@ -61,11 +61,12 @@ export const userIdParamSchema = Joi.object({
 
 export const updateUserSchema = Joi.object({
   phone_number: optionalPhoneNumber.optional(),
+  location_id: Joi.number().integer().positive().allow(null).optional(),
   panel_ids: Joi.array().items(Joi.number().integer().positive()).unique().optional(),
   full_name: Joi.string().trim().allow("", null).optional(),
   is_active: Joi.boolean().optional(),
 })
-  .or("phone_number", "panel_ids", "full_name", "is_active")
+  .or("phone_number", "location_id", "panel_ids", "full_name", "is_active")
   .unknown(false);
 
 export const updateFcmTokenSchema = Joi.object({

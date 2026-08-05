@@ -222,6 +222,10 @@ const normalizeUpdateTodoPayload = (payload) => {
     }
   }
 
+  if (hasOwnValue(payload, "due_time")) {
+    normalized.due_time = normalizeOptionalText(payload.due_time);
+  }
+
   if (hasOwnValue(payload, "start_date")) {
     normalized.start_date = normalizeOptionalDate(payload.start_date);
   }
