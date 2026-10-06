@@ -30,6 +30,7 @@ const EMPTY_FORM = {
     title: '',
     description: '',
     checkbox_items: [{ key: 'checkbox_1', label: '' }],
+    location_ids: [],
     due_time: '09:00',
     start_date: '',
     day_of_week: '',
